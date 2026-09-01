@@ -33,7 +33,7 @@ ARG NETMUXD_REF=ac8da97420c2ab1f05efcf62b3c7aa0f9c596336
 # -----------------------------------------------------------------------------
 # 钉到 bookworm（不用 debian:stable）：① 必须与 netmuxd-builder 的 rust:bookworm 同代，
 # 否则 netmuxd 的 glibc 与 scratch 运行时库不匹配；② 避免 stable 滚动到新版（trixie）破坏构建。
-FROM debian:bookworm@sha256:813017f3d62be4b5891a7acca6a01bdcd4b8513daa81b1ab99d3a50385b26931 AS builder
+FROM debian:bookworm@sha256:6ebd97fa83deb272194a2cf015b3d26a4d538e9ad3a7a79d544c8af5b0a01443 AS builder
 
 # Install basic build tools first（software-properties-common 未使用，已移除）
 RUN apt-get update && apt-get install -y \
@@ -243,7 +243,7 @@ RUN test -n "${IOSBK_BUILD_DATE}" \
 # Stage 4: Dependency analyzer(ldd 收集所有二进制的运行时 .so)
 # -----------------------------------------------------------------------------
 # 同样钉 bookworm：收集的 .so 必须与 builder/netmuxd-builder 同代
-FROM debian:bookworm@sha256:813017f3d62be4b5891a7acca6a01bdcd4b8513daa81b1ab99d3a50385b26931 AS deps-analyzer
+FROM debian:bookworm@sha256:6ebd97fa83deb272194a2cf015b3d26a4d538e9ad3a7a79d544c8af5b0a01443 AS deps-analyzer
 
 ARG TARGETARCH
 
@@ -378,7 +378,7 @@ RUN case "${TARGETARCH}" in \
 # -----------------------------------------------------------------------------
 # Stage 5: Prepare final filesystem
 # -----------------------------------------------------------------------------
-FROM debian:bookworm-slim@sha256:abd67ffcfa541b485a3dff59865ab629aa048a6c613e639d36e7456b0b229241 AS final-prep
+FROM debian:bookworm-slim@sha256:88200866dfff7ea7f5cbcb6ec7c8a701889efe6fe859fe64d6990e4b07ea4171 AS final-prep
 
 # Install minimal runtime dependencies
 RUN apt-get update && \
