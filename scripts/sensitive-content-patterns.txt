@@ -1,0 +1,10 @@
+# rule<TAB>POSIX extended regular expression
+ios-udid-modern	(^|[^0-9A-Fa-f])[0-9A-Fa-f]{8}-[0-9A-Fa-f]{16}([^0-9A-Fa-f]|$)
+ios-udid-legacy-context	(^|[^[:alnum:]_])UDID[[:space:]"'= :]+[0-9A-Fa-f]{40}([^0-9A-Fa-f]|$)
+ios-unique-device-id	(^|[^[:alnum:]_])UniqueDeviceID[[:space:]"'= :]+[0-9A-Fa-f]{40}([^0-9A-Fa-f]|$)
+ios-serial-number	(^|[^[:alnum:]_])(SerialNumber|Serial[[:space:]]+Number|serial_number)[[:space:]"'= :]+[[:alnum:]-]{8,}
+private-key	-----BEGIN[[:space:]]+([A-Z0-9]+[[:space:]]+)?PRIVATE[[:space:]]+KEY-----
+access-token	(^|[^[:alnum:]_])(gh[pousr]_[[:alnum:]]{20,}|github_pat_[[:alnum:]_]{20,}|(api[_-]?key|access[_-]?token|auth[_-]?token)[[:space:]"'= :]+[[:alnum:]_.+/=-]{16,})
+private-domain	(^|[^[:alnum:]-])([[:alnum:]-]+[.])+(internal|corp|lan)([^[:alnum:]-]|$)
+private-project-domain	(^|[^[:alnum:]-])(git[.]isw[.]app|hub[.]isw[.]app)([^[:alnum:]-]|$)
+local-users-path	/Users/[[:alnum:]_.-]+/[^[:space:]"']+

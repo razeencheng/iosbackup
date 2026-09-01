@@ -1,0 +1,76 @@
+{
+  "enabled": true,
+  "telegram_configs": [
+    {
+      "name": "main_bot",
+      "bot_token": "YOUR_BOT_TOKEN_HERE",
+      "chat_id": "YOUR_CHAT_ID_HERE",
+      "enabled": true
+    }
+  ],
+  "email_configs": [
+    {
+      "name": "gmail",
+      "smtp_host": "smtp.gmail.com",
+      "smtp_port": 587,
+      "username": "your_email@gmail.com",
+      "password": "your_app_password",
+      "from": "your_email@gmail.com",
+      "to": "notify_target@gmail.com",
+      "enabled": false
+    },
+    {
+      "name": "qq_mail",
+      "smtp_host": "smtp.qq.com",
+      "smtp_port": 587,
+      "username": "your_qq@qq.com",
+      "password": "your_authorization_code",
+      "from": "your_qq@qq.com",
+      "to": "notify_target@qq.com",
+      "enabled": false
+    }
+  ],
+  "wecom_configs": [
+    {
+      "name": "work_group",
+      "webhook_url": "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=YOUR_WEBHOOK_KEY",
+      "enabled": false
+    }
+  ],
+  "bark_configs": [
+    {
+      "name": "phone",
+      "server_url": "https://api.day.app",
+      "device_key": "YOUR_BARK_DEVICE_KEY",
+      "enabled": false
+    }
+  ],
+  "webhook_configs": [
+    {
+      "name": "custom_webhook",
+      "url": "https://your-webhook-endpoint.com/notifications",
+      "method": "POST",
+      "headers": {
+        "Authorization": "Bearer YOUR_TOKEN",
+        "Content-Type": "application/json"
+      },
+      "enabled": false
+    }
+  ],
+  "notification_rules": {
+    "backup_start": ["Telegram_main_bot"],
+    "backup_success": ["Telegram_main_bot"],
+    "backup_failed": ["Telegram_main_bot", "Email_gmail"],
+    "device_online": [],
+    "device_offline": [],
+    "system_error": ["Telegram_main_bot", "Email_gmail"]
+  },
+  "notification_templates": {
+    "backup_start": "设备 ${device_name} 开始备份",
+    "backup_success": "设备 ${device_name} 备份成功完成",
+    "backup_failed": "设备 ${device_name} 备份失败\n原因: ${reason}",
+    "device_online": "设备 ${device_name} 已连接",
+    "device_offline": "设备 ${device_name} 已断开连接",
+    "system_error": "${content}"
+  }
+} 

@@ -1,0 +1,12 @@
+diff --git a/usbmuxd2/Client.cpp b/usbmuxd2/Client.cpp
+--- a/usbmuxd2/Client.cpp
++++ b/usbmuxd2/Client.cpp
+@@ -107,7 +107,7 @@ void Client::recvData()
+     retassure(readsize, "out of bufspace for client");
+     got = recv(_fd, _recvbuffer+_recvBytesCnt, readsize, 0);
+     if (got == 0) {
+-        retcustomerror(MUXException_client_disconnected, "client %d disconnected!",_fd);
++        throw tihmstar::MUXException_client_disconnected(NULL, NULL, __LINE__, __func__, "client disconnected!");
+     }
+     assure(got > 0);
+     _recvBytesCnt+=got;

@@ -1,0 +1,9 @@
+modern-device=00008110-001234567890801E
+UDID=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+{"UniqueDeviceID":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"}
+SerialNumber: TESTSERIAL0001
+fake-key=-----BEGIN PRIVATE KEY-----
+fake-token=ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmn
+private-service=backup.example.internal
+local-source=/Users/example/private/iosbackup
+ordinary-commit=0123456789abcdef0123456789abcdef01234567

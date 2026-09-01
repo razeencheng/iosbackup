@@ -1,0 +1,11 @@
+archieve/
+lockdown/
+backups/
+/iosbackup
+iosbackup2
+main
+configs/notification_configs.json
+.worktrees/
+coverage.out
+coverage.html
+.DS_Store

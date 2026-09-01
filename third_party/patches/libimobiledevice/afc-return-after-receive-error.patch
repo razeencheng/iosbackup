@@ -1,0 +1,17 @@
+From: iosbackup maintainers
+Subject: afc: return immediately after payload receive failure
+
+The locked upstream revision frees the receive buffer after a failed
+service_receive call but then continues into the short-read checks. That can
+free the same buffer again or use it later in the function.
+
+--- a/src/afc.c
++++ b/src/afc.c
+@@ -313,6 +313,7 @@ static afc_error_t afc_receive_data(afc_client_t client, char **bytes, uint32_t
+ 		if (err != AFC_E_SUCCESS) {
+ 			free(buf);
+ 			debug_info("Failed to receive data: %s (%d)", afc_strerror(err), err);
++			return err;
+ 		}
+ 		if (recv_len <= 0) {
+ 			free(buf);

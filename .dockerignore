@@ -1,0 +1,21 @@
+.git
+.github
+.worktrees
+.DS_Store
+
+# 本机编译和测试产物
+iosbackup
+iosbackup2
+main
+coverage.out
+coverage.html
+*.log
+
+# 运行时数据和秘密绝不能进入构建上下文
+backups
+lockdown
+data
+configs/backup_configs.json
+configs/notification_configs.json
+configs/secrets.enc
+secrets.enc

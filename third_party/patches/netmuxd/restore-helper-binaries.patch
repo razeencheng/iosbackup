@@ -1,0 +1,50 @@
+diff --git a/Cargo.toml b/Cargo.toml
+index d4c7d33..53fc855 100644
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -30,6 +30,14 @@ exclude = [
+ 
+ default-run = "netmuxd"
+ 
++[[bin]]
++name = "passthrough"
++path = "src/passthrough.rs"
++
++[[bin]]
++name = "add_device"
++path = "src/add_device.rs"
++
+ [dependencies]
+ # Wasm-safe subset always on; native pulls the rest via target deps below.
+ tokio = { version = "1", default-features = false, features = [
+diff --git a/src/add_device.rs b/src/add_device.rs
+index 2f179d2..f8a9075 100644
+--- a/src/add_device.rs
++++ b/src/add_device.rs
+@@ -3,7 +3,7 @@
+ 
+ use std::io::{Read, Write};
+ 
+-use netmuxd::raw_packet;
++use idevice::usbmuxd::RawPacket;
+ 
+ const SERVICE_NAME: &str = "apple-mobdev2";
+ const SERVICE_PROTOCOL: &str = "tcp";
+@@ -30,7 +30,7 @@ fn main() {
+     request.insert("IPAddress".into(), ip.to_string().into());
+     request.insert("DeviceID".into(), udid.as_str().into());
+ 
+-    let request = raw_packet::RawPacket::new(request, 69, 69, 69);
++    let request = RawPacket::new(request, 69, 69, 69);
+     let request: Vec<u8> = request.into();
+ 
+     // Connect to the socket
+@@ -63,7 +63,7 @@ fn main() {
+         buffer.append(&mut packet);
+     }
+ 
+-    let parsed: raw_packet::RawPacket = buffer.try_into().unwrap();
++    let parsed: RawPacket = buffer.try_into().unwrap();
+     match parsed.plist.get("Result") {
+         Some(plist::Value::Integer(r)) => {
+             if r.as_unsigned().unwrap() == 1 {

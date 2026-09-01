@@ -1,0 +1,70 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      # actions/checkout v6.1.0
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+      # actions/setup-go v7.0.0
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
+        with:
+          go-version: '1.26.5'
+          cache: true
+      - name: Public repository policy
+        run: ./scripts/check_public_repo.sh --directory .
+      - name: Public policy self-test
+        run: ./scripts/check_public_repo_test.sh
+      - name: Sensitive-content scanner self-test
+        run: ./scripts/check_sensitive_content_test.sh
+      - name: Release manifest parser self-test
+        run: ./scripts/read_release_manifest_test.sh
+      - name: Load validated release metadata
+        run: ./scripts/read_release_manifest.sh release/manifest.env > "$GITHUB_ENV"
+      - name: License verification
+        run: |
+          ./scripts/verify_licensing.sh
+          ./scripts/verify_licensing_test.sh
+          ./scripts/collect_cargo_licenses_test.sh
+      - name: Format
+        run: test -z "$(find cmd internal scripts -type f -name '*.go' -exec gofmt -l {} +)"
+      - name: Standard-library-only module
+        run: test "$(go list -m all)" = "iosbackup"
+      - name: Vet
+        run: go vet ./...
+      - name: Package dependency direction
+        run: go test -count=1 -run '^TestPackageDependencyDirection$' ./internal/app
+      - name: Test
+        run: go test -count=1 ./...
+      - name: Race test
+        run: go test -race -count=1 ./...
+      - name: Static release build
+        shell: bash
+        run: |
+          test -n "$IOSBK_VERSION"
+          test -n "$IOSBK_BUILD_DATE"
+          test -n "$IOSBK_SOURCE_URL"
+          for arch in amd64 arm64; do
+            GOOS=linux GOARCH="$arch" CGO_ENABLED=0 go build -trimpath \
+              -ldflags="-X iosbackup/internal/buildinfo.Version=$IOSBK_VERSION -X iosbackup/internal/buildinfo.BuildDate=$IOSBK_BUILD_DATE -X iosbackup/internal/buildinfo.Commit=$GITHUB_SHA -X iosbackup/internal/buildinfo.SourceURL=$IOSBK_SOURCE_URL" \
+              -o "/tmp/iosbackup-linux-$arch" ./cmd/iosbackup
+          done
+      - name: Vulnerability scan
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@v1.1.4
+          govulncheck ./...

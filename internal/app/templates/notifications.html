@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="iosbk-csrf" content="{{.CSRFToken}}">
+<title>Notifications · iOS Device Backup</title>
+<link rel="icon" href="/static/favicon.ico?v={{.Version}}" type="image/x-icon">
+<style>
+  :root{--iosbk-radius:9px}
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{background:#EDF2F6;color:#213041;font-family:system-ui,-apple-system,'PingFang SC','Microsoft YaHei',sans-serif;-webkit-font-smoothing:antialiased}
+  @keyframes iosbktoast{from{opacity:0;transform:translate(-50%,-8px)}to{opacity:1;transform:translate(-50%,0)}}
+  .hidden{display:none !important}
+  .ui-icon{width:16px;height:16px;display:inline-block;flex:none;vertical-align:-3px;overflow:visible;color:inherit}
+  .iosbk-brand-logo{position:relative;display:block;width:42px;height:42px;flex:none;overflow:hidden;border:1px solid #c5daf6;border-radius:var(--iosbk-radius);background:#eef5ff;box-shadow:0 6px 16px rgba(44,98,198,.16)}
+  .iosbk-brand-logo img{position:absolute;display:block;width:128%;height:128%;max-width:none;left:-14%;top:-14%;object-fit:contain}
+  .iosbk-in{border:1px solid #D8E2EA;border-radius:var(--iosbk-radius);font-size:13.5px;padding:9px 12px;font-family:inherit;color:#213041;background:#fff;outline:none;width:100%}
+  .iosbk-in:focus{border-color:#2C62C6;box-shadow:0 0 0 3px rgba(44,98,198,.14)}
+  .lang-btn{border:none;border-radius:var(--iosbk-radius);padding:6px 11px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap;background:transparent;color:#718090}
+  .lang-btn.active{background:#fff;color:#213041;box-shadow:0 1px 2px rgba(35,52,68,.12)}
+  /* unsaved (dirty) indicator */
+  @keyframes iosbkpulse{0%,100%{opacity:1}50%{opacity:.35}}
+  @keyframes iosbkdirty{0%,100%{box-shadow:0 0 0 3px rgba(224,146,47,.32)}50%{box-shadow:0 0 0 6px rgba(224,146,47,.10)}}
+  .dirty-hint{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;font-weight:600;color:#B45309}
+  .dirty-hint .ddot{width:7px;height:7px;border-radius:50%;background:#E0922F;animation:iosbkpulse 1.4s ease-in-out infinite}
+  .save-dirty{animation:iosbkdirty 1.5s ease-in-out infinite}
+</style>
+</head>
+<body>
+<div style="min-height:100vh;padding:22px 16px 64px">
+<div style="max-width:860px;margin:0 auto">
+
+  <!-- header -->
+  <div style="background:#fff;border:1px solid #D8E2EA;border-radius:var(--iosbk-radius);box-shadow:0 1px 2px rgba(35,52,68,.04);padding:16px 18px;margin-bottom:14px;display:flex;flex-wrap:wrap;gap:13px;align-items:center;justify-content:space-between">
+    <div style="display:flex;align-items:center;gap:12px">
+      <a class="iosbk-brand-logo" href="/" aria-label="返回备份控制台"><img src="/static/logo-mark.png" alt=""></a>
+      <div>
+        <div style="font-size:18px;font-weight:700;letter-spacing:-.01em" data-i18n="notif.title"></div>
+        <div style="font-size:12.5px;color:#6F7E8C;margin-top:2px" data-i18n="notif.subtitle"></div>
+      </div>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+      <div style="display:inline-flex;background:#F3F7FA;border:1px solid #D8E2EA;border-radius:var(--iosbk-radius);padding:3px">
+        <button class="lang-btn" data-lang="en" onclick="setLang('en')">EN</button>
+        <button class="lang-btn" data-lang="zh" onclick="setLang('zh')">中文</button>
+      </div>
+      <a data-back-control href="/" style="display:inline-flex;align-items:center;gap:7px;padding:9px 14px;background:#fff;color:#27384A;border:1px solid #D8E2EA;border-radius:var(--iosbk-radius);font-size:13.5px;font-weight:600;text-decoration:none;font-family:inherit"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-arrow-left"></use></svg><span data-i18n="notif.back"></span></a>
+      <span id="notifDirty" class="dirty-hint hidden"><span class="ddot"></span><span data-i18n="notif.unsaved"></span></span>
+      <button onclick="reloadConfig()" style="display:inline-flex;align-items:center;gap:7px;padding:9px 14px;background:#fff;color:#27384A;border:1px solid #D8E2EA;border-radius:var(--iosbk-radius);font-size:13.5px;font-weight:500;cursor:pointer;font-family:inherit"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-refresh"></use></svg><span data-i18n="notif.reload"></span></button>
+      <button id="notifSaveBtn" onclick="saveConfig()" style="display:inline-flex;align-items:center;gap:7px;padding:9px 16px;background:#2C62C6;color:#fff;border:none;border-radius:var(--iosbk-radius);font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-save"></use></svg><span data-i18n="notif.save"></span></button>
+    </div>
+  </div>
+
+  <!-- master switch -->
+  <div style="background:#fff;border:1px solid #D8E2EA;border-radius:var(--iosbk-radius);padding:16px 18px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;gap:14px">
+    <div><div style="font-size:15px;font-weight:600" data-i18n="notif.masterTitle"></div><div style="font-size:12.5px;color:#6F7E8C;margin-top:3px" data-i18n="notif.masterBody"></div></div>
+    <button id="masterToggle" onclick="toggleMaster()"></button>
+  </div>
+
+  <div id="channelsArea">
+    <div id="channels"></div>
+
+    <!-- rules -->
+    <div style="background:#fff;border:1px solid #D8E2EA;border-radius:var(--iosbk-radius);padding:18px;margin-bottom:14px">
+      <div style="font-size:15px;font-weight:600" data-i18n="notif.rulesTitle"></div>
+      <div style="font-size:12.5px;color:#6F7E8C;margin-top:3px;margin-bottom:14px" data-i18n="notif.rulesBody"></div>
+      <div id="rules" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px"></div>
+    </div>
+
+    <div style="background:#fff;border:1px solid #D8E2EA;border-radius:var(--iosbk-radius);padding:18px;margin-bottom:14px">
+      <div style="font-size:15px;font-weight:600" data-i18n="notif.templatesTitle"></div>
+      <div style="font-size:12.5px;color:#6F7E8C;margin-top:3px;margin-bottom:5px" data-i18n="notif.templatesBody"></div>
+      <div style="font-size:12px;color:#718090;margin-bottom:14px"><code>${title}</code> · <code>${content}</code> · <code>${device_name}</code> · <code>${device_udid}</code> · <code>${timestamp}</code> · <code>${type}</code> · <code>${level}</code> · <code>${reason}</code></div>
+      <div id="templates" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px"></div>
+    </div>
+
+    <!-- test -->
+    <div style="background:#fff;border:1px solid #D8E2EA;border-radius:var(--iosbk-radius);padding:18px;display:flex;flex-wrap:wrap;gap:14px;align-items:center;justify-content:space-between">
+      <div style="flex:1;min-width:200px"><div style="font-size:15px;font-weight:600" data-i18n="notif.testTitle"></div><div style="font-size:12.5px;color:#6F7E8C;margin-top:3px" data-i18n="notif.testBody"></div></div>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <select id="testType" class="iosbk-in" style="width:auto;min-width:150px"><option value="backup_start" data-i18n="notif.evtStart"></option><option value="backup_success" data-i18n="notif.evtSuccess"></option><option value="backup_failed" data-i18n="notif.evtFailed"></option><option value="device_online" data-i18n="notif.evtOnline"></option><option value="device_offline" data-i18n="notif.evtOffline"></option><option value="system_error" data-i18n="notif.evtError"></option></select>
+        <button onclick="testNotification()" style="display:inline-flex;align-items:center;gap:8px;padding:9px 16px;background:#2E7D5B;color:#fff;border:none;border-radius:var(--iosbk-radius);font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-send"></use></svg><span data-i18n="notif.test"></span></button>
+      </div>
+    </div>
+
+    <div style="display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:12px;padding:14px 2px 0">
+      <span id="notifBottomDirty" class="dirty-hint hidden"><span class="ddot"></span><span data-i18n="notif.unsaved"></span></span>
+      <button id="notifBottomSaveBtn" onclick="saveConfig()" style="display:inline-flex;align-items:center;gap:7px;padding:9px 16px;background:#2C62C6;color:#fff;border:none;border-radius:var(--iosbk-radius);font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-save"></use></svg><span data-i18n="notif.save"></span></button>
+    </div>
+  </div>
+
+  <div style="text-align:center;margin-top:24px"><a href="/" style="display:inline-flex;align-items:center;gap:5px;color:#6F7E8C;text-decoration:none;font-size:12.5px"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-arrow-left"></use></svg><span data-i18n="common.console"></span></a></div>
+
+</div>
+<footer style="max-width:860px;margin:22px auto 0;text-align:center;color:#718090;font-size:12px">
+  iOS Backup {{.Version}} · <a href="{{.SourceURL}}/tree/{{.Commit}}" rel="noreferrer" style="color:#5B6F91">Source {{.Commit}}</a> · AGPL-3.0-only
+</footer>
+</div>
+
+<div id="toast" class="hidden" style="position:fixed;left:50%;top:14px;transform:translateX(-50%);z-index:70;background:#213041;color:#fff;padding:12px 18px;border-radius:var(--iosbk-radius);font-size:13.5px;font-weight:500;box-shadow:0 14px 30px -10px rgba(35,52,68,.5);display:flex;align-items:center;gap:9px">
+  <svg id="toastIcon" class="ui-icon" style="color:#5FD0A0" aria-hidden="true"><use href="/static/ui-icons.svg#icon-check-circle"></use></svg><span id="toastMsg"></span>
+</div>
+
+<script>
+/* ============== bilingual dictionary (notif subtree, verbatim from i18n.js) ============== */
+const IOSBK_DICT = {
+  notif: { unsaved:{zh:"有未保存的修改",en:"Unsaved changes"}, title:{zh:"通知设置",en:"Notifications"}, subtitle:{zh:"备份成功、失败等事件发生时，把消息发到你常用的地方。",en:"Get a message where you want it when backups succeed, fail, and more."}, back:{zh:"返回",en:"Back"}, reload:{zh:"重新加载",en:"Reload"}, save:{zh:"保存",en:"Save"}, saved:{zh:"已保存",en:"Saved"}, masterTitle:{zh:"启用通知",en:"Enable notifications"}, masterBody:{zh:"关闭后，下面所有渠道都不会发送。",en:"When off, none of the channels below will send."}, add:{zh:"添加",en:"Add"}, remove:{zh:"删除",en:"Remove"}, removeConfirm:{zh:"删除这个配置？",en:"Delete this entry?"}, configName:{zh:"名称",en:"Name"}, test:{zh:"发送测试通知",en:"Send test"}, testTitle:{zh:"测试",en:"Test"}, testBody:{zh:"发一条测试消息，确认配置无误。",en:"Send a test message to confirm everything's wired up."}, testSent:{zh:"测试通知已发送，请到对应渠道查看。",en:"Test sent — check the channel."}, tg:{zh:"Telegram",en:"Telegram"}, tgDesc:{zh:"通过 Telegram 机器人发送。",en:"Send via a Telegram bot."}, email:{zh:"邮件",en:"Email"}, emailDesc:{zh:"通过 SMTP 发送邮件。",en:"Send email over SMTP."}, wecom:{zh:"企业微信",en:"WeCom"}, wecomDesc:{zh:"通过企业微信群机器人发送。",en:"Send via a WeCom group bot."}, bark:{zh:"Bark",en:"Bark"}, barkDesc:{zh:"通过 Bark 推送到 iPhone。",en:"Push to iPhone through Bark."}, webhook:{zh:"Webhook",en:"Webhook"}, webhookDesc:{zh:"发送到你自定义的 HTTP 地址。",en:"POST to your own HTTP endpoint."}, botToken:{zh:"Bot Token",en:"Bot Token"}, chatId:{zh:"Chat ID",en:"Chat ID"}, smtpHost:{zh:"SMTP 主机",en:"SMTP host"}, smtpPort:{zh:"端口",en:"Port"}, username:{zh:"用户名",en:"Username"}, password:{zh:"密码",en:"Password"}, from:{zh:"发件人",en:"From"}, to:{zh:"收件人",en:"To"}, serverUrl:{zh:"服务器地址",en:"Server URL"}, deviceKey:{zh:"设备 Key",en:"Device Key"}, url:{zh:"地址 URL",en:"URL"}, method:{zh:"请求方法",en:"Method"}, rulesTitle:{zh:"通知规则",en:"Notification rules"}, rulesBody:{zh:"选择每种事件要发到哪些渠道。",en:"Choose which channels each event goes to."}, templatesTitle:{zh:"消息模板",en:"Message templates"}, templatesBody:{zh:"按事件自定义通知正文；留空时使用内建默认模板。",en:"Customize the message body per event; blank uses the built-in default."}, evtStart:{zh:"备份开始",en:"Backup started"}, evtSuccess:{zh:"备份成功",en:"Backup succeeded"}, evtFailed:{zh:"备份失败",en:"Backup failed"}, evtOnline:{zh:"设备上线",en:"Device online"}, evtOffline:{zh:"设备离线",en:"Device offline"}, evtError:{zh:"系统错误",en:"System error"}, none:{zh:"未配置任何渠道",en:"No channels configured"} },
+  common: { console:{zh:"备份控制台",en:"Console"}, logout:{zh:"退出登录",en:"Sign out"} }
+};
+
+function dpath(o,p){return p.split('.').reduce(function(a,k){return a&&a[k];},o);}
+let lang;
+try{ lang = localStorage.getItem('iosbk_lang') || ((navigator.language||'en').toLowerCase().indexOf('zh')===0?'zh':'en'); }catch(e){ lang='en'; }
+function tr(key){ var n=dpath(IOSBK_DICT,key); return n?(n[lang]||n.en):key; }
+function L(zh,en){ return lang==='zh'?zh:en; }
+function applyI18n(){
+  document.querySelectorAll('[data-i18n]').forEach(function(el){ var n=dpath(IOSBK_DICT,el.getAttribute('data-i18n')); if(n) el.textContent=n[lang]||n.en; });
+  document.documentElement.lang = lang==='zh'?'zh-CN':'en';
+  document.querySelectorAll('.lang-btn').forEach(function(b){ b.classList.toggle('active', b.dataset.lang===lang); });
+}
+function setLang(l){ lang=l; try{ localStorage.setItem('iosbk_lang',l); }catch(e){} applyI18n(); render(); }
+
+let toastTimer;
+function iconHTML(name){ return '<svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-'+name+'"></use></svg>'; }
+function toast(msg,isErr){ var box=document.getElementById('toast'),icon=document.getElementById('toastIcon'),use=icon.querySelector('use'); document.getElementById('toastMsg').textContent=msg; if(use) use.setAttribute('href','/static/ui-icons.svg#icon-'+(isErr?'alert':'check-circle')); icon.style.color=isErr?'#FF8A80':'#5FD0A0'; box.classList.remove('hidden'); box.style.animation='iosbktoast .25s ease'; clearTimeout(toastTimer); toastTimer=setTimeout(function(){ box.classList.add('hidden'); },2600); }
+
+const IOSBK_CSRF=(document.querySelector('meta[name="iosbk-csrf"]')||{}).content||'';
+function csrfFetch(url,opts){ opts=opts||{}; opts.headers=Object.assign({'X-IOSBK-CSRF':IOSBK_CSRF},opts.headers||{}); return fetch(url,opts); }
+function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+/* ============== config state ============== */
+let cfg = { enabled:true, telegram_configs:[], email_configs:[], wecom_configs:[], bark_configs:[], webhook_configs:[], notification_rules:{}, notification_templates:{} };
+
+const CHANNELS = [
+  { key:'telegram_configs', type:'Telegram', titleKey:'notif.tg', descKey:'notif.tgDesc', icon:'telegram', color:'#2C62C6', soft:'#EAF1FC', border:'#C5DAF6', dn:'telegram',
+    fields:[{k:'name',lbl:'notif.configName',type:'text'},{k:'bot_token',lbl:'notif.botToken',type:'password',ph:'123456:ABC…',secret:true},{k:'chat_id',lbl:'notif.chatId',type:'text',ph:'-100…'}] },
+  { key:'email_configs', type:'Email', titleKey:'notif.email', descKey:'notif.emailDesc', icon:'mail', color:'#9F231C', soft:'#FBEBE9', border:'#F1C9C5', dn:'email',
+    fields:[{k:'name',lbl:'notif.configName',type:'text'},{k:'smtp_host',lbl:'notif.smtpHost',type:'text',ph:'smtp.gmail.com'},{k:'smtp_port',lbl:'notif.smtpPort',type:'number',ph:'587'},{k:'username',lbl:'notif.username',type:'text'},{k:'password',lbl:'notif.password',type:'password',secret:true},{k:'from',lbl:'notif.from',type:'text'},{k:'to',lbl:'notif.to',type:'text'}] },
+  { key:'wecom_configs', type:'Wecom', titleKey:'notif.wecom', descKey:'notif.wecomDesc', icon:'message', color:'#0B7565', soft:'#E2F3EF', border:'#B9E2DA', dn:'wecom',
+    fields:[{k:'name',lbl:'notif.configName',type:'text'},{k:'webhook_url',lbl:'notif.url',type:'password',ph:'https://qyapi.weixin.qq.com/…',secret:true}] },
+  { key:'bark_configs', type:'Bark', titleKey:'notif.bark', descKey:'notif.barkDesc', icon:'bell', color:'#D26A24', soft:'#FFF0E5', border:'#F3D0B8', dn:'bark',
+    fields:[{k:'name',lbl:'notif.configName',type:'text'},{k:'server_url',lbl:'notif.serverUrl',type:'text',ph:'https://api.day.app'},{k:'device_key',lbl:'notif.deviceKey',type:'password',ph:'your-device-key',secret:true}] },
+  { key:'webhook_configs', type:'Webhook', titleKey:'notif.webhook', descKey:'notif.webhookDesc', icon:'webhook', color:'#6B4FB8', soft:'#EFEAF8', border:'#D6C9EE', dn:'webhook',
+    fields:[{k:'name',lbl:'notif.configName',type:'text'},{k:'method',lbl:'notif.method',type:'text',ph:'POST'},{k:'url',lbl:'notif.url',type:'password',ph:'https://…',secret:true}] }
+];
+
+const RULE_DEFS = [
+  { rk:'backup_start', lbl:'notif.evtStart', icon:'play', color:'#6F7E8C' },
+  { rk:'backup_success', lbl:'notif.evtSuccess', icon:'check-circle', color:'#2E7D5B' },
+  { rk:'backup_failed', lbl:'notif.evtFailed', icon:'x-circle', color:'#BD2C24' },
+  { rk:'device_online', lbl:'notif.evtOnline', icon:'wifi', color:'#0B7565' },
+  { rk:'device_offline', lbl:'notif.evtOffline', icon:'power', color:'#718090' },
+  { rk:'system_error', lbl:'notif.evtError', icon:'alert', color:'#B45309' }
+];
+
+function notifierNames(){
+  var out=[];
+  CHANNELS.forEach(function(ch){ (cfg[ch.key]||[]).forEach(function(e){ if(e.enabled && e.name) out.push(ch.type+'_'+e.name); }); });
+  return out;
+}
+
+/* ============== unsaved (dirty) tracking ============== */
+let notifDirty=false;
+function markNotifDirty(){ notifDirty=true; ['notifDirty','notifBottomDirty'].forEach(function(id){ var h=document.getElementById(id); if(h) h.classList.remove('hidden'); }); ['notifSaveBtn','notifBottomSaveBtn'].forEach(function(id){ var b=document.getElementById(id); if(b) b.classList.add('save-dirty'); }); }
+function clearNotifDirty(){ notifDirty=false; ['notifDirty','notifBottomDirty'].forEach(function(id){ var h=document.getElementById(id); if(h) h.classList.add('hidden'); }); ['notifSaveBtn','notifBottomSaveBtn'].forEach(function(id){ var b=document.getElementById(id); if(b) b.classList.remove('save-dirty'); }); }
+
+/* ============== mutations ============== */
+function addEntry(key, dn){ cfg[key]=(cfg[key]||[]).concat([{ name:dn, enabled:true }]); markNotifDirty(); render(); }
+function removeEntry(key, i){ if(!confirm(tr('notif.removeConfirm'))) return; cfg[key]=cfg[key].filter(function(_,idx){return idx!==i;}); markNotifDirty(); render(); }
+function toggleEntry(key, i){ cfg[key]=cfg[key].map(function(e,idx){ return idx===i?Object.assign({},e,{enabled:!e.enabled}):e; }); markNotifDirty(); render(); }
+function setField(key, i, fk, val, isSecret){ var e=cfg[key][i]; if(!e) return; e[fk]=(fk==='smtp_port')?(parseInt(val)||0):val; if(isSecret){ e.replace_secret=val!==''; e.clear_secret=false; } markNotifDirty(); if(fk==='name') syncNotifierNameUI(key,i); }
+function clearEntrySecret(key,i){ var e=cfg[key][i]; if(!e) return; e.clear_secret=true; e.replace_secret=false; e.enabled=false; ['bot_token','password','webhook_url','device_key','url'].forEach(function(k){if(k in e)e[k]='';}); e.configured=false; markNotifDirty(); render(); }
+function toggleMaster(){ cfg.enabled=!cfg.enabled; markNotifDirty(); render(); }
+function toggleRule(rk, name){ var cur=cfg.notification_rules[rk]||[]; cfg.notification_rules[rk]=cur.indexOf(name)>=0?cur.filter(function(n){return n!==name;}):cur.concat([name]); markNotifDirty(); render(); }
+
+function syncNotifierNameUI(key,i){
+  var e=cfg[key]&&cfg[key][i], ch=null;
+  if(!e) return;
+  CHANNELS.forEach(function(item){ if(item.key===key) ch=item; });
+  var title=document.getElementById('channelTitle-'+key+'-'+i);
+  if(title&&ch) title.textContent=tr(ch.titleKey)+' · '+(e.name||('#'+(i+1)));
+  renderRules();
+}
+
+function renderRules(){
+  var names=notifierNames();
+  var rules_html = RULE_DEFS.map(function(rd){
+    var sel=cfg.notification_rules[rd.rk]||[];
+    var chips = names.length ? names.map(function(n){
+      var on=sel.indexOf(n)>=0;
+      var st='border:1px solid '+(on?'#2C62C6':'#D8E2EA')+';background:'+(on?'#EAF1FC':'#fff')+';color:'+(on?'#2356B8':'#718090')+';border-radius:var(--iosbk-radius);padding:5px 11px;font-size:11.5px;font-weight:600;cursor:pointer;font-family:inherit;';
+      return '<button onclick="toggleRule(\''+rd.rk+'\',&quot;'+esc(n)+'&quot;)" style="'+st+'">'+esc(n)+'</button>';
+    }).join('') : '<button style="border:1px dashed #D8E2EA;background:#FBFCFD;color:#ADB9C2;border-radius:var(--iosbk-radius);padding:5px 11px;font-size:11.5px;cursor:default;font-family:inherit;font-style:italic">'+tr('notif.none')+'</button>';
+    return '<div style="border:1px solid #E7EDF2;border-radius:var(--iosbk-radius);padding:13px;background:#FBFCFD">'+
+      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:9px;color:'+rd.color+'">'+iconHTML(rd.icon)+'<span style="font-size:13px;font-weight:600;color:#213041">'+tr(rd.lbl)+'</span></div>'+
+      '<div style="display:flex;flex-wrap:wrap;gap:6px">'+chips+'</div>'+
+    '</div>';
+  }).join('');
+  document.getElementById('rules').innerHTML = rules_html;
+}
+
+function setTemplate(eventType, value){ cfg.notification_templates[eventType]=value; markNotifDirty(); }
+
+function renderTemplates(){
+  var templates=cfg.notification_templates||{};
+  var html=RULE_DEFS.map(function(rd){
+    var value=templates[rd.rk]||'';
+    return '<label style="border:1px solid #E7EDF2;border-radius:var(--iosbk-radius);padding:13px;background:#FBFCFD">'+
+      '<span style="display:block;font-size:13px;font-weight:600;color:#213041;margin-bottom:8px">'+tr(rd.lbl)+'</span>'+
+      '<textarea class="iosbk-in" rows="3" oninput="setTemplate(\''+rd.rk+'\',this.value)" style="resize:vertical;line-height:1.5">'+esc(value)+'</textarea>'+
+    '</label>';
+  }).join('');
+  document.getElementById('templates').innerHTML=html;
+}
+
+/* ============== render ============== */
+function render(){
+  document.getElementById('masterToggle').outerHTML =
+    '<button id="masterToggle" onclick="toggleMaster()" style="width:46px;height:26px;flex:none;border-radius:999px;border:none;cursor:pointer;padding:0;position:relative;background:'+(cfg.enabled?'#2C62C6':'#CAD5DE')+'"><span style="position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(35,52,68,.3);transition:transform .15s;transform:translateX('+(cfg.enabled?'20px':'0')+')"></span></button>';
+  document.getElementById('channelsArea').style.cssText = cfg.enabled ? '' : 'opacity:.5;pointer-events:none;';
+
+  var ch_html = CHANNELS.map(function(ch){
+    var entries=(cfg[ch.key]||[]);
+    var entriesHtml = entries.map(function(e,i){
+      var fields = ch.fields.map(function(f){
+		var ph=(f.secret&&e.configured)?L('已配置；留空即保留','Configured; leave blank to keep'):(f.ph||'');
+        return '<div><label style="display:block;font-size:11.5px;color:#6F7E8C;margin-bottom:4px;font-weight:500">'+tr(f.lbl)+'</label>'+
+		  '<input type="'+f.type+'" value="'+esc(e[f.k])+'" placeholder="'+esc(ph)+'" oninput="setField(\''+ch.key+'\','+i+',\''+f.k+'\',this.value,'+(f.secret?'true':'false')+')" class="iosbk-in"></div>';
+      }).join('');
+      var tg='<button onclick="toggleEntry(\''+ch.key+'\','+i+')" style="width:42px;height:24px;flex:none;border-radius:999px;border:none;cursor:pointer;padding:0;position:relative;background:'+(e.enabled?'#2E7D5B':'#CAD5DE')+'"><span style="position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(35,52,68,.3);transition:transform .15s;transform:translateX('+(e.enabled?'18px':'0')+')"></span></button>';
+      return '<div style="border:1px solid #E7EDF2;border-radius:var(--iosbk-radius);padding:14px;margin-top:12px;background:#FBFCFD">'+
+        '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">'+
+          '<span id="channelTitle-'+ch.key+'-'+i+'" style="font-size:12.5px;font-weight:600;color:#607181">'+esc(tr(ch.titleKey)+' · '+(e.name||('#'+(i+1))))+'</span>'+
+		  '<div style="display:flex;align-items:center;gap:12px">'+(e.configured?'<button onclick="clearEntrySecret(\''+ch.key+'\','+i+')" style="background:none;border:none;color:#B45309;cursor:pointer;font-size:12px">'+L('清除密钥','Clear secret')+'</button>':'')+tg+
+            '<button onclick="removeEntry(\''+ch.key+'\','+i+')" style="display:inline-flex;align-items:center;justify-content:center;background:none;border:none;color:#BD2C24;cursor:pointer;padding:4px">'+iconHTML('trash')+'</button>'+
+          '</div>'+
+        '</div>'+
+        '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px">'+fields+'</div>'+
+      '</div>';
+    }).join('');
+    var emptyHtml = entries.length===0 ? '<div style="font-size:12.5px;color:#ADB9C2;font-style:italic;padding:12px 2px 2px">'+L('尚未添加，点右上「添加」。','None yet — tap “Add”.')+'</div>' : '';
+    return '<div style="background:#fff;border:1px solid #D8E2EA;border-radius:var(--iosbk-radius);padding:16px 18px;margin-bottom:14px">'+
+      '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:4px">'+
+        '<div style="display:flex;align-items:center;gap:12px">'+
+          '<span style="width:38px;height:38px;flex:none;border-radius:var(--iosbk-radius);display:flex;align-items:center;justify-content:center;background:'+ch.soft+';border:1px solid '+ch.border+';color:'+ch.color+'">'+iconHTML(ch.icon)+'</span>'+
+          '<div><div style="font-size:15px;font-weight:600">'+tr(ch.titleKey)+'</div><div style="font-size:12.5px;color:#6F7E8C">'+tr(ch.descKey)+'</div></div>'+
+        '</div>'+
+        '<button onclick="addEntry(\''+ch.key+'\',\''+ch.dn+'\')" style="display:inline-flex;align-items:center;gap:7px;padding:8px 13px;background:#EAF1FC;color:#2356B8;border:1px solid #C5DAF6;border-radius:var(--iosbk-radius);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">'+iconHTML('plus')+tr('notif.add')+'</button>'+
+      '</div>'+entriesHtml+emptyHtml+
+    '</div>';
+  }).join('');
+  document.getElementById('channels').innerHTML = ch_html;
+  renderRules();
+  renderTemplates();
+}
+
+/* ============== load / save / test ============== */
+function loadConfig(){
+  fetch('/api/notifications/config').then(function(r){return r.json();}).then(function(data){
+    if(data && !data.error){
+      cfg = {
+        enabled: data.enabled!==false,
+        telegram_configs: data.telegram_configs||[],
+        email_configs: data.email_configs||[],
+        wecom_configs: data.wecom_configs||[],
+        bark_configs: data.bark_configs||[],
+        webhook_configs: data.webhook_configs||[],
+        notification_rules: data.notification_rules || {},
+        notification_templates: data.notification_templates || {}
+      };
+    }
+    clearNotifDirty(); // 刚从服务端载入 = 干净状态
+    render();
+  }).catch(function(){ render(); });
+}
+function reloadConfig(){ loadConfig(); toast(L('已重新加载','Reloaded')); }
+function saveConfig(){
+  csrfFetch('/api/notifications/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(cfg)})
+    .then(function(r){return r.json();}).then(function(data){ if(data.error){ toast(L('保存失败：','Save failed: ')+data.error,true); } else { clearNotifDirty(); toast(tr('notif.saved')); loadConfig(); } }).catch(function(e){ toast(L('保存失败：','Save failed: ')+e,true); });
+}
+function testNotification(){
+  var mt=document.getElementById('testType').value;
+  csrfFetch('/api/notifications/test',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message_type:mt})})
+    .then(function(r){return r.json();}).then(function(data){ toast(data.error?(L('测试失败：','Test failed: ')+data.error):tr('notif.testSent'), !!data.error); }).catch(function(e){ toast(L('测试失败：','Test failed: ')+e,true); });
+}
+
+window.addEventListener('DOMContentLoaded', function(){ applyI18n(); loadConfig(); });
+window.addEventListener('beforeunload', function(e){ if(notifDirty){ e.preventDefault(); e.returnValue=''; } });
+</script>
+</body>
+</html>

@@ -1,0 +1,6 @@
+*.patch -whitespace
+# Preserve exact upstream bytes for the three official SPDX texts that contain
+# intentional trailing spaces. Their SHA-256 values are locked and verified.
+third_party/licenses/BSD-2-Clause.txt -text -whitespace
+third_party/licenses/BSD-3-Clause.txt -text -whitespace
+third_party/licenses/MPL-2.0.txt -text -whitespace

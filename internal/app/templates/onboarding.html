@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <meta name="theme-color" content="#edf4f8">
+  <title>iOS Backup · 首次使用向导</title>
+  <link rel="icon" href="/static/favicon.ico?v={{.Version}}">
+  <link rel="stylesheet" href="/static/onboarding.css">
+  <style>.toast[hidden]{display:none!important}</style>
+</head>
+<body data-csrf="{{.CSRFToken}}" data-version="{{.Version}}">
+  <main class="app">
+    <div class="toast" id="toast" role="status" aria-live="polite" hidden><span></span><b id="toastText"></b></div>
+    <div class="wrap">
+      <header class="topbar">
+        <div class="top-row">
+          <a class="brand" href="/" aria-label="返回 iOS Backup 首页">
+            <span class="brand-mark"><img src="/static/onboarding-logo.png" alt=""></span>
+            <span class="brand-copy"><b>iOS Backup</b><span id="brandSub">回到家连上 Wi-Fi，就自动备份你的 iPhone 和 iPad。</span></span>
+          </a>
+          <div class="header-actions">
+            <span class="connection-badge" id="connectionBadge"><i></i><span>正在连接服务</span></span>
+            <div class="lang" aria-label="Language"><button type="button" data-lang="en">EN</button><button type="button" data-lang="zh" class="active">中文</button></div>
+            <a class="home-button" href="/" id="backConsole">返回控制台</a>
+          </div>
+        </div>
+        <div class="status-row"><span id="liveText">实时状态连接中</span><span id="tzText">北京时间 (UTC+8)</span><span class="version">{{.Version}}</span></div>
+      </header>
+
+      <section class="hero">
+        <div class="hero-main">
+          <div class="hero-copy"><div class="eyebrow">FIRST SETUP</div><h1 id="heroTitle">让这台 iPhone 开始在家自动备份</h1><p id="heroLead">第一次只需完成一次 USB 配对。系统会告诉你下一步做什么，并自动识别连接和备份状态。</p></div>
+          <div class="hero-art"><img src="/static/onboarding-empty-device.png" alt=""></div>
+        </div>
+        <div class="hero-meta"><b id="progressLabel">首次设置进度</b><div class="progress-track"><div class="progress-fill" id="progressFill"></div></div><strong id="progressCount">0 / 4 步</strong></div>
+      </section>
+
+      <section class="wizard">
+        <aside class="step-rail">
+          <div class="step-list" id="stepList">
+            <button type="button" class="step-row active" data-step="0"><span class="step-index">1</span><span><b data-step-title="0">准备 Wi-Fi 连接</b><small data-step-sub="0">可选，只用 USB 可跳过</small></span><em data-step-state="0">当前</em></button>
+            <button type="button" class="step-row" data-step="1"><span class="step-index">2</span><span><b data-step-title="1">连接 iOS Backup</b><small data-step-sub="1">把设备插到 NAS / 主机</small></span><em data-step-state="1">待进行</em></button>
+            <button type="button" class="step-row" data-step="2"><span class="step-index">3</span><span><b data-step-title="2">信任并完成配对</b><small data-step-sub="2">在设备上确认一次</small></span><em data-step-state="2">待进行</em></button>
+            <button type="button" class="step-row" data-step="3"><span class="step-index">4</span><span><b data-step-title="3">完成第一次备份</b><small data-step-sub="3">确认整条链路可用</small></span><em data-step-state="3">待进行</em></button>
+          </div>
+          <p class="rail-note" id="railNote">这套设置只需做一次。完成后仍可从菜单重新打开向导。</p>
+        </aside>
+
+        <div class="panels">
+          <section class="step-panel active" data-panel="0">
+            <div class="panel-kicker"><span>STEP 1</span><em id="optionalLabel">可选</em></div>
+            <div class="step-intro"><div><h2 id="s1Title">准备以后通过 Wi-Fi 备份</h2><p id="s1Lead">Apple 要求先通过 Mac 或 Windows 打开无线连接。只准备使用 USB 备份，可以直接跳过。</p></div><figure><img src="/static/onboarding-step-wifi.png" alt="手机连接电脑并开启 Wi-Fi 显示"></figure></div>
+            <div class="platform-tabs"><button type="button" class="active" data-platform="mac">Mac</button><button type="button" data-platform="windows">Windows</button><button type="button" data-platform="itunes" id="itunesLabel">旧版 iTunes</button></div>
+            <div class="instructions" id="wifiInstructions"></div>
+            <div class="callout amber" id="s1Note">这一项无法由 NAS 自动判断，需要你确认。以后想开也可以；不会影响今天先用 USB 备份。</div>
+            <div class="panel-actions"><button type="button" class="text-button" id="skipWifi">暂时跳过，只用 USB</button><button type="button" class="primary" id="completeWifi">我已完成</button></div>
+          </section>
+
+          <section class="step-panel" data-panel="1">
+            <div class="panel-kicker"><span>STEP 2</span></div>
+            <div class="step-intro"><div><h2 id="s2Title">把设备连接到 iOS Backup 主机</h2><p id="s2Lead">请使用支持数据传输的 USB 线，把已经解锁的 iPhone / iPad 插到运行 iOS Backup 的 NAS 或主机。</p></div><figure><img src="/static/onboarding-step-usb.png" alt="手机通过 USB 数据线连接 NAS"></figure></div>
+            <div class="live-card"><div class="status-symbol" id="usbSymbol">USB</div><div><b id="usbTitle">等待 USB 设备</b><p id="usbDetail">插好后，系统会自动识别；通常不需要手动刷新。</p></div><span class="live-state"><i></i><span id="usbState">正在监听</span></span></div>
+            <div class="device-choices" id="deviceChoices" hidden></div>
+            <div class="callout blue" id="s2Note">USB 连接状态由后端实时识别；检测到设备后，这一步会自动完成。</div>
+            <div class="panel-actions"><button type="button" class="text-button" data-back="0" id="backStep1">返回上一步</button><button type="button" class="primary" id="refreshDevices">我已插好，检查连接</button></div>
+          </section>
+
+          <section class="step-panel" data-panel="2">
+            <div class="panel-kicker"><span>STEP 3</span></div>
+            <div class="step-intro"><div><h2 id="s3Title">在 iPhone 上确认“信任”</h2><p id="s3Lead">这是与 iOS Backup 主机建立的独立信任关系。即使手机以前信任过 Mac 或 Windows，这里仍可能再询问一次。</p></div><figure><img src="/static/onboarding-step-trust.png" alt="在手机上确认信任并输入设备锁屏密码"></figure></div>
+            <div class="live-card"><div class="status-symbol"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-check"></use></svg></div><div><b id="pairTitle">等待设备确认</b><p id="pairDetail">在 iPhone / iPad 上点“信任”，并按提示输入设备锁屏密码。</p></div><span class="live-state"><i></i><span id="pairState">等待操作</span></span></div>
+            <div class="password-grid"><div class="password-card correct"><b id="correctTitle">这里输入的是</b><span id="correctBody">iPhone / iPad 的设备锁屏密码。</span></div><div class="password-card"><b id="wrongTitle">不是下面这些</b><span id="wrongBody">不是控制台登录密码，也不是加密本地备份密码。</span></div></div>
+            <div class="error-card" id="pairError" hidden></div>
+            <div class="panel-actions"><button type="button" class="text-button" data-back="1" id="backStep2">返回连接步骤</button><button type="button" class="primary" id="checkPair">我已确认，检查配对</button></div>
+          </section>
+
+          <section class="step-panel" data-panel="3">
+            <div class="panel-kicker"><span>STEP 4</span></div>
+            <div class="step-intro"><div><h2 id="s4Title">完成第一次备份</h2><p id="s4Lead">先用 USB 完成一次备份，确认配对、存储路径和设备通信都正常；之后再开启自动备份。</p></div><figure><img src="/static/onboarding-step-backup.png" alt="手机数据通过数据线备份到 NAS"></figure></div>
+            <div class="device-summary"><div><span class="phone-symbol"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-phone"></use></svg></span><span><b id="deviceName">这台 iPhone</b><small id="deviceMeta">等待设备状态</small></span></div><strong id="connectionPill">USB</strong></div>
+            <div class="backup-box"><div><b id="backupTitle">可以开始第一次备份</b><span id="backupDetail">尚未开始</span></div><div class="indeterminate" id="backupMotion" hidden><i></i></div></div>
+            <div class="callout amber" id="backupAuth" hidden>如设备出现授权提示，请解锁并输入设备锁屏密码。</div>
+            <div class="success-card" id="backupSuccess" hidden><b id="backupSuccessTitle">第一次备份已完成</b><p id="backupSuccessBody">设备、配对和本地存储均已验证。现在可以拔掉数据线，并按需要开启自动备份。</p></div>
+            <div class="error-card" id="backupError" hidden></div>
+            <div class="panel-actions"><button type="button" class="text-button" data-back="2" id="backStep3">返回配对步骤</button><button type="button" class="primary" id="startBackup">立即备份</button></div>
+          </section>
+        </div>
+      </section>
+
+      <section class="wifi-section" id="wifiAfter">
+        <div class="wifi-summary"><div><h2 id="wifiAfterTitle">以后通过 Wi-Fi 备份</h2><p id="wifiAfterLead">系统发现设备并满足你设置的条件后，会自动尝试发起备份；如 iOS 要求授权，请在手机上完成确认。</p></div><figure><img src="/static/onboarding-wifi-auto.png" alt="手机通过家庭 Wi-Fi 自动备份到 NAS"></figure></div>
+        <div class="wifi-flow"><span id="wifiFlowDiscover">发现设备</span><b>→</b><span id="wifiFlowCheck">检查时间与电量</span><b>→</b><span id="wifiFlowStart">自动发起备份</span><b>→</b><span id="wifiFlowDone">完成本地备份</span></div>
+        <div class="conditions"><span><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-check"></use></svg><span id="conditionVisible">已打开 Wi-Fi 显示</span></span><span><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-check"></use></svg><span id="conditionNetwork">手机与 NAS 网络可互通</span></span><span><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-check"></use></svg><span id="conditionPairing">配对记录仍然有效</span></span><span><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-check"></use></svg><span id="conditionRules">满足充电与时间条件</span></span></div>
+      </section>
+
+      <footer>iOS Backup {{.Version}} · <a href="{{.SourceURL}}/tree/{{.Commit}}" rel="noreferrer">Source {{.Commit}}</a> · AGPL-3.0-only · <span id="footerLocal">本地备份</span> · <a href="/" id="footerBack">返回控制台</a></footer>
+    </div>
+  </main>
+  <script src="/static/onboarding.js" defer></script>
+</body>
+</html>

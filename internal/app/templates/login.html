@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>登录 · iOS Backup</title>
+<link rel="icon" href="/static/favicon.ico?v={{.Version}}" type="image/x-icon">
+<style>
+  :root{--iosbk-radius:9px;--ink:#213041;--muted:#718090;--line:#dce4ea;--blue:#2c62c6;--blue-deep:#2454ae;--paper:#fbfcfd;--soft:#eef3f7;--green:#2e7d5b;--amber:#9a5b12;font-family:-apple-system,"SF Pro Text","PingFang SC","Noto Sans SC",system-ui,sans-serif;color:var(--ink);background:#edf2f6}
+  *{box-sizing:border-box}
+  html,body{margin:0;min-height:100%}
+  body{min-height:100vh;-webkit-font-smoothing:antialiased}
+  button,input{font:inherit}
+  .page{position:relative;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:42px 24px;overflow:hidden;background:#edf2f6}
+  .page:before{content:"";position:absolute;inset:0;background-image:linear-gradient(rgba(58,84,113,.045) 1px,transparent 1px),linear-gradient(90deg,rgba(58,84,113,.045) 1px,transparent 1px);background-size:28px 28px;mask-image:linear-gradient(to bottom,rgba(0,0,0,.7),transparent 88%)}
+  .shell{position:relative;width:min(100%,890px);min-height:530px;display:grid;grid-template-columns:1.05fr .95fr;border:1px solid #d7dfe6;border-radius:var(--iosbk-radius);background:rgba(250,252,253,.97);box-shadow:0 30px 80px rgba(40,57,72,.16),0 2px 8px rgba(40,57,72,.05);overflow:hidden}
+  .story{display:flex;flex-direction:column;padding:29px 32px 31px;border-right:1px solid #e3e8ec;background:linear-gradient(145deg,#f7fafc,#edf3f7)}
+  .brand{display:flex;align-items:center;gap:11px}
+  .logo{position:relative;width:48px;height:48px;flex:none;border:1px solid #c5daf6;border-radius:var(--iosbk-radius);overflow:hidden;background:#eef5ff;box-shadow:0 6px 16px rgba(44,98,198,.16)}
+  .logo img{position:absolute;display:block;width:128%;height:128%;max-width:none;left:-14%;top:-14%;object-fit:contain}
+  .brand-copy b{display:block;color:#1b1c1e;font-size:14px;letter-spacing:-.01em}
+  .brand-copy span{display:block;margin-top:1px;color:#7f8a96;font-size:10px;letter-spacing:.06em;text-transform:uppercase}
+  .story-copy{margin:auto 0 38px}
+  .story-copy h1{max-width:350px;margin:0;font-size:35px;line-height:1.13;letter-spacing:-.045em;font-weight:700;text-wrap:balance}
+  .story-copy p{max-width:360px;margin:15px 0 0;color:var(--muted);font-size:12.5px;line-height:1.75;text-wrap:pretty}
+  .metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .metric{padding:12px;border:1px solid var(--line);border-radius:var(--iosbk-radius);background:rgba(255,255,255,.76)}
+  .metric b{display:block;color:#27394c;font-size:13px}.metric span{display:block;margin-top:3px;color:#8a97a4;font-size:9.5px;line-height:1.4}
+  .main{display:flex;align-items:center;justify-content:center;padding:42px}
+  .form-panel{width:min(100%,340px)}
+  .form-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:42px}
+  .eyebrow{color:#82909c;font-size:10.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase}
+  .lang{display:flex;gap:3px;padding:3px;background:#f0f1ed;border-radius:var(--iosbk-radius)}
+  .lang button{border:0;border-radius:var(--iosbk-radius);padding:5px 8px;background:transparent;color:#8a8c92;font-size:11px;cursor:pointer}
+  .lang button.active{background:#fff;color:#33353a;box-shadow:0 1px 2px rgba(20,20,20,.12)}
+  h2{margin:0;font-size:28px;line-height:1.15;letter-spacing:-.04em}
+  .subtitle{margin:9px 0 0;color:var(--muted);font-size:12.5px;line-height:1.6}
+  .field{display:block;margin-top:18px}
+  .field-label{display:block;margin-bottom:7px;color:#555d65;font-size:11.5px;font-weight:650}
+  .input-wrap{position:relative;display:block}
+  .input-wrap input{width:100%;height:45px;border:1px solid #d9dee2;border-radius:var(--iosbk-radius);padding:0 13px;background:#fff;color:#1b1c1e;outline:none;transition:border-color .16s,box-shadow .16s}
+  .input-wrap input:hover{border-color:#c3cbd1}.input-wrap input:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(44,98,198,.13)}
+  .input-wrap.password input{padding-right:60px}
+  .toggle{position:absolute;right:6px;top:6px;height:33px;border:0;border-radius:var(--iosbk-radius);padding:0 9px;background:transparent;color:#6d7680;font-size:11.5px;font-weight:650;cursor:pointer}
+  .toggle:hover{background:#f2f4f5;color:var(--ink)}
+  .submit{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;height:45px;margin-top:22px;border:0;border-radius:var(--iosbk-radius);background:var(--blue);color:#fff;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 8px 18px rgba(44,98,198,.2);transition:background .16s,transform .16s,box-shadow .16s}
+  .submit:hover{background:var(--blue-deep);transform:translateY(-1px);box-shadow:0 10px 22px rgba(44,98,198,.25)}
+  .submit:disabled{cursor:wait;opacity:.85;transform:none}
+  .spinner{display:none;width:13px;height:13px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:spin .65s linear infinite}.submit.loading .spinner{display:block}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .alert{margin-top:15px;padding:10px 11px;border-radius:var(--iosbk-radius);font-size:11px;line-height:1.5}
+  .alert.error{border:1px solid #efcbc7;background:#fff4f3;color:#9f231c}
+  .alert.warning{display:flex;gap:9px;border:1px solid #efdfc8;background:#fffaf2;color:#7a4b17}
+  .alert.secure{display:flex;gap:9px;border:1px solid #cce4d8;background:#f2faf6;color:#2f684e}
+  .dot{width:7px;height:7px;margin-top:4px;flex:none;border-radius:50%;background:#d6862d;box-shadow:0 0 0 3px #f9e8d3}.secure .dot{background:#47a87c;box-shadow:0 0 0 3px #dff0e7}
+  .trust{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:17px;padding-top:15px;border-top:1px solid #e2e6e9;color:#83909b;font-size:10px}.trust a{color:#5b6f91;text-decoration:none}.trust a:hover{text-decoration:underline}.trust b{color:#52715f;font-weight:650}
+  @media(max-width:720px){.page{align-items:flex-start;padding:18px 14px 28px}.shell{display:block;min-height:0}.story{padding:22px;border-right:0;border-bottom:1px solid #e3e8ec}.story-copy{margin:34px 0 24px}.story-copy h1{font-size:28px}.story-copy p{font-size:12px}.metrics{display:none}.main{padding:29px 24px 34px}.form-panel{width:100%}.form-top{margin-bottom:34px}}
+  @media(max-width:390px){.story-copy h1{font-size:26px}.story,.main{padding-left:19px;padding-right:19px}}
+  @media(prefers-reduced-motion:reduce){*{animation-duration:.001ms!important;transition-duration:.001ms!important}}
+</style>
+</head>
+<body>
+<main class="page">
+  <div class="shell">
+    <section class="story" aria-label="iOS Backup">
+      <div class="brand"><span class="logo" aria-hidden="true"><img src="/static/logo-mark.png" alt=""></span><span class="brand-copy"><b>iOS Backup</b><span>Private console</span></span></div>
+      <div class="story-copy">
+        <h1><span data-zh="回到家。" data-en="Home again.">回到家。</span><br><span data-zh="连上 Wi‑Fi。" data-en="Wi‑Fi connected.">连上 Wi‑Fi。</span><br><span data-zh="备份自然发生。" data-en="Backup happens automatically.">备份自然发生。</span></h1>
+        <p data-zh="将 iPhone 和 iPad 自动备份到家里的 NAS，随时查看设备与任务状态。" data-en="Back up iPhone and iPad to your home NAS, with device and task status always in view.">将 iPhone 和 iPad 自动备份到家里的 NAS，随时查看设备与任务状态。</p>
+      </div>
+      <div class="metrics" aria-label="产品特点">
+        <div class="metric"><b>Local</b><span data-zh="数据留在本地" data-en="Data stays local">数据留在本地</span></div>
+        <div class="metric"><b>USB / Wi‑Fi</b><span data-zh="两种连接方式" data-en="Two connections">两种连接方式</span></div>
+        <div class="metric"><b>Open</b><span>AGPL-3.0</span></div>
+      </div>
+    </section>
+    <section class="main" aria-label="管理员登录">
+      <div class="form-panel">
+        <div class="form-top"><span class="eyebrow">Admin access</span><div class="lang"><button type="button" data-lang="zh" class="active">中文</button><button type="button" data-lang="en">EN</button></div></div>
+        <h2 data-zh="身份验证" data-en="Sign in">身份验证</h2>
+        <p class="subtitle" data-zh="输入管理员密码以打开控制台。" data-en="Enter the administrator password to open the console.">输入管理员密码以打开控制台。</p>
+        <form method="post" action="/login" id="loginForm">
+          <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+          <input type="hidden" name="next" value="{{.Next}}">
+          <label class="field"><span class="field-label" data-zh="密码" data-en="Password">密码</span><span class="input-wrap password"><input id="password" name="password" type="password" maxlength="4096" autocomplete="current-password" required data-zh-placeholder="输入管理员密码" data-en-placeholder="Enter administrator password" placeholder="输入管理员密码"><button id="togglePassword" class="toggle" type="button" data-zh="显示" data-en="Show">显示</button></span></label>
+          <button id="submitButton" class="submit" type="submit"><span class="button-label" data-zh="验证并进入" data-en="Verify and continue">验证并进入</span><span class="spinner" aria-hidden="true"></span></button>
+        </form>
+        {{if .Error}}<div class="alert error" role="alert">{{.Error}}</div>{{end}}
+        {{if .Insecure}}<div class="alert warning"><span class="dot"></span><span data-zh="局域网 HTTP 模式：密码传输未加密。请仅在可信网络中登录。" data-en="LAN HTTP mode: password transport is not encrypted. Sign in only on a trusted network.">局域网 HTTP 模式：密码传输未加密。请仅在可信网络中登录。</span></div>{{else}}<div class="alert secure"><span class="dot"></span><span data-zh="当前连接已启用 HTTPS。" data-en="This connection is protected with HTTPS.">当前连接已启用 HTTPS。</span></div>{{end}}
+        <div class="trust"><span>iOS Backup {{.Version}} · <a href="{{.SourceURL}}/tree/{{.Commit}}" rel="noreferrer">Source {{.Commit}}</a> · AGPL-3.0-only</span><b data-zh="服务在线" data-en="Service online">服务在线</b></div>
+      </div>
+    </section>
+  </div>
+</main>
+<script>
+(function(){
+  var language='zh';
+  try{language=localStorage.getItem('iosbk_lang')||((navigator.language||'').toLowerCase().indexOf('zh')===0?'zh':'en');}catch(e){}
+  function applyLanguage(next){
+    language=next==='en'?'en':'zh';
+    document.documentElement.lang=language==='zh'?'zh-CN':'en';
+    document.querySelectorAll('[data-zh]').forEach(function(el){el.textContent=el.getAttribute(language==='zh'?'data-zh':'data-en');});
+    document.querySelectorAll('[data-zh-placeholder]').forEach(function(el){el.placeholder=el.getAttribute(language==='zh'?'data-zh-placeholder':'data-en-placeholder');});
+    document.querySelectorAll('[data-lang]').forEach(function(el){el.classList.toggle('active',el.getAttribute('data-lang')===language);});
+    try{localStorage.setItem('iosbk_lang',language);}catch(e){}
+  }
+  document.querySelectorAll('[data-lang]').forEach(function(button){button.addEventListener('click',function(){applyLanguage(button.getAttribute('data-lang'));});});
+  var password=document.getElementById('password'),toggle=document.getElementById('togglePassword');
+  toggle.addEventListener('click',function(){var showing=password.type==='text';password.type=showing?'password':'text';toggle.textContent=language==='zh'?(showing?'显示':'隐藏'):(showing?'Show':'Hide');});
+  applyLanguage(language);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,16 @@
+# SPDX identifiers used by third_party/netmuxd-cargo-licenses.tsv
+# identifier	kind	file	sha256	authoritative_source
+Apache-2.0	license	third_party/licenses/Apache-2.0.txt	cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30	https://www.apache.org/licenses/LICENSE-2.0.txt
+BSD-1-Clause	license	third_party/licenses/BSD-1-Clause.txt	244e17b6f02493de568a8ddfd7f4349996a6c332c0585d304ceaf5394becea52	https://raw.githubusercontent.com/spdx/license-list-data/v3.28.0/text/BSD-1-Clause.txt
+BSD-2-Clause	license	third_party/licenses/BSD-2-Clause.txt	f32fb3b417a194167cfad068223fc975ba96c5960513a10f66a3c28720aec1df	https://raw.githubusercontent.com/spdx/license-list-data/v3.28.0/text/BSD-2-Clause.txt
+BSD-3-Clause	license	third_party/licenses/BSD-3-Clause.txt	5a93d5831e1297ab10fe643e1a631e83be392896da14ee2951285a79012df69d	https://raw.githubusercontent.com/spdx/license-list-data/v3.28.0/text/BSD-3-Clause.txt
+CC0-1.0	license	third_party/licenses/CC0-1.0.txt	a2010f343487d3f7618affe54f789f5487602331c0a8d03f49e9a7c547cf0499	https://raw.githubusercontent.com/spdx/license-list-data/v3.28.0/text/CC0-1.0.txt
+ISC	license	third_party/licenses/ISC.txt	f2ec607f67bb0dd3053b49835b02110d5cd0f8eb6da3aac4dc0b142a6b299be9	https://raw.githubusercontent.com/spdx/license-list-data/v3.28.0/text/ISC.txt
+LGPL-2.1-only	license	third_party/licenses/LGPL-2.1.txt	20e50fe7aae3e56378ebf0417d9de904f55a0e61e4df315333e632a4d3555d95	https://www.gnu.org/licenses/old-licenses/lgpl-2.1.txt
+LGPL-2.1-or-later	license	third_party/licenses/LGPL-2.1.txt	20e50fe7aae3e56378ebf0417d9de904f55a0e61e4df315333e632a4d3555d95	https://www.gnu.org/licenses/old-licenses/lgpl-2.1.txt
+LLVM-exception	exception	third_party/licenses/LLVM-exception.txt	e34c58338bd89d43e709e226610d8f32b3e3c47f4ad9a99a8dc1d4ac7842488e	https://raw.githubusercontent.com/spdx/license-list-data/v3.28.0/text/LLVM-exception.txt
+MIT	license	third_party/licenses/MIT.txt	b05785f9f18e6716bab63424b11454513b9943a222595b70411009202fc592b5	https://raw.githubusercontent.com/spdx/license-list-data/v3.28.0/text/MIT.txt
+MIT-0	license	third_party/licenses/MIT-0.txt	59746d6285ffa44bfc7ecada352aa5d6a20dc8eab418a60ce091cc739012c135	https://raw.githubusercontent.com/spdx/license-list-data/v3.28.0/text/MIT-0.txt
+MPL-2.0	license	third_party/licenses/MPL-2.0.txt	66a3107d5ad6a058aab753eaac2047ccb2ed0e39465dd0fe5844da3e300d5172	https://raw.githubusercontent.com/spdx/license-list-data/v3.28.0/text/MPL-2.0.txt
+Unicode-3.0	license	third_party/licenses/Unicode-3.0.txt	f7db81051789b729fea528a63ec4c938fdcb93d9d61d97dc8cc2e9df6d47f2a1	https://raw.githubusercontent.com/spdx/license-list-data/v3.28.0/text/Unicode-3.0.txt
+Unlicense	license	third_party/licenses/Unlicense.txt	0bdebfeda07d45dada625ae1317c6f833186e798b171d0db640bcf32e92a8240	https://raw.githubusercontent.com/spdx/license-list-data/v3.28.0/text/Unlicense.txt

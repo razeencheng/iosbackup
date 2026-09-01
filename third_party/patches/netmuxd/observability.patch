@@ -1,0 +1,195 @@
+diff --git a/src/heartbeat.rs b/src/heartbeat.rs
+index 44a0b52..994ef9e 100644
+--- a/src/heartbeat.rs
++++ b/src/heartbeat.rs
+@@ -1,6 +1,6 @@
+ // Jackson Coxson
+ 
+-use idevice::{Idevice, heartbeat::HeartbeatClient, lockdown::LockdownClient};
++use idevice::{HeartbeatError, Idevice, IdeviceError, heartbeat::HeartbeatClient, lockdown::LockdownClient};
+ use log::{debug, info, warn};
+ use std::net::SocketAddr;
+ use tokio::sync::oneshot::Sender;
+@@ -16,7 +16,10 @@ pub async fn heartbeat(
+     pairing_file: idevice::pairing_file::PairingFile,
+     sender: ManagerSender,
+ ) {
+-    debug!("Spawning heartbeat for {device:?}");
++    debug!(
++        "event=heartbeat_spawn udid={} device={device:?}",
++        device.serial_number
++    );
+     tokio::spawn(async move {
+         let udid = device.serial_number.clone();
+         let socket = SocketAddr::new(
+@@ -27,7 +30,9 @@ pub async fn heartbeat(
+         let socket = match tokio::net::TcpStream::connect(socket).await {
+             Ok(s) => s,
+             Err(e) => {
+-                warn!("Failed to connect to lockdown port: {e:?}");
++                warn!(
++                    "event=heartbeat_setup_failed udid={udid} phase=connect_lockdown error={e:?}"
++                );
+                 if let Some(response) = response {
+                     response
+                         .send(plist_macro::plist!(dict {
+@@ -44,7 +49,9 @@ pub async fn heartbeat(
+ 
+         let mut lockdown_client = LockdownClient { idevice };
+         if let Err(e) = lockdown_client.start_session(&pairing_file).await {
+-            warn!("Failed to start lockdown session: {e:?}");
++            warn!(
++                "event=heartbeat_setup_failed udid={udid} phase=start_lockdown_session error={e:?}"
++            );
+             if let Some(response) = response {
+                 response
+                     .send(plist_macro::plist!(dict {
+@@ -61,7 +68,7 @@ pub async fn heartbeat(
+         {
+             Ok(p) => p,
+             Err(e) => {
+-                warn!("Failed to start heartbeat service: {e:?}");
++                warn!("event=heartbeat_setup_failed udid={udid} phase=start_service error={e:?}");
+                 if let Some(response) = response {
+                     response
+                         .send(plist_macro::plist!(dict {
+@@ -77,7 +84,7 @@ pub async fn heartbeat(
+         let socket = match tokio::net::TcpStream::connect(socket).await {
+             Ok(s) => s,
+             Err(e) => {
+-                warn!("Failed to connect to heartbeat port: {e:?}");
++                warn!("event=heartbeat_setup_failed udid={udid} phase=connect_service error={e:?}");
+                 if let Some(response) = response {
+                     response
+                         .send(plist_macro::plist!(dict {
+@@ -93,7 +100,7 @@ pub async fn heartbeat(
+         let mut idevice = Idevice::new(socket, "heartbeat_client");
+ 
+         if let Err(e) = idevice.start_session(&pairing_file, false).await {
+-            warn!("Failed to wrap heartbeat client in TLS: {e:?}");
++            warn!("event=heartbeat_setup_failed udid={udid} phase=start_tls error={e:?}");
+             if let Some(response) = response {
+                 response
+                     .send(plist_macro::plist!(dict {
+@@ -119,13 +126,29 @@ pub async fn heartbeat(
+             .await
+             .ok();
+ 
++        info!("event=heartbeat_ready udid={udid} interval_seconds={interval}");
++
+         loop {
+             match heartbeat_client.get_marco(interval + 5).await {
+                 Ok(i) => {
+                     interval = i;
+                 }
++                Err(IdeviceError::Heartbeat(HeartbeatError::SleepyTime)) => {
++                    info!(
++                        "event=heartbeat_sleep_notification udid={udid} action=send_polo_keep_device_and_streams"
++                    );
++                    if let Err(e) = heartbeat_client.send_polo().await {
++                        warn!("event=heartbeat_failed udid={udid} phase=send_after_sleep error={e:?}");
++                        sender
++                            .send(ManagerRequest::heartbeat_failed(udid.clone()))
++                            .await
++                            .ok();
++                        break;
++                    }
++                    continue;
++                }
+                 Err(e) => {
+-                    info!("Heartbeat recv failed: {:?}", e);
++                    warn!("event=heartbeat_failed udid={udid} phase=recv error={e:?}");
+                     sender
+                         .send(ManagerRequest::heartbeat_failed(udid.clone()))
+                         .await
+@@ -134,7 +157,7 @@ pub async fn heartbeat(
+                 }
+             }
+             if let Err(e) = heartbeat_client.send_polo().await {
+-                info!("Heartbeat send failed: {:?}", e);
++                warn!("event=heartbeat_failed udid={udid} phase=send error={e:?}");
+                 sender
+                     .send(ManagerRequest::heartbeat_failed(udid.clone()))
+                     .await
+diff --git a/src/main.rs b/src/main.rs
+index 125ee3d..0fd94ac 100644
+--- a/src/main.rs
++++ b/src/main.rs
+@@ -441,7 +441,6 @@ async fn handle_stream(
+                             }
+                         }
+                     } else {
+-                        println!("{}", plist_macro::pretty_print_dictionary(&res));
+                         RawPacket::new(res, 1, 8, parsed.tag).into()
+                     };
+                     if let Err(e) = socket.write_all(&out).await {
+@@ -692,6 +691,11 @@ async fn handle_stream(
+                         }
+                     };
+ 
++                    let udid = lookup.serial_number.clone();
++                    info!(
++                        "event=proxy_connect udid={udid} device_id={device_id} port={port}"
++                    );
++
+                     type Upstream = Box<dyn AsyncReadWrite>;
+                     let upstream: Result<Upstream, String> = match lookup.connection_type.as_str() {
+                         "Network" => match lookup.network_address {
+@@ -749,10 +753,10 @@ async fn handle_stream(
+ 
+                     tokio::select! {
+                         _ = killed => {
+-                            info!("Bidirectional stream stopped via heartbeat failure");
++                            warn!("event=proxy_stream_stopped udid={udid} device_id={device_id} port={port} reason=heartbeat_failed");
+                         }
+                         e = tokio::io::copy_bidirectional(&mut *upstream, &mut socket) => {
+-                            info!("Bidirectional stream stopped: {e:?}");
++                            info!("event=proxy_stream_stopped udid={udid} device_id={device_id} port={port} reason=io_complete result={e:?}");
+                         }
+                     }
+                     return;
+diff --git a/src/manager.rs b/src/manager.rs
+index 743b6bb..7b73118 100644
+--- a/src/manager.rs
++++ b/src/manager.rs
+@@ -6,7 +6,7 @@
+ use std::{collections::HashMap, net::IpAddr};
+ 
+ use crossfire::{AsyncRx, MAsyncTx, mpmc::unbounded_async};
+-use log::debug;
++use log::{debug, info, warn};
+ use tokio::sync::{mpsc::UnboundedSender, oneshot::Sender};
+ 
+ use crate::{
+@@ -260,7 +260,7 @@ pub fn new_manager_thread(config: &NetmuxdConfig) -> ManagerSender {
+                     last_interface_index = last_interface_index.wrapping_add(1);
+                 }
+                 ManagerRequestType::DeferredMuxerAdd { device, response } => {
+-                    println!("Adding network device {}", device.serial_number);
++                    info!("event=device_added udid={}", device.serial_number);
+                     let attached = attached_plist(&device);
+                     devices.insert(device.device_id, device);
+                     broadcast(&mut listeners, ListenerEvent::Attached(attached));
+@@ -320,12 +320,21 @@ pub fn new_manager_thread(config: &NetmuxdConfig) -> ManagerSender {
+                 }
+                 ManagerRequestType::HeartbeatFailed { udid } => {
+                     if let Some(id) = find_device_id(&devices, &udid, "Network") {
++                        let open_socket_count = open_sockets.get(&id).map_or(0, Vec::len);
++                        warn!(
++                            "event=heartbeat_failed udid={udid} device_id={id} action=remove_device_and_stop_streams open_sockets={open_socket_count}"
++                        );
+                         drop_entry(id, &mut devices, &mut usb_handles, &mut open_sockets);
+                         broadcast(&mut listeners, ListenerEvent::Detached(id));
+                     }
+                 }
+                 ManagerRequestType::OpenSocket { device_id, kill } => {
+-                    open_sockets.entry(device_id).or_default().push(kill);
++                    let sockets = open_sockets.entry(device_id).or_default();
++                    sockets.push(kill);
++                    info!(
++                        "event=proxy_socket_opened device_id={device_id} registered_sockets={}",
++                        sockets.len()
++                    );
+                 }
+                 ManagerRequestType::Subscribe { listener } => {
+                     let mut ok = true;

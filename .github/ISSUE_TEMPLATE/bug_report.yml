@@ -1,0 +1,72 @@
+name: Bug report
+description: Report a reproducible problem in the latest Beta
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve iosbackup. Security issues must be reported through the private channel in SECURITY.md, not here. Never upload backups, pairing records, credentials, full device identifiers, or unredacted logs.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Pre-submission checks
+      options:
+        - label: I reproduced this on the latest published Beta.
+          required: true
+        - label: I searched existing issues and found no matching report.
+          required: true
+        - label: This report contains no security-sensitive or private data.
+          required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version and commit
+      description: Copy the version and commit from /api/version.
+      placeholder: v1.5.0-beta.1, commit 0123456...
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Linux host and architecture
+      description: Include the Linux distribution or NAS model and amd64 or arm64.
+      placeholder: Debian 13, linux/amd64
+    validations:
+      required: true
+  - type: dropdown
+    id: connection
+    attributes:
+      label: Device connection
+      options:
+        - USB
+        - Wi-Fi
+        - Not device-related
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reproduction steps
+      description: Use a non-critical device and provide the smallest safe reproduction.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Redacted logs
+      description: Include only the minimal window around the failure. Replace all identifiers and secrets before submitting.
+      render: shell
