@@ -72,7 +72,7 @@ iOS Backup 的 Go 应用本身仅使用 Go 标准库，源码采用 `AGPL-3.0-on
 
 - **Debian bookworm** build tools (apt packages): `build-essential`, `pkg-config`, `git`, `autoconf`, `automake`, `libtool-bin`, `cmake`, `patch`
 - **Rust** toolchain: rust:bookworm 镜像；netmuxd 的 Cargo 依赖由锁定的上游 commit 决定，包级许可证表达式记录在 `third_party/netmuxd-cargo-licenses.tsv`
-- **Go** toolchain: golang:1.26.6-alpine
+- **Go** toolchain: golang:1.26.7-alpine@sha256:28d89ee9cc0ff9fec75c82ca201e6bf7fdf9a679d4b7b24dfa04f2bb766bb468 (linux/amd64, linux/arm64/v8)
 
 ## Verification and updates
 

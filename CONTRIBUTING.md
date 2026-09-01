@@ -4,7 +4,7 @@ Thank you for contributing. Use an Issue to agree on user-visible behavior befor
 
 ## Development
 
-Use Go 1.21 or newer. The Go module must remain standard-library-only; the container's device toolchain is tracked separately.
+Use Go 1.21 or newer. Automatic toolchain selection is pinned to Go 1.26.7 as the security baseline for project builds. The Go module must remain standard-library-only; the container's device toolchain is tracked separately.
 
 ```bash
 gofmt -w <changed-go-files>
