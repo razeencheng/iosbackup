@@ -146,7 +146,7 @@ RUN git clone https://github.com/tihmstar/libgeneral.git && \
 # -----------------------------------------------------------------------------
 # rust:bookworm 与所有 debian:bookworm 阶段同代 → glibc 一致, netmuxd 二进制可混入同一
 # scratch 运行时。三处 Debian 基础镜像与此 rust 镜像必须保持同一 Debian 代号。
-FROM rust:bookworm@sha256:14bc9c5966e7b3a385794b3d5389a8765668342025fbcc7b2e3d2866ac4bd8c3 AS netmuxd-builder
+FROM rust:bookworm@sha256:82150a52ec202c1b14d7817e14516c392bb7f5cfebd88f1ed531cb37ebd39922 AS netmuxd-builder
 
 ENV CARGO_HTTP_TIMEOUT=600
 ENV CARGO_HTTP_LOW_SPEED_LIMIT=1
