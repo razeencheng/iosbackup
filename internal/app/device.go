@@ -286,6 +286,13 @@ func (app *application) setPairingState(udid, stateCode, errorCode, message stri
 	app.broadcastStatus()
 }
 
+func pairingFailureMessage(output string) string {
+	if strings.Contains(strings.ToLower(output), "passcode is set") {
+		return "设备已锁定。请解锁设备并输入锁屏密码，然后重试。"
+	}
+	return "配对失败。请确认设备已解锁并保持 USB 连接，然后重试。"
+}
+
 // pairDevice 检查并配对设备（通过 runIdeviceCmd，自动注入 socket 和 -n）。
 // 所有用户可见结果都写入结构化状态，由 /api/events 发布。
 func (app *application) pairDevice(device *device) {
@@ -325,7 +332,7 @@ func (app *application) pairDevice(device *device) {
 			if outputStr == "" {
 				outputStr = err.Error()
 			}
-			app.setPairingState(device.UDID, pairingStateFailed, "pair_failed", outputStr)
+			app.setPairingState(device.UDID, pairingStateFailed, "pair_failed", pairingFailureMessage(outputStr))
 		}
 		return
 	}
@@ -339,7 +346,7 @@ func (app *application) pairDevice(device *device) {
 		app.setPairingState(device.UDID, pairingStatePaired, "", "")
 	} else {
 		app.addLog(device.UDID, "配对验证失败，可能需要手动重新配对")
-		app.setPairingState(device.UDID, pairingStateFailed, "pair_validation_failed", err.Error())
+		app.setPairingState(device.UDID, pairingStateFailed, "pair_validation_failed", pairingFailureMessage(err.Error()))
 	}
 }
 
@@ -400,7 +407,7 @@ func (app *application) retryPairAfterTrustWithSchedule(udid string, interval ti
 			if outputStr == "" {
 				outputStr = err.Error()
 			}
-			app.setPairingState(udid, pairingStateFailed, "pair_failed", outputStr)
+			app.setPairingState(udid, pairingStateFailed, "pair_failed", pairingFailureMessage(outputStr))
 			return
 		}
 

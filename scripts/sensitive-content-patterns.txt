@@ -7,4 +7,5 @@ private-key	-----BEGIN[[:space:]]+([A-Z0-9]+[[:space:]]+)?PRIVATE[[:space:]]+KEY
 access-token	(^|[^[:alnum:]_])(gh[pousr]_[[:alnum:]]{20,}|github_pat_[[:alnum:]_]{20,}|(api[_-]?key|access[_-]?token|auth[_-]?token)[[:space:]"'= :]+[[:alnum:]_.+/=-]{16,})
 private-domain	(^|[^[:alnum:]-])([[:alnum:]-]+[.])+(internal|corp|lan)([^[:alnum:]-]|$)
 private-project-domain	(^|[^[:alnum:]-])(git[.]isw[.]app|hub[.]isw[.]app)([^[:alnum:]-]|$)
+private-project-network	(^|[^0-9])10[.]10[.]0[.][0-9]{1,3}([^0-9]|$)
 local-users-path	/Users/[[:alnum:]_.-]+/[^[:space:]"']+

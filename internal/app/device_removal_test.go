@@ -33,7 +33,7 @@ func newDeviceRemovalTestApp(t *testing.T, udid string) (*application, backupCon
 	backupCfg.Name = "家庭 iPhone"
 	backupCfg.BackupDirectory = cfg.BackupsRoot
 	backupCfg.AutoBackupEnabled = true
-	backupCfg.NetworkAddress = "10.10.0.15"
+	backupCfg.NetworkAddress = "192.0.2.15"
 	backupCfg.LastBackupConnection = connectTypeNetwork
 	backupCfg.RestoreEnabled = true
 	backupCfg.LastBackup = time.Date(2026, 8, 14, 7, 53, 0, 0, beijingLocation)

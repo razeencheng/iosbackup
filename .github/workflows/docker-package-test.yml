@@ -16,6 +16,8 @@ jobs:
     name: Build linux/amd64 and linux/arm64 without publishing
     runs-on: ubuntu-24.04
     timeout-minutes: 180
+    env:
+      DOCKER_BUILD_RECORD_UPLOAD: "false"
     steps:
       - name: Checkout source
         # actions/checkout v6.1.0

@@ -6,7 +6,9 @@ iOS Backup 是一个本地优先、面向单管理员的 iPhone/iPad 备份 Web 
 
 > **Docker Beta 警告：**`v1.5.0-beta.1` 是公开测试版，不代表生产稳定，也不构成灾难恢复承诺。请先用非关键设备验证，并始终保留独立备份。
 
-![iOS Backup 首次使用向导插图](internal/app/static/onboarding-wifi-auto.png)
+![iOS Backup 真机 USB 备份成功后的控制台](docs/images/tutorial/09-usb-backup-completed.png)
+
+上图来自 Raspberry Pi ARM64 测试实例，已完成一次 USB 备份并核对磁盘完成标记。已有加密备份的解密读取和整机恢复仍未验证。安装、设备接入、进度及成功终态的真实截图见[图文快速开始](docs/QUICKSTART.zh-CN.md)。
 
 ## 功能状态
 
@@ -79,6 +81,8 @@ Compose 部署等价使用 `--privileged` 和 `--network host`，挂载 `/dev/bu
 - [快速开始](docs/QUICKSTART.zh-CN.md)
 - [操作手册](docs/OPERATIONS.zh-CN.md)
 - [功能状态](docs/FEATURE_STATUS.zh-CN.md)
+- [通知配置指南](docs/NOTIFICATION_README.md)
+- [Webhook 推送指南](docs/WEBHOOK_GUIDE.md)
 - [隐私](docs/PRIVACY.md)
 - [安全策略](SECURITY.md)
 - [支持范围](SUPPORT.md)

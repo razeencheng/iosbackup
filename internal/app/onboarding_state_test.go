@@ -68,8 +68,32 @@ func TestPairingStatePublishesFailure(t *testing.T) {
 	app.pairDevice(device)
 
 	state := operationStateForTest(app, device.UDID)
-	if state.PairingState != pairingStateFailed || state.PairingErrorCode != "pair_failed" || !strings.Contains(state.PairingError, "transport") {
+	if state.PairingState != pairingStateFailed || state.PairingErrorCode != "pair_failed" || state.PairingError != "配对失败。请确认设备已解锁并保持 USB 连接，然后重试。" {
 		t.Fatalf("配对失败状态不正确: %+v", state)
+	}
+}
+
+func TestPairingFailureStateDoesNotExposeCommandOutput(t *testing.T) {
+	rawUDID := strings.Repeat("A", 8) + "-" + strings.Repeat("B", 16)
+	runner := &mockRunner{outputFn: func(_ string, args []string, _ []string) ([]byte, error) {
+		if argsHas(args, "validate") {
+			return nil, errors.New("not paired")
+		}
+		return []byte("ERROR: Could not validate with device " + rawUDID + " because a passcode is set. Please enter the passcode on the device and retry."), errors.New("pair failed")
+	}}
+	app := newApplication()
+	app.cmdRunner = runner.run
+	device := &device{UDID: rawUDID, IsOnline: true, Connection: connectionTypeDesc(connectTypeUSB)}
+	app.devices[device.UDID] = device
+
+	app.pairDevice(device)
+
+	state := operationStateForTest(app, device.UDID)
+	if strings.Contains(state.PairingError, rawUDID) {
+		t.Fatalf("用户可见配对错误不得包含完整设备标识: %q", state.PairingError)
+	}
+	if state.PairingError != "设备已锁定。请解锁设备并输入锁屏密码，然后重试。" {
+		t.Fatalf("锁屏错误提示不正确: %q", state.PairingError)
 	}
 }
 

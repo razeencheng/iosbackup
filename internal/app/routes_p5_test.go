@@ -96,10 +96,10 @@ func TestIndexTemplateShowsDiscoveredIP(t *testing.T) {
 	html := renderIndex(t, homePayload{
 		Devices: []*device{dev}, Configs: map[string]*backupConfig{"U-DISC": cfg},
 		BackupStatuses: map[string]bool{"U-DISC": false}, EncryptionAvailable: true,
-		DiscoveredIPs: map[string]string{"U-DISC": "10.10.0.249"},
+		DiscoveredIPs: map[string]string{"U-DISC": "192.0.2.249"},
 	})
 	// 发现块的唯一标记是语义搜索图标 + IP 值
-	if !strings.Contains(html, "ui-icons.svg#icon-search") || !strings.Contains(html, "10.10.0.249") {
+	if !strings.Contains(html, "ui-icons.svg#icon-search") || !strings.Contains(html, "192.0.2.249") {
 		t.Error("有发现 IP 时应在设备 IP 栏下显示自动发现的 IP")
 	}
 }

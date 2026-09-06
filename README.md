@@ -6,7 +6,9 @@ iOS Backup is a local-first, single-administrator web application for backing up
 
 > **Docker Beta:** `v1.5.0-beta.1` is a public Beta, not a production-stable or disaster-recovery guarantee. Test it with non-critical devices and keep an independent backup before relying on it.
 
-![iOS Backup onboarding illustration](internal/app/static/onboarding-wifi-auto.png)
+![iOS Backup console after a successful USB backup](docs/images/tutorial/09-usb-backup-completed.png)
+
+This Raspberry Pi ARM64 test deployment completed a USB backup and its on-disk completion marker was checked. Decryption of the existing encrypted backup and device restore remain unverified. See the [illustrated quick start](docs/QUICKSTART.md) for real setup, progress, and completion screenshots.
 
 ## Feature status
 
@@ -79,6 +81,8 @@ The detailed runbook is in [Operations](docs/OPERATIONS.md).
 - [Quick start](docs/QUICKSTART.md)
 - [Operations manual](docs/OPERATIONS.md)
 - [Feature status](docs/FEATURE_STATUS.md)
+- [Notification guide (Chinese)](docs/NOTIFICATION_README.md)
+- [Webhook guide (Chinese)](docs/WEBHOOK_GUIDE.md)
 - [Privacy](docs/PRIVACY.md)
 - [Security policy](SECURITY.md)
 - [Support policy](SUPPORT.md)

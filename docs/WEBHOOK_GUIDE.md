@@ -1,5 +1,7 @@
 # Webhook 推送指导
 
+[返回通知配置指南](NOTIFICATION_README.md)
+
 ## 1. 工作方式
 
 iOS Backup 会在通知事件发生时，向已启用的 Webhook 发送 HTTP 请求。请求体是完整的 JSON 通知消息，发送方式为异步 best-effort：业务流程不会等待 Webhook 完成，也不会因为 Webhook 失败而中断备份。
@@ -71,11 +73,11 @@ Webhook 的 `content` 字段支持按事件配置的模板。可用变量包括 
 
 ## 3. 配置方式
 
-推荐通过通知设置页面配置。也可以使用配置 API。下面的例子假设应用运行在远程机器 `10.10.0.65`，并且管理员认证已启用：
+推荐通过通知设置页面配置。也可以使用配置 API。下面的例子假设应用运行在 `<Linux主机>`，使用默认端口 `9000`，并且管理员认证已启用：
 
 ```bash
 curl -i -u 'iosbackup:YOUR_ADMIN_PASSWORD' \
-  -X GET 'http://10.10.0.65:8080/api/notifications/config'
+  -X GET 'http://<Linux主机>:9000/api/notifications/config'
 ```
 
 POST 保存配置需要 CSRF 请求头。先从登录后的浏览器会话取得应用页面中的 `iosbk-csrf` meta 值，或者直接在通知设置页面保存配置。不要把管理员密码、CSRF token、Webhook 密钥提交到 Git。
@@ -170,14 +172,14 @@ http.HandleFunc("/iosbackup", func(w http.ResponseWriter, r *http.Request) {
 
 ## 5. 远程验证
 
-在 `root@10.10.0.65` 上先检查应用看到的通知器和规则：
+在 Linux 宿主机上先检查应用看到的通知器和规则：
 
 ```bash
 curl -sS -u 'iosbackup:YOUR_ADMIN_PASSWORD' \
-  'http://127.0.0.1:8080/api/notifications/status'
+  'http://127.0.0.1:9000/api/notifications/status'
 
 curl -sS -u 'iosbackup:YOUR_ADMIN_PASSWORD' \
-  'http://127.0.0.1:8080/api/notifications/config'
+  'http://127.0.0.1:9000/api/notifications/config'
 ```
 
 然后在通知设置页面逐项测试六种事件。测试接口支持：

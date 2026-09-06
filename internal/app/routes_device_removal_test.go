@@ -53,7 +53,7 @@ func TestHandleRemovedDevicesListsOnlySafeFieldsInNewestFirstOrder(t *testing.T)
 	const secondUDID = "REMOVE-LIST-NEWER"
 	second := *app.defaultBackupConfig(secondUDID, "家庭 iPad")
 	second.BackupDirectory = app.paths.BackupsRoot
-	second.NetworkAddress = "10.10.0.99"
+	second.NetworkAddress = "192.0.2.99"
 	second.RestoreEnabled = true
 	second.LastBackup = time.Date(2026, 8, 14, 8, 30, 0, 0, beijingLocation)
 	second.DeviceType = "iPad14,1"

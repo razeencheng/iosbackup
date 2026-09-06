@@ -94,6 +94,16 @@ assert_output_omits_fixture() {
 no_rename_calls=$(grep -Ec 'git .*diff --cached --no-renames ' "$scanner" || true)
 [ "$no_rename_calls" -ge 2 ] || fail 'staged discovery and content reads must both disable rename detection'
 
+# Project-specific private network examples must not leak into public files.
+# Build the test value in pieces so the scanner test itself remains publishable.
+private_network_root="$test_root/private-network"
+mkdir -p "$private_network_root"
+printf 'host=10.%s.%s.%s\n' 10 0 42 >"$private_network_root/private-network.txt"
+run_expect_fail 'project private network address' --directory "$private_network_root"
+if ! awk -F '\t' '$1 == "private-project-network" && $2 == "private-network.txt" { found=1 } END { exit !found }' "$test_root/output"; then
+	fail 'project private network address did not trigger the expected rule'
+fi
+
 # Directory mode: only the exact fixture path and exact content are excepted.
 directory_root="$test_root/directory"
 mkdir -p "$directory_root/$(dirname "$fixture_rel")"

@@ -170,7 +170,7 @@ func TestLoginAcceptsValidCSRFWhenProxyRewritesHostAndFetchMetadataIsUnavailable
 	req := httptest.NewRequest(http.MethodPost, "http://internal:9000/login", strings.NewReader(form.Encode()))
 	req.Host = "internal:9000"
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req.Header.Set("Origin", "http://10.10.0.65:9000")
+	req.Header.Set("Origin", "http://remote.example.test:9000")
 	// Chromium may omit Sec-Fetch-Site in the embedded browser. The per-installation
 	// form token must remain the authoritative same-page proof for the login route.
 	rr := httptest.NewRecorder()
