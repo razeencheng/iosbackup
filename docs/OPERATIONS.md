@@ -2,7 +2,7 @@
 
 [简体中文](OPERATIONS.zh-CN.md) · [Back to README](../README.md)
 
-This runbook covers the official Linux Docker Beta. It does not promise native Windows/macOS device support or guaranteed restore. Keep an independently tested backup.
+This runbook covers the official Linux container. It does not promise native Windows/macOS device support or guaranteed restore. Keep an independently tested backup.
 
 ## Security boundary
 
@@ -89,7 +89,7 @@ The archive contains credentials, pairing records, and personal data. Encrypt it
 
 1. Read [CHANGELOG.md](../CHANGELOG.md) and [Feature status](FEATURE_STATUS.md).
 2. Make and verify the volume backup above.
-3. Change `IOSBK_IMAGE` in `.env` to an explicit reviewed tag such as `ghcr.io/razeencheng/iosbackup:v1.5.0-beta.1`.
+3. Change `IOSBK_IMAGE` in `.env` to an explicit reviewed tag such as `ghcr.io/razeencheng/iosbackup:v1.5.1`.
 4. Pull and recreate the service.
 5. Verify health, build identity, logs, pairing, and read-only inspection; then complete one USB backup on a non-critical device and verify the result.
 

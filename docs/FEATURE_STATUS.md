@@ -2,7 +2,7 @@
 
 [简体中文](FEATURE_STATUS.zh-CN.md) · [Back to README](../README.md)
 
-`v1.5.0-beta.1` is a Docker Beta. These tiers describe the current support boundary; none is a guarantee that a backup can replace an independently tested recovery plan.
+These tiers describe the support boundary for `v1.5.1`; none is a guarantee that a backup can replace an independently tested recovery plan.
 
 ## Core
 

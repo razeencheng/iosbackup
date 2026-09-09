@@ -10,11 +10,11 @@ import (
 	"iosbackup/internal/buildinfo"
 )
 
-const publicBetaImage = "ghcr.io/razeencheng/iosbackup:v1.5.0-beta.1"
+const publicReleaseImage = "ghcr.io/razeencheng/iosbackup:v1.5.1"
 
 var markdownLinkRE = regexp.MustCompile(`!?\[[^]]*\]\(([^)[:space:]]+)(?:[[:space:]]+"[^"]*")?\)`)
 
-func TestPublicReadmesDocumentBetaDeployment(t *testing.T) {
+func TestPublicReadmesDocumentReleaseDeployment(t *testing.T) {
 	tests := []struct {
 		path       string
 		other      string
@@ -25,7 +25,7 @@ func TestPublicReadmesDocumentBetaDeployment(t *testing.T) {
 			path:  "README.md",
 			other: "README.zh-CN.md",
 			markers: []string{
-				publicBetaImage, "Beta", "Core", "Preview", "Experimental",
+				publicReleaseImage, "Core", "Preview", "Experimental",
 				"--privileged", "--network host", "/dev/bus/usb:/dev/bus/usb",
 				"/run/udev:/run/udev:ro", "/var/lib/lockdown", "/backups", "/configs",
 				"Linux", "Windows", "macOS", "/healthz",
@@ -36,7 +36,7 @@ func TestPublicReadmesDocumentBetaDeployment(t *testing.T) {
 			path:  "README.zh-CN.md",
 			other: "README.md",
 			markers: []string{
-				publicBetaImage, "Beta", "核心", "预览", "实验",
+				publicReleaseImage, "核心", "预览", "实验",
 				"--privileged", "--network host", "/dev/bus/usb:/dev/bus/usb",
 				"/run/udev:/run/udev:ro", "/var/lib/lockdown", "/backups", "/configs",
 				"Linux", "Windows", "macOS", "/healthz", "宿主机级权限", "不要暴露到公网", "升级", "回滚", "排错",
@@ -90,7 +90,7 @@ func TestPublicDocsAreBilingualAndOperational(t *testing.T) {
 	for _, path := range []string{"docs/QUICKSTART.md", "docs/QUICKSTART.zh-CN.md"} {
 		text := readRepoFile(t, path)
 		for _, marker := range []string{
-			publicBetaImage, "docker compose", "/healthz", "--privileged", "--network host",
+			publicReleaseImage, "docker compose", "/healthz", "--privileged", "--network host",
 			"/dev/bus/usb:/dev/bus/usb", "/run/udev:/run/udev:ro",
 			"/var/lib/lockdown", "/backups", "/configs",
 		} {
@@ -325,10 +325,10 @@ func TestPublicAllowlistIncludesBetaDocumentation(t *testing.T) {
 	}
 }
 
-func TestPublicComposeUsesOfficialBetaImage(t *testing.T) {
+func TestPublicComposeUsesOfficialReleaseImage(t *testing.T) {
 	compose := readRepoFile(t, "compose.yaml")
-	if !strings.Contains(compose, "${IOSBK_IMAGE:-"+publicBetaImage+"}") {
-		t.Fatalf("compose.yaml must default to the official Beta image")
+	if !strings.Contains(compose, "${IOSBK_IMAGE:-"+publicReleaseImage+"}") {
+		t.Fatalf("compose.yaml must default to the official release image")
 	}
 	for _, forbidden := range []string{"iosbackup:v1.4.1", "docker.io/", "ghcr.io/razeencheng/iosbackup:latest"} {
 		if strings.Contains(compose, forbidden) {

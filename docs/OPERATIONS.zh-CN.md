@@ -2,7 +2,7 @@
 
 [English](OPERATIONS.md) · [返回 README](../README.zh-CN.md)
 
-本手册适用于官方 Linux Docker Beta，不承诺 Windows/macOS 原生真机支持，也不保证恢复成功。请保留独立验证过的备份。
+本手册适用于官方 Linux 容器，不承诺 Windows/macOS 原生真机支持，也不保证恢复成功。请保留独立验证过的备份。
 
 ## 安全边界
 
@@ -89,7 +89,7 @@ docker compose start
 
 1. 阅读 [CHANGELOG.md](../CHANGELOG.md) 和[功能状态](FEATURE_STATUS.zh-CN.md)。
 2. 创建并核验上面的卷备份。
-3. 把 `.env` 中的 `IOSBK_IMAGE` 改成明确审核过的标签，例如 `ghcr.io/razeencheng/iosbackup:v1.5.0-beta.1`。
+3. 把 `.env` 中的 `IOSBK_IMAGE` 改成明确审核过的标签，例如 `ghcr.io/razeencheng/iosbackup:v1.5.1`。
 4. 拉取镜像并重建服务。
 5. 检查健康状态、构建身份、日志、配对和只读查看；然后在非关键设备上完成一次 USB 备份并确认结果。
 

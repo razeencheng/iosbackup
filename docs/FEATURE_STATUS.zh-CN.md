@@ -2,7 +2,7 @@
 
 [English](FEATURE_STATUS.md) · [返回 README](../README.zh-CN.md)
 
-`v1.5.0-beta.1` 是 Docker Beta。以下分级描述当前支持边界，任何分级都不能代替独立验证过的恢复方案。
+以下分级描述 `v1.5.1` 的当前支持边界，任何分级都不能代替独立验证过的恢复方案。
 
 ## 核心（Core）
 

@@ -24,7 +24,7 @@ body:
     attributes:
       label: Version and commit
       description: Copy the version and commit from /api/version.
-      placeholder: v1.5.0-beta.1, commit 0123456...
+      placeholder: v1.5.1, commit 0123456...
     validations:
       required: true
   - type: input

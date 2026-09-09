@@ -2,7 +2,7 @@
 
 [简体中文](QUICKSTART.zh-CN.md) · [Back to README](../README.md)
 
-This guide starts the official Docker Beta on a trusted Linux host. The same image supports `linux/amd64` and `linux/arm64`. Windows and macOS native device operation is not supported or promised.
+This guide starts the official Docker image on a trusted Linux host. The same image supports `linux/amd64` and `linux/arm64`. Windows and macOS native device operation is not supported or promised.
 
 The screenshots below show a real Beta candidate running on a Raspberry Pi ARM64 host, with the UI set to Chinese. They cover login, device setup, backup progress, and one successful USB backup. Task success does not establish verified decryption or device restore. See the [image inventory](images/tutorial/README.md) for the source and verification scope.
 
@@ -19,7 +19,7 @@ umask 077
 mkdir -p data/backups data/configs data/lockdown
 openssl rand -base64 24 > data/configs/admin_password
 printf 'IOSBK_IMAGE=%s\nIOSBK_SECRET_KEY=%s\n' \
-  'ghcr.io/razeencheng/iosbackup:v1.5.0-beta.1' \
+  'ghcr.io/razeencheng/iosbackup:v1.5.1' \
   "$(openssl rand -base64 32)" > .env
 chmod 600 .env data/configs/admin_password
 ```

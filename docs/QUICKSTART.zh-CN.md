@@ -2,7 +2,7 @@
 
 [English](QUICKSTART.md) · [返回 README](../README.zh-CN.md)
 
-本指南用于在可信 Linux 主机上启动官方 Docker Beta。同一镜像支持 `linux/amd64` 和 `linux/arm64`；不支持、也不承诺 Windows 或 macOS 原生真机运行。
+本指南用于在可信 Linux 主机上启动官方 Docker 镜像。同一镜像支持 `linux/amd64` 和 `linux/arm64`；不支持、也不承诺 Windows 或 macOS 原生真机运行。
 
 下面的图片来自 Raspberry Pi ARM64 上运行的 Beta 候选容器，记录登录、设备接入、备份进度和一次 USB 备份的成功终态。成功终态不代表已验证加密内容读取或整机恢复。截图来源与验证范围见[图片清单](images/tutorial/README.md)。
 
@@ -19,7 +19,7 @@ umask 077
 mkdir -p data/backups data/configs data/lockdown
 openssl rand -base64 24 > data/configs/admin_password
 printf 'IOSBK_IMAGE=%s\nIOSBK_SECRET_KEY=%s\n' \
-  'ghcr.io/razeencheng/iosbackup:v1.5.0-beta.1' \
+  'ghcr.io/razeencheng/iosbackup:v1.5.1' \
   "$(openssl rand -base64 32)" > .env
 chmod 600 .env data/configs/admin_password
 ```
