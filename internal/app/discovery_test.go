@@ -1,8 +1,13 @@
 package app
 
 import (
+	"context"
 	"encoding/base64"
+	"encoding/binary"
+	"io"
+	"net"
 	"testing"
+	"time"
 )
 
 func TestSockaddrToIPv4(t *testing.T) {
@@ -10,6 +15,78 @@ func TestSockaddrToIPv4(t *testing.T) {
 	b := []byte{0x02, 0x00, 0x00, 0x00, 192, 0, 2, 249, 0, 0, 0, 0}
 	if got := sockaddrToIP(b); got != "192.0.2.249" {
 		t.Errorf("应解出 192.0.2.249，得到 %q", got)
+	}
+}
+
+func TestQueryNetworkIPsDistinguishesEmptyFromFailure(t *testing.T) {
+	for _, tc := range []struct {
+		name, body string
+		wantErr    bool
+	}{
+		{"empty", `<plist><dict><key>DeviceList</key><array></array></dict></plist>`, false},
+		{"missing list", `<plist><dict><key>Result</key><integer>1</integer></dict></plist>`, true},
+		{"malformed", `not plist`, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ln, err := net.Listen("tcp", "127.0.0.1:0")
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer ln.Close()
+			done := make(chan struct{})
+			go func() {
+				defer close(done)
+				conn, err := ln.Accept()
+				if err != nil {
+					return
+				}
+				defer conn.Close()
+				_ = conn.SetDeadline(time.Now().Add(time.Second))
+				header := make([]byte, 16)
+				if _, err := io.ReadFull(conn, header); err != nil {
+					return
+				}
+				body := make([]byte, int(binary.LittleEndian.Uint32(header))-16)
+				if _, err := io.ReadFull(conn, body); err != nil {
+					return
+				}
+				binary.LittleEndian.PutUint32(header, uint32(16+len(tc.body)))
+				_, _ = conn.Write(append(header, []byte(tc.body)...))
+			}()
+			ips, err := queryNetworkIPs(context.Background(), ln.Addr().String())
+			<-done
+			if (err != nil) != tc.wantErr || len(ips) != 0 {
+				t.Fatalf("不能把查询失败解释为全部掉线：ips=%v err=%v", ips, err)
+			}
+		})
+	}
+}
+
+func TestQueryNetworkIPsCancellationInterruptsRead(t *testing.T) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ln.Close()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		conn, err := ln.Accept()
+		if err != nil {
+			return
+		}
+		defer conn.Close()
+		cancel() // 对端不发送响应，取消必须中断 ReadFull。
+		_ = conn.SetDeadline(time.Now().Add(time.Second))
+		_, _ = io.Copy(io.Discard, conn)
+	}()
+	started := time.Now()
+	_, err = queryNetworkIPs(ctx, ln.Addr().String())
+	<-done
+	if err == nil || time.Since(started) > time.Second {
+		t.Fatalf("取消未及时中断查询：err=%v elapsed=%s", err, time.Since(started))
 	}
 }
 

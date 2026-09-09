@@ -864,8 +864,7 @@ func (app *application) handleEncryptionStatus(w http.ResponseWriter, r *http.Re
 }
 
 // handleTestDeviceIP 探测「设备 IP」是否可达（lockdown over Wi-Fi: 62078）。
-// 可达则注入 netmuxd（add_device）让设备按 IP 立即上线。给「测试连接」按钮即时、
-// 明确的反馈，替代过去填了 IP 却静默离线、看不出通不通的体验。
+// 等待 netmuxd 注册并确认设备上线后才返回成功，同时返回状态供页面立即更新。
 func (app *application) handleTestDeviceIP(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -876,6 +875,10 @@ func (app *application) handleTestDeviceIP(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	udid := extractUDIDFromPath(r.URL.Path, "/api/test-ip/")
+	if udid == "" {
+		writeError(w, http.StatusBadRequest, "无效的设备UDID")
+		return
+	}
 	if app.rejectRemovedDeviceOperation(w, udid) {
 		return
 	}
@@ -897,11 +900,27 @@ func (app *application) handleTestDeviceIP(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	ip = addr.String()
-	ok, reason := app.probeReachable(ip)
-	if ok && udid != "" {
-		go app.callAddDevice(udid, ip) // 可达 → 注入 netmuxd，使其按 IP 上线
+	if err := app.callAddDevice(udid, ip); err != nil {
+		writeJSON(w, http.StatusOK, map[string]interface{}{"ok": false, "reason": err.Error(), "ip": ip})
+		return
 	}
-	writeJSON(w, http.StatusOK, map[string]interface{}{"ok": ok, "reason": reason, "ip": ip})
+	if app.refreshPresence() {
+		app.refreshDetails()
+	}
+	snapshot := app.buildStatusSnapshot()
+	connected := false
+	for _, device := range snapshot.Devices {
+		if device.UDID == udid {
+			connected = device.Online
+			break
+		}
+	}
+	reason := ""
+	if !connected {
+		reason = "IP 可达，但设备尚未上线，请确认设备已解锁并完成配对后重试"
+	}
+	app.broadcastStatus()
+	writeJSON(w, http.StatusOK, map[string]interface{}{"ok": connected, "reason": reason, "ip": ip, "status": snapshot})
 }
 
 // mergeBackupConfig 将 rawFields 中出现的字段合并到 dst。

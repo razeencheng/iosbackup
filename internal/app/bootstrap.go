@@ -154,6 +154,7 @@ func run(ctx context.Context, cfg runtimeConfig) error {
 	// 启动 SSE 事件总线 + 中央状态轮询（实时推送设备状态给浏览器）
 	app.hub = newEventHub()
 	go app.statusPoller(ctx)
+	go app.networkRecoveryLoop(ctx)
 
 	// 设置路由并启动服务器
 	mux := app.setupRoutes()

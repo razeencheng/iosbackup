@@ -147,6 +147,11 @@ type application struct {
 	streamCmdRunner streamCmdRunner
 	// reachProbe 可注入的 IP 可达性探测（nil 时使用真实 wifiReachable）；测试时注入避免真实拨号
 	reachProbe func(ip string) (bool, string)
+	// networkIPLookup 测试可注入 netmuxd 的地址快照；生产读取 ListDevices。
+	networkIPLookup      func(context.Context) (map[string]string, error)
+	networkRecoveryMu    sync.Mutex                      // 单次恢复循环串行，网络 I/O 不占用 app.mu
+	networkRecovery      map[string]networkRecoveryState // app.mu 保护；仅内存缓存
+	networkRegistrations map[string]bool                 // app.mu 保护；同一设备禁止重复注册
 	// muxProcFactory 可注入的进程工厂（nil 时使用真实 exec）；测试时注入 fake
 	muxProcFactory func(ctx context.Context, name string, args ...string) muxProcess
 	// powerAssertionStarter 启动 Wi-Fi WirelessSync assertion helper；测试时注入 fake。

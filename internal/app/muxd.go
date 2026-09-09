@@ -348,13 +348,13 @@ func (app *application) replayAddDevice() {
 	app.mu.RLock()
 	cfgs := make(map[string]*backupConfig, len(app.configs))
 	for udid, cfg := range app.configs {
-		cfgs[udid] = cfg
+		cfgs[udid] = cloneBackupConfig(cfg)
 	}
 	app.mu.RUnlock()
 
 	// 3. 对「有 IP 且不在当前列表」的设备调用 add_device
 	for udid, cfg := range cfgs {
-		if cfg.NetworkAddress == "" {
+		if cfg == nil || cfg.NetworkAddress == "" || cfg.RemovedAt != nil {
 			continue
 		}
 		if _, alreadyIn := currentNetDevices[udid]; alreadyIn {
@@ -368,15 +368,19 @@ func (app *application) replayAddDevice() {
 
 // currentNetmuxdDevices 通过 idevice_id -l -n（netmuxd env）获取当前 netmuxd 设备列表。
 func (app *application) currentNetmuxdDevices() map[string]*device {
+	return app.currentNetmuxdDevicesContext(context.Background())
+}
+
+func (app *application) currentNetmuxdDevicesContext(parent context.Context) map[string]*device {
 	runner := app.cmdRunner
 	if runner == nil {
 		runner = defaultCmdRunner
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), shortCmdTimeout)
+	ctx, cancel := context.WithTimeout(parent, shortCmdTimeout)
 	defer cancel()
 
-	netEnv := append(os.Environ(), "USBMUXD_SOCKET_ADDRESS="+netmuxdAddr)
+	netEnv := withEnvOverride(os.Environ(), "USBMUXD_SOCKET_ADDRESS", netmuxdAddr)
 	out, err := runner(ctx, cmdIdeviceID, []string{"-l", "-n"}, netEnv)
 	if err != nil {
 		return make(map[string]*device)
@@ -384,12 +388,17 @@ func (app *application) currentNetmuxdDevices() map[string]*device {
 	return parseDeviceList(string(out))
 }
 
-// wifiLockdownPort 设备在 Wi-Fi 上 lockdownd 的监听端口；连得通 = 设备在网且可备份。
+// wifiLockdownPort 设备在 Wi-Fi 上 lockdownd 的监听端口；端口可达不代表已注册到 netmuxd。
 const wifiLockdownPort = "62078"
 
 // reachableTCP 探测 addr 能否建立 TCP 连接，返回 (是否可达, 中文原因)。
 func reachableTCP(addr string, timeout time.Duration) (bool, string) {
-	conn, err := net.DialTimeout("tcp", addr, timeout)
+	return reachableTCPContext(context.Background(), addr, timeout)
+}
+
+func reachableTCPContext(ctx context.Context, addr string, timeout time.Duration) (bool, string) {
+	dialer := net.Dialer{Timeout: timeout}
+	conn, err := dialer.DialContext(ctx, "tcp", addr)
 	if err == nil {
 		_ = conn.Close()
 		return true, ""
@@ -423,17 +432,59 @@ func (app *application) probeReachable(ip string) (bool, string) {
 // callAddDevice 调用 add_device 二进制并处理 Failure/Success 语义。
 // add_device 语义（已真机验证）：
 //   - 首次注入 → "Success"
-//   - 已存在设备再次调用 → helper panic（无害），stdout 可能为空或乱
+//   - 已存在设备再次调用 → helper 可能 panic 或一直等待响应，应先查注册表避免重复
 //   - 死 IP → "Failure"
-func (app *application) callAddDevice(udid, ip string) {
+func (app *application) callAddDevice(udid, ip string) error {
+	ctx := app.rootCtx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	return app.callAddDeviceContext(ctx, udid, ip)
+}
+
+func (app *application) callAddDeviceContext(parent context.Context, udid, ip string) error {
+	if err := parent.Err(); err != nil {
+		return err
+	}
 	if app.usesUSBMuxd2WiFi() {
 		app.addWarnLog(udid, fmt.Sprintf("usbmuxd2 Wi-Fi 模式仅支持同网段 mDNS 自动发现，忽略手工 IP %s", ip))
-		return
+		return fmt.Errorf("当前 Wi-Fi 连接模式不支持手动 IP，请使用同网段自动发现或切换到 netmuxd")
 	}
-	// 先快速探测可达性：避免 add_device 连不可达 IP 时挂满 12s 被杀（日志里的 signal: killed）
-	if ok, reason := app.probeReachable(ip); !ok {
+	app.mu.Lock()
+	if err := app.deviceRemovalBlockedUnsafe(udid); err != nil {
+		app.mu.Unlock()
+		return err
+	}
+	if app.deviceRemovalBusyUnsafe(udid) {
+		app.mu.Unlock()
+		// 已注册时只是查询，不干扰正在进行的备份；未注册时禁止重连。
+		if _, exists := app.currentNetmuxdDevicesContext(parent)[udid]; exists {
+			return nil
+		}
+		return errDeviceBusy
+	}
+	if app.networkRegistrations == nil {
+		app.networkRegistrations = make(map[string]bool)
+	}
+	app.networkRegistrations[udid] = true
+	app.mu.Unlock()
+	defer func() { app.mu.Lock(); delete(app.networkRegistrations, udid); app.mu.Unlock() }()
+	ctx, cancel := context.WithTimeout(parent, shortCmdTimeout)
+	defer cancel()
+	// 先快速探测可达性：避免 add_device 连不可达 IP 时耗尽超时。
+	probe := app.reachProbe
+	if probe == nil {
+		probe = func(ip string) (bool, string) {
+			return reachableTCPContext(ctx, net.JoinHostPort(ip, wifiLockdownPort), 4*time.Second)
+		}
+	}
+	if ok, reason := probe(ip); !ok {
 		app.addWarnLog(udid, fmt.Sprintf("add_device 跳过：IP %s 不可达（%s）", ip, reason))
-		return
+		return fmt.Errorf("%s", reason)
+	}
+	// 已注册设备重复添加可能触发 helper panic。
+	if _, exists := app.currentNetmuxdDevicesContext(ctx)[udid]; exists {
+		return nil
 	}
 
 	runner := app.cmdRunner
@@ -441,25 +492,43 @@ func (app *application) callAddDevice(udid, ip string) {
 		runner = defaultCmdRunner
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), shortCmdTimeout)
-	defer cancel()
-
-	out, err := runner(ctx, cmdAddDevice, []string{udid, ip}, os.Environ())
+	// helper 默认连接 USB unix socket，必须显式指向接收 AddDevice 的 netmuxd。
+	env := withEnvOverride(os.Environ(), "USBMUXD_SOCKET_ADDRESS", netmuxdAddr)
+	env = withEnvOverride(env, "OPENSSL_CONF", opensslConfPath)
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	out, err := runner(ctx, cmdAddDevice, []string{udid, ip}, env)
 	output := strings.TrimSpace(string(out))
+	if parent.Err() != nil {
+		return parent.Err()
+	}
+	// helper 可能在注册已成功时仍等待响应；以注册表复核超时/未知响应。
+	if err != nil || !strings.Contains(output, "Success") {
+		verifyCtx, verifyCancel := context.WithTimeout(parent, 2*time.Second)
+		_, registered := app.currentNetmuxdDevicesContext(verifyCtx)[udid]
+		verifyCancel()
+		if registered {
+			app.addInfoLog(udid, fmt.Sprintf("add_device 响应未确认，但注册表已确认设备上线: ip=%s", ip))
+			return nil
+		}
+	}
 
 	if err != nil {
-		app.addWarnLog(udid, fmt.Sprintf("add_device 执行错误（dead IP 或 helper panic？）: ip=%s err=%v output=%q", ip, err, output))
-		return
+		app.addWarnLog(udid, fmt.Sprintf("add_device 执行失败且未查询到设备注册: ip=%s err=%v output=%q", ip, err, output))
+		return fmt.Errorf("IP 可达，但连接服务注册失败，请检查 Wi-Fi 连接服务和设备配对状态")
 	}
 
 	switch {
 	case strings.Contains(output, "Success"):
 		app.addInfoLog(udid, fmt.Sprintf("add_device 成功: ip=%s", ip))
+		return nil
 	case strings.Contains(output, "Failure"):
-		app.addWarnLog(udid, fmt.Sprintf("add_device 返回 Failure，IP 不通或设备不可达: ip=%s，跨子网 Wi-Fi 不可用", ip))
+		app.addWarnLog(udid, fmt.Sprintf("add_device 返回 Failure，设备未注册: ip=%s", ip))
+		return fmt.Errorf("IP 可达，但设备未能注册到 Wi-Fi 连接服务，请确认 IP 属于此设备且已完成配对")
 	default:
-		// helper panic 但无害（已存在设备），记 warn
-		app.addWarnLog(udid, fmt.Sprintf("add_device 输出未知（可能是已存在设备的 helper panic，无害）: ip=%s output=%q", ip, output))
+		app.addWarnLog(udid, fmt.Sprintf("add_device 输出未知且未查询到设备注册: ip=%s output=%q", ip, output))
+		return fmt.Errorf("IP 可达，但 Wi-Fi 连接服务未确认注册成功，请重试并检查服务日志")
 	}
 }
 

@@ -2,6 +2,7 @@ package app
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"encoding/binary"
 	"encoding/xml"
@@ -185,11 +186,26 @@ func plistArray(dec *xml.Decoder) ([]interface{}, error) {
 
 // discoveredNetworkIPs 连 netmuxd，发 usbmux ListDevices，返回 UDID→发现 IP。失败返回空 map。
 func (app *application) discoveredNetworkIPs() map[string]string {
-	conn, err := net.DialTimeout("tcp", netmuxdAddr, 2*time.Second)
+	ips, _ := app.lookupNetworkIPs(context.Background())
+	return ips
+}
+
+func (app *application) lookupNetworkIPs(ctx context.Context) (map[string]string, error) {
+	if app.networkIPLookup != nil {
+		return app.networkIPLookup(ctx)
+	}
+	return queryNetworkIPs(ctx, netmuxdAddr)
+}
+
+func queryNetworkIPs(ctx context.Context, addr string) (map[string]string, error) {
+	dialer := net.Dialer{Timeout: 2 * time.Second}
+	conn, err := dialer.DialContext(ctx, "tcp", addr)
 	if err != nil {
-		return map[string]string{}
+		return nil, err
 	}
 	defer conn.Close()
+	stop := context.AfterFunc(ctx, func() { _ = conn.Close() })
+	defer stop()
 	_ = conn.SetDeadline(time.Now().Add(3 * time.Second))
 
 	payload := []byte(`<?xml version="1.0"?><plist version="1.0"><dict><key>MessageType</key><string>ListDevices</string></dict></plist>`)
@@ -199,20 +215,31 @@ func (app *application) discoveredNetworkIPs() map[string]string {
 	binary.LittleEndian.PutUint32(hdr[8:], 8)  // message = plist
 	binary.LittleEndian.PutUint32(hdr[12:], 1) // tag
 	if _, err := conn.Write(append(hdr, payload...)); err != nil {
-		return map[string]string{}
+		return nil, err
 	}
 
 	respHdr := make([]byte, 16)
 	if _, err := io.ReadFull(conn, respHdr); err != nil {
-		return map[string]string{}
+		return nil, err
 	}
 	total := binary.LittleEndian.Uint32(respHdr[0:])
 	if total < 16 || total > 10*1024*1024 {
-		return map[string]string{}
+		return nil, fmt.Errorf("无效的 netmuxd 响应长度: %d", total)
 	}
 	body := make([]byte, total-16)
 	if _, err := io.ReadFull(conn, body); err != nil {
-		return map[string]string{}
+		return nil, err
 	}
-	return parseNetworkIPs(body)
+	root, err := decodePlist(body)
+	if err != nil {
+		return nil, err
+	}
+	dict, ok := root.(map[string]interface{})
+	if !ok {
+		return nil, fmt.Errorf("无效的 netmuxd 响应")
+	}
+	if _, ok := dict["DeviceList"].([]interface{}); !ok {
+		return nil, fmt.Errorf("netmuxd 响应缺少 DeviceList")
+	}
+	return parseNetworkIPs(body), nil
 }
