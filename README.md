@@ -4,7 +4,7 @@
 
 iOS Backup is a local-first, single-administrator web application for backing up iPhone and iPad devices to a Linux host or NAS. It wraps libimobiledevice, usbmuxd2, and netmuxd in a privileged container and provides USB discovery, scheduled backups, read-only backup inspection, and optional notifications.
 
-> **Current release:** `v1.5.1` adds automatic Wi-Fi device recovery after heartbeat disconnects. Wi-Fi and encryption remain Preview features; see the support boundaries below.
+> **Current release:** `v1.5.2` stops stalled backups with bounded inactivity timeouts and shows accurate session phases and last activity. Wi-Fi and encryption remain Preview features; see the support boundaries below.
 
 ![iOS Backup console after a successful USB backup](docs/images/tutorial/09-usb-backup-completed.png)
 
@@ -35,7 +35,7 @@ umask 077
 mkdir -p data/backups data/configs data/lockdown
 openssl rand -base64 24 > data/configs/admin_password
 printf 'IOSBK_IMAGE=%s\nIOSBK_SECRET_KEY=%s\n' \
-  'ghcr.io/razeencheng/iosbackup:v1.5.1' \
+  'ghcr.io/razeencheng/iosbackup:v1.5.2' \
   "$(openssl rand -base64 32)" > .env
 docker compose pull
 docker compose up -d
@@ -90,6 +90,7 @@ The detailed runbook is in [Operations](docs/OPERATIONS.md).
 
 ## Version history
 
+- **v1.5.2:** bound backup inactivity independently of device visibility, preserve the last successful backup time on failure, and show authorization, transfer, and device-processing phases. See [Changelog](CHANGELOG.md).
 - **v1.5.1:** recover previously registered Wi-Fi devices in the background, including devices discovered through mDNS with no manual IP; report IP-test success only after registration is confirmed. See [Changelog](CHANGELOG.md) for details.
 
 ## Development and contributions

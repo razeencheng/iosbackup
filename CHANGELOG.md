@@ -2,6 +2,17 @@
 
 This project follows Semantic Versioning. Release dates and source metadata are frozen in [`release/manifest.env`](release/manifest.env); this file does not duplicate the current release date.
 
+## v1.5.2
+
+Released 2026-09-12.
+
+- Stop manual and automatic backup sessions that exceed phase-specific inactivity limits, even when the device remains visible. Gracefully terminate the process group, release the job, and report `backup_stalled` without changing the last successful backup time.
+- Use payload-free mobilebackup2 activity records from the bundled tool; repeated progress output, device heartbeats, and power assertions do not keep a dead session alive. Active transfers have no total-duration deadline.
+- Show authorization, sending, receiving, and device-processing phases with the last activity time. Require a success acknowledgement from the current command before recording success.
+- Add configurable authorization, transfer inactivity, and preparation limits (defaults: 5, 10, and 30 minutes). Existing configs and backup sets need no migration. This bounds indefinite waits; it does not establish why an individual iOS service stopped responding.
+
+中文：修复手机仍在线时备份无限等待的问题；增加分阶段无活动超时、准确阶段和最后活动时间，正常慢速传输不会仅因总体百分比不变而中止。失败会释放任务并保留最后成功记录，配置与备份数据无需迁移。
+
 ## v1.5.1
 
 ### Fixed

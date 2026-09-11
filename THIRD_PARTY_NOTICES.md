@@ -12,7 +12,7 @@ iOS Backup 的 Go 应用本身仅使用 Go 标准库，源码采用 `AGPL-3.0-on
 | libimobiledevice-glue | `da770a76...` | https://github.com/libimobiledevice/libimobiledevice-glue | LGPL-2.1 | 无 |
 | libusbmuxd | `93eb168b...` | https://github.com/libimobiledevice/libusbmuxd | LGPL-2.1 | 无 |
 | libtatsu | `60a39f36...` | https://github.com/libimobiledevice/libtatsu | LGPL-2.1 | 无 |
-| libimobiledevice | `fa0f7919...` | https://github.com/libimobiledevice/libimobiledevice | LGPL-2.1 | `afc-return-after-receive-error.patch` |
+| libimobiledevice | `fa0f7919...` | https://github.com/libimobiledevice/libimobiledevice | LGPL-2.1 | `afc-return-after-receive-error.patch`, `backup-activity-records.patch` |
 | libgeneral | `81e46367...` | https://github.com/tihmstar/libgeneral | LGPL-2.1 | 无 |
 | usbmuxd2 | `744c46fc...` | https://github.com/tihmstar/usbmuxd2 | LGPL-3.0 | `client-disconnect-exception.patch` |
 | netmuxd | `ac8da974...` | https://github.com/jkcoxson/netmuxd | LGPL-2.1-only | `observability.patch`, `heartbeat-reconnect-after-sleep.patch`, `restore-helper-binaries.patch` |
@@ -22,6 +22,7 @@ iOS Backup 的 Go 应用本身仅使用 Go 标准库，源码采用 `AGPL-3.0-on
 本地补丁位于 `third_party/patches/`。每个补丁都记录在对应组件的 `patches` 数组中。补丁内容：
 
 - **libimobiledevice/afc-return-after-receive-error.patch**：修复 AFC 接收错误后的返回处理
+- **libimobiledevice/backup-activity-records.patch**：为备份任务增加可选的无载荷协议活动计数和阶段标记，供无活动超时判断使用
 - **usbmuxd2/client-disconnect-exception.patch**：修复客户端断开时的异常处理
 - **netmuxd/observability.patch**：增加可观察性日志
 - **netmuxd/heartbeat-reconnect-after-sleep.patch**：修复睡眠后心跳重连

@@ -102,6 +102,7 @@ type backupProgressDTO struct {
 	CurrentBytes       *int64   `json:"current_bytes,omitempty"`
 	CurrentTotalBytes  *int64   `json:"current_total_bytes,omitempty"`
 	UpdatedAt          string   `json:"updated_at"`
+	LastActivityAt     string   `json:"last_activity_at,omitempty"`
 }
 
 type statusSnapshot struct {
@@ -160,7 +161,12 @@ func (app *application) buildStatusSnapshot() statusSnapshot {
 			if !progress.UpdatedAt.IsZero() {
 				updatedAt = toBeijingTime(progress.UpdatedAt).Format(time.RFC3339)
 			}
+			lastActivityAt := ""
+			if !progress.LastActivityAt.IsZero() {
+				lastActivityAt = toBeijingTime(progress.LastActivityAt).Format(time.RFC3339)
+			}
 			progressDTO = &backupProgressDTO{
+				LastActivityAt:     lastActivityAt,
 				State:              string(progress.State),
 				Phase:              progress.Phase,
 				OverallPercent:     cloneOptionalFloat64(progress.OverallPercent),

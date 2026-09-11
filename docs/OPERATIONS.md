@@ -50,6 +50,22 @@ Start with a successful manual USB backup. Then enable the schedule for one devi
 
 The main bar is the overall progress for the backup. When the device tool reports it, a separate current file progress value restarts for each file. The UI deliberately does not display the filename and does not estimate remaining time. If the Wi-Fi device briefly disappears, the state can show **waiting for device reconnection** while retaining the last trusted progress. Once a task has ended, it is not resumed automatically; start a new backup after connectivity is restored.
 
+### Inactivity timeouts
+
+The UI distinguishes device authorization, sending data, receiving data, and waiting for the device, and shows the last backup activity time in Beijing time. Incremental backups first send the existing manifest to the device. A large encrypted manifest can take several minutes to process; neither overall 0% nor current-file 100% alone indicates a stall. Overall 100% still requires the tool to acknowledge success for this job.
+
+The bundled `idevicebackup2` reports payload-free protocol counters. Only transferred bytes or a successfully received protocol message update activity; discovery, heartbeats, power-assertion renewals, and repeated progress displays do not. Custom unpatched tools fall back to recognized file changes, byte counts, and progress changes, with the limitations of their output.
+
+| Startup environment variable | Default | Phase |
+| --- | --- | --- |
+| `IOSBK_BACKUP_AUTHORIZATION_TIMEOUT` | `5m` | Waiting for device passcode authorization |
+| `IOSBK_BACKUP_INACTIVITY_TIMEOUT` | `10m` | Sending or receiving without new activity |
+| `IOSBK_BACKUP_PREPARATION_TIMEOUT` | `30m` | Session setup, device processing, or waiting for the next response |
+
+Each accepts a Go duration from `1s` to `24h`; zero cannot disable the guard. Persist changes in Compose environment settings and recreate the container. These are inactivity limits, not total backup deadlines. Increase the preparation limit for slower devices when needed.
+
+A timeout terminates the old process group and reports `backup_stalled`, preserves the backup set and last successful time, and releases the job for retry. Check device prompts and connectivity before retrying. No immediate retry loop is added; future automatic backups still follow the existing scheduler conditions. Use USB as a comparison if new sessions repeatedly stop at the same point. This guard bounds an indefinite wait; it does not establish why iOS originally stopped responding.
+
 ## Wi-Fi prerequisites and fallback
 
 Wi-Fi backup is Preview. Before using it:
@@ -89,7 +105,7 @@ The archive contains credentials, pairing records, and personal data. Encrypt it
 
 1. Read [CHANGELOG.md](../CHANGELOG.md) and [Feature status](FEATURE_STATUS.md).
 2. Make and verify the volume backup above.
-3. Change `IOSBK_IMAGE` in `.env` to an explicit reviewed tag such as `ghcr.io/razeencheng/iosbackup:v1.5.1`.
+3. Change `IOSBK_IMAGE` in `.env` to an explicit reviewed tag such as `ghcr.io/razeencheng/iosbackup:v1.5.2`.
 4. Pull and recreate the service.
 5. Verify health, build identity, logs, pairing, and read-only inspection; then complete one USB backup on a non-critical device and verify the result.
 

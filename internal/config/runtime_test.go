@@ -292,3 +292,27 @@ func mapEnv(values map[string]string) func(string) string {
 func mustPrefix(value string) netip.Prefix {
 	return netip.MustParsePrefix(value)
 }
+
+func TestBackupTimeoutConfiguration(t *testing.T) {
+	values := map[string]string{"IOSBK_BACKUP_PREPARATION_TIMEOUT": "45m", "IOSBK_BACKUP_INACTIVITY_TIMEOUT": "12m", "IOSBK_BACKUP_AUTHORIZATION_TIMEOUT": "7m"}
+	cfg, err := config.Load(func(key string) string { return values[key] })
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.BackupPreparationTimeout != 45*time.Minute || cfg.BackupInactivityTimeout != 12*time.Minute || cfg.BackupAuthorizationTimeout != 7*time.Minute {
+		t.Fatalf("timeouts not loaded: %+v", cfg)
+	}
+	for key := range values {
+		for _, value := range []string{"0", "-1s", "25h", "bad"} {
+			_, err := config.Load(func(k string) string {
+				if k == key {
+					return value
+				}
+				return ""
+			})
+			if err == nil {
+				t.Errorf("%s=%s should fail startup validation", key, value)
+			}
+		}
+	}
+}

@@ -1,6 +1,6 @@
 services:
   iosbackup:
-    image: ${IOSBK_IMAGE:-ghcr.io/razeencheng/iosbackup:v1.5.1}
+    image: ${IOSBK_IMAGE:-ghcr.io/razeencheng/iosbackup:v1.5.2}
     container_name: iosbackup
     network_mode: host
     privileged: true

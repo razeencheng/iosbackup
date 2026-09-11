@@ -145,6 +145,8 @@ type application struct {
 	cmdRunner cmdRunner
 	// streamCmdRunner 用于长时间/大输出命令；nil 时使用真实流式 exec。
 	streamCmdRunner streamCmdRunner
+	// backupCommand 是外部备份工具的构造边界；nil 时执行固定路径的真实工具。
+	backupCommand func(context.Context, string, ...string) *execCmd
 	// reachProbe 可注入的 IP 可达性探测（nil 时使用真实 wifiReachable）；测试时注入避免真实拨号
 	reachProbe func(ip string) (bool, string)
 	// networkIPLookup 测试可注入 netmuxd 的地址快照；生产读取 ListDevices。

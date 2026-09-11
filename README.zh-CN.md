@@ -4,7 +4,7 @@
 
 iOS Backup 是一个本地优先、面向单管理员的 iPhone/iPad 备份 Web 应用，用于把设备备份到 Linux 主机或 NAS。它在特权容器中封装 libimobiledevice、usbmuxd2 和 netmuxd，提供 USB 发现、定时备份、只读备份查看和可选通知。
 
-> **当前版本：**`v1.5.1` 增加 Wi-Fi 设备心跳断连后的自动恢复。Wi-Fi 与加密仍属于预览功能，支持范围见下文。
+> **当前版本：**`v1.5.2` 增加备份无活动超时保护，准确展示会话阶段和最后活动时间。Wi-Fi 与加密仍属于预览功能，支持范围见下文。
 
 ![iOS Backup 真机 USB 备份成功后的控制台](docs/images/tutorial/09-usb-backup-completed.png)
 
@@ -35,7 +35,7 @@ umask 077
 mkdir -p data/backups data/configs data/lockdown
 openssl rand -base64 24 > data/configs/admin_password
 printf 'IOSBK_IMAGE=%s\nIOSBK_SECRET_KEY=%s\n' \
-  'ghcr.io/razeencheng/iosbackup:v1.5.1' \
+  'ghcr.io/razeencheng/iosbackup:v1.5.2' \
   "$(openssl rand -base64 32)" > .env
 docker compose pull
 docker compose up -d
@@ -90,6 +90,7 @@ Compose 部署等价使用 `--privileged` 和 `--network host`，挂载 `/dev/bu
 
 ## 版本历史
 
+- **v1.5.2：**独立于设备在线状态检测备份停滞，失败时保留最后成功备份时间，区分授权等待、数据传输和手机处理阶段。详见[版本记录](CHANGELOG.md)。
 - **v1.5.1：**后台自动恢复曾注册的 Wi-Fi 设备，支持不填手动 IP、由 mDNS 发现的设备；测试 IP 仅在确认设备注册后提示成功。详见[版本记录](CHANGELOG.md)。
 
 ## 开发与贡献

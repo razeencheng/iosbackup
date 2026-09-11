@@ -44,6 +44,9 @@ type Runtime struct {
 	MaxHeavyJobs                 int
 	PresenceInterval             time.Duration
 	DeviceDisconnectGrace        time.Duration
+	BackupPreparationTimeout     time.Duration
+	BackupInactivityTimeout      time.Duration
+	BackupAuthorizationTimeout   time.Duration
 	SchedulerInterval            time.Duration
 	NetmuxdLogLevel              string
 	WiFiBackend                  string
@@ -64,6 +67,9 @@ func Default() Runtime {
 		MaxHeavyJobs:                 defaultMaxHeavyJobs,
 		PresenceInterval:             defaultPresenceInterval,
 		DeviceDisconnectGrace:        defaultDisconnectGrace,
+		BackupPreparationTimeout:     30 * time.Minute,
+		BackupInactivityTimeout:      10 * time.Minute,
+		BackupAuthorizationTimeout:   5 * time.Minute,
 		SchedulerInterval:            defaultSchedulerInterval,
 		NetmuxdLogLevel:              defaultNetmuxdLogLevel,
 		WiFiBackend:                  WiFiBackendNetmuxd,
@@ -147,6 +153,21 @@ func Load(getenv func(string) string) (Runtime, error) {
 		cfg.DeviceDisconnectGrace, err = parseDurationRange("IOSBK_DEVICE_DISCONNECT_GRACE", value, 5*time.Second, 10*time.Minute)
 		if err != nil {
 			return Runtime{}, err
+		}
+	}
+	for _, item := range []struct {
+		name   string
+		target *time.Duration
+	}{
+		{"IOSBK_BACKUP_PREPARATION_TIMEOUT", &cfg.BackupPreparationTimeout},
+		{"IOSBK_BACKUP_INACTIVITY_TIMEOUT", &cfg.BackupInactivityTimeout},
+		{"IOSBK_BACKUP_AUTHORIZATION_TIMEOUT", &cfg.BackupAuthorizationTimeout},
+	} {
+		if value := strings.TrimSpace(getenv(item.name)); value != "" {
+			*item.target, err = parseDurationRange(item.name, value, time.Second, 24*time.Hour)
+			if err != nil {
+				return Runtime{}, err
+			}
 		}
 	}
 	if value := strings.TrimSpace(getenv("IOSBK_SCHEDULER_INTERVAL")); value != "" {

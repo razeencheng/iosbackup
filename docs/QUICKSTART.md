@@ -19,7 +19,7 @@ umask 077
 mkdir -p data/backups data/configs data/lockdown
 openssl rand -base64 24 > data/configs/admin_password
 printf 'IOSBK_IMAGE=%s\nIOSBK_SECRET_KEY=%s\n' \
-  'ghcr.io/razeencheng/iosbackup:v1.5.1' \
+  'ghcr.io/razeencheng/iosbackup:v1.5.2' \
   "$(openssl rand -base64 32)" > .env
 chmod 600 .env data/configs/admin_password
 ```

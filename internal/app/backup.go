@@ -56,6 +56,9 @@ func (app *application) markBackupRunning(udid string) {
 }
 
 func backupFailureState(err error) (stateCode, errorCode string) {
+	if errors.Is(err, errBackupStalled) {
+		return backupStateFailed, "backup_stalled"
+	}
 	if errors.Is(err, errDeviceDisconnected) {
 		return backupStateInterrupted, "device_disconnected"
 	}
@@ -80,6 +83,24 @@ func (app *application) finishBackupState(udid string, err error) {
 	}
 	stateCode, errorCode := backupFailureState(err)
 	app.setBackupOperationState(udid, stateCode, errorCode, err.Error())
+}
+
+// finishBackupOperation 原子提交终态并释放占用，下一任务不能被旧终态覆盖。
+func (app *application) finishBackupOperation(udid string, err error, at time.Time) {
+	app.mu.Lock()
+	app.finishBackupProgressUnsafe(udid, err, at)
+	state := app.deviceOperationStates[udid]
+	state.BackupState = backupStateSucceeded
+	state.BackupErrorCode = ""
+	state.LastBackupError = ""
+	if err != nil {
+		state.BackupState, state.BackupErrorCode = backupFailureState(err)
+		state.LastBackupError = err.Error()
+	}
+	app.deviceOperationStates[udid] = state
+	delete(app.backupInProgress, udid)
+	app.mu.Unlock()
+	app.broadcastStatus()
 }
 
 func (app *application) PerformBackup(udid string) (retErr error) {
@@ -109,11 +130,7 @@ func (app *application) PerformBackup(udid string) (retErr error) {
 
 	// 确保在函数退出时清理备份状态
 	defer func() {
-		app.mu.Lock()
-		delete(app.backupInProgress, udid)
-		app.mu.Unlock()
-		app.finishBackupProgress(udid, retErr, nowBeijing())
-		app.finishBackupState(udid, retErr) // 备份结束：即时推送结构化结果
+		app.finishBackupOperation(udid, retErr, nowBeijing())
 	}()
 
 	if !exists {
@@ -162,52 +179,7 @@ func (app *application) PerformBackup(udid string) (retErr error) {
 	}
 	defer releasePowerAssertion()
 
-	var cmdArgs []string
-	if isNetwork {
-		cmdArgs = append(cmdArgs, "-n")
-	}
-	cmdArgs = append(cmdArgs, "-u", udid, "backup", config.BackupDirectory)
-
-	cmd := newExecCmd(backupCtx, cmdIdevicebackup2, cmdArgs...)
-	cmd.SetGracefulCancel(3 * time.Second)
-	if isNetwork {
-		releaseActive := app.registerActiveDeviceCommand(udid, connectTypeNetwork, backupCancel)
-		defer releaseActive()
-	}
-	cmdEnv := os.Environ()
-	if isNetwork {
-		cmdEnv = append(cmdEnv, app.networkIdeviceEnvVars()...)
-	}
-	cmd.cmd.Env = cmdEnv
-
-	// 实时输出备份日志
-	stdout, err := cmd.cmd.StdoutPipe()
-	if err != nil {
-		backupLog(fmt.Sprintf("备份失败: %v", err))
-		return err
-	}
-
-	stderr, err := cmd.cmd.StderrPipe()
-	if err != nil {
-		backupLog(fmt.Sprintf("备份失败: %v", err))
-		return err
-	}
-
-	if err := cmd.Start(); err != nil {
-		backupLog(fmt.Sprintf("备份失败: %v", err))
-		return err
-	}
-
-	// 启动日志读取协程
-	go app.readBackupOutput(udid, sessionID, stdout, "STDOUT")
-	go app.readBackupOutput(udid, sessionID, stderr, "STDERR")
-
-	err = cmd.Wait()
-	if errors.Is(context.Cause(backupCtx), errDeviceDisconnected) {
-		err = errDeviceDisconnected
-	} else if errors.Is(context.Cause(backupCtx), errPowerAssertionLost) {
-		err = context.Cause(backupCtx)
-	}
+	err = app.runBackupCommand(backupCtx, backupCancel, udid, sessionID, config.BackupDirectory, isNetwork)
 	if err != nil {
 		backupLog(fmt.Sprintf("备份失败: %v", err))
 
@@ -260,7 +232,7 @@ func (app *application) PerformBackup(udid string) (retErr error) {
 }
 
 // readBackupOutput 读取备份输出
-func (app *application) readBackupOutput(udid, sessionID string, pipe interface{}, logType string) {
+func (app *application) readBackupOutput(udid, sessionID string, pipe interface{}, logType string, observers ...func(string, string) bool) {
 	defer func() {
 		// 确保goroutine能够正常退出
 		if r := recover(); r != nil {
@@ -282,7 +254,11 @@ func (app *application) readBackupOutput(udid, sessionID string, pipe interface{
 
 	var lastProgressUpdate time.Time
 	err := consumeBoundedLines(reader, func(line string, carriageReturn bool) error {
-		if logType == "STDOUT" {
+		if len(observers) > 0 {
+			if observers[0](line, logType) {
+				return nil
+			}
+		} else if logType == "STDOUT" {
 			if update, ok := parseBackupProgressLine(line); ok {
 				app.applyBackupProgressUpdate(udid, update, nowBeijing())
 			}
@@ -338,11 +314,7 @@ func (app *application) performBackupWithConnection(udid, connectionType, sessio
 
 	// 确保在函数退出时清理备份状态
 	defer func() {
-		app.mu.Lock()
-		delete(app.backupInProgress, udid)
-		app.mu.Unlock()
-		app.finishBackupProgress(udid, retErr, nowBeijing())
-		app.finishBackupState(udid, retErr) // 备份结束：即时推送结构化结果
+		app.finishBackupOperation(udid, retErr, nowBeijing())
 	}()
 
 	if !exists {
@@ -392,51 +364,7 @@ func (app *application) performBackupWithConnection(udid, connectionType, sessio
 	}
 	defer releasePowerAssertion()
 
-	var cmdArgs []string
-	if isNetwork {
-		cmdArgs = append(cmdArgs, "-n")
-	}
-	cmdArgs = append(cmdArgs, "-u", udid, "backup", backupDir)
-
-	cmd := newExecCmd(backupCtx, cmdIdevicebackup2, cmdArgs...)
-	cmd.SetGracefulCancel(3 * time.Second)
-	if isNetwork {
-		releaseActive := app.registerActiveDeviceCommand(udid, connectTypeNetwork, backupCancel)
-		defer releaseActive()
-	}
-	cmdEnv := os.Environ()
-	if isNetwork {
-		cmdEnv = append(cmdEnv, app.networkIdeviceEnvVars()...)
-	}
-	cmd.cmd.Env = cmdEnv
-	cmd.cmd.Dir = dirBackupBase
-
-	stdout, err := cmd.cmd.StdoutPipe()
-	if err != nil {
-		backupLog(fmt.Sprintf("创建输出管道失败: %v", err))
-		return err
-	}
-
-	stderr, err := cmd.cmd.StderrPipe()
-	if err != nil {
-		backupLog(fmt.Sprintf("创建错误管道失败: %v", err))
-		return err
-	}
-
-	if err := cmd.Start(); err != nil {
-		backupLog(fmt.Sprintf("启动备份命令失败: %v", err))
-		return err
-	}
-
-	go app.readBackupOutput(udid, sessionID, stdout, "STDOUT")
-	go app.readBackupOutput(udid, sessionID, stderr, "STDERR")
-
-	err = cmd.Wait()
-	if errors.Is(context.Cause(backupCtx), errDeviceDisconnected) {
-		err = errDeviceDisconnected
-	} else if errors.Is(context.Cause(backupCtx), errPowerAssertionLost) {
-		err = context.Cause(backupCtx)
-	}
+	err = app.runBackupCommand(backupCtx, backupCancel, udid, sessionID, backupDir, isNetwork)
 	if err != nil {
 		backupLog(fmt.Sprintf("自动备份失败: %v", err))
 

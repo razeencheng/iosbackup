@@ -10,7 +10,7 @@ import (
 	"iosbackup/internal/buildinfo"
 )
 
-const publicReleaseImage = "ghcr.io/razeencheng/iosbackup:v1.5.1"
+const publicReleaseImage = "ghcr.io/razeencheng/iosbackup:v1.5.2"
 
 var markdownLinkRE = regexp.MustCompile(`!?\[[^]]*\]\(([^)[:space:]]+)(?:[[:space:]]+"[^"]*")?\)`)
 
