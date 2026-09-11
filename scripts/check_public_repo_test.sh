@@ -110,6 +110,7 @@ third_party/licenses/SQLite-Blessing.txt
 third_party/licenses/Unicode-3.0.txt
 third_party/licenses/Unlicense.txt
 third_party/patches/libimobiledevice/afc-return-after-receive-error.patch
+third_party/patches/libimobiledevice/backup-activity-records.patch
 third_party/patches/netmuxd/heartbeat-reconnect-after-sleep.patch
 third_party/patches/netmuxd/observability.patch
 third_party/patches/netmuxd/restore-helper-binaries.patch
