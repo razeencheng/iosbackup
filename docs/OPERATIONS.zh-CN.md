@@ -147,6 +147,62 @@ docker compose logs --tail=200 iosbackup
 
 备份运行时不要连续重启所有组件。等待活动任务进入终态，解锁并重新连接设备，查看之前的心跳与传输日志，再通过 USB 重试。如果 USB 成功，该设备应继续关闭 Wi-Fi，并提交已脱敏的预览功能问题。
 
+### Wi-Fi 在线但备份长期停在 0%：检查空闲 NAT 连接
+
+设备发现、心跳和备份数据可以使用不同的 TCP 连接。mDNS 能找到设备、心跳仍然正常，不能证明备份数据流可用。手机在本机扫描和准备清单时，备份连接可能连续数分钟没有传输；这个阶段短暂的 0% 本身不等于故障。
+
+一次跨网段、使用 SNAT 的现场问题中，同版本与备份集的 USB 备份成功，Wi-Fi 却在手机扫描后收到 `Connection reset by peer`。独立只读查询第一次成功，同一连接空闲 240 秒后复用失败。双端抓包确认：手机向原 NAT 端口发来 ACK，路由器立即回 RST，而 NAS 没收到这次来包。仅绕过这对设备的流量卸载后，相同空闲测试通过，随后一次完整 Wi-Fi 增量备份成功。
+
+这将问题定位到该路由器的软件流量卸载路径：空闲 NAT 映射提前失效，手机的回包无法还原到 NAS。单次连接跟踪查询缺席不足以证明映射丢失，需要结合双端抓包与连接复用对照；240 秒是本次测试间隔，不是统一的 NAT 超时标准，也不能将结论推广到所有路由器。
+
+排查顺序：
+
+1. 保存原任务的阶段、最后活动时间和日志，确认本次手机密码授权已完成；不要先重启组件或删除配对与备份集。
+2. 用相同版本与备份集完成 USB 对照，再分析 Wi-Fi 会话中手机退出的第一条错误。空间查询失败若发生在连接重置之后，不能直接判断磁盘已满。
+3. 在 NAS 和路由器同时抓取目标连接，区分路由器独立产生的 RST 与主机正常关闭后经 NAT 转发的 RST。持续观察连接跟踪记录，并复用同一连接做空闲前后对照。
+4. 确认卸载路径有关后，仅改变这对设备的卸载策略，重复相同测试。原任务失败后需要新会话及新的手机授权，不能续接旧流。
+
+#### 已验证的 OpenWrt fw3 / iptables 处理方式
+
+以下方案适用于已经核对规则顺序的 fw3 路由器：原有 MIA 等前置策略仍先执行，`forwarding_rule` 位于 `FLOWOFFLOAD` 之前，正常策略原本就允许这对设备的已建立连接。两条精确的 `ESTABLISHED` TCP ACCEPT 规则让它们走常规转发，新连接和其他设备仍经过原有规则。不要直接套用到 fw4 / nftables 或规则顺序不同的设备。
+
+在路由器新增 `/etc/firewall.iosbackup-wifi-nooffload`，内容如下。示例地址来自文档保留网段，必须分别替换为实际 NAS 和手机 IPv4 地址；SNAT 使用连接跟踪，保留之前已经验证需要的精确 SNAT 规则。
+
+```sh
+#!/bin/sh
+NAS_IP=192.0.2.10
+PHONE_IP=198.51.100.20
+for direction in nas_to_phone phone_to_nas; do
+    case "$direction" in
+        nas_to_phone) src=$NAS_IP; dst=$PHONE_IP ;;
+        phone_to_nas) src=$PHONE_IP; dst=$NAS_IP ;;
+    esac
+    iptables -w 5 -C forwarding_rule -s "$src/32" -d "$dst/32" -p tcp \
+        -m conntrack --ctstate ESTABLISHED \
+        -m comment --comment 'iosbackup-wifi-nooffload' -j ACCEPT 2>/dev/null ||
+    iptables -w 5 -I forwarding_rule 1 -s "$src/32" -d "$dst/32" -p tcp \
+        -m conntrack --ctstate ESTABLISHED \
+        -m comment --comment 'iosbackup-wifi-nooffload' -j ACCEPT || exit 1
+done
+```
+
+先备份 `/etc/config/firewall`，再新增下列 include，并赋予脚本执行权限。脚本用于添加规则；include 用于防火墙启动或重载时重新加载。仅修改应用 Compose 或重建容器不会持久化路由器规则。
+
+```uci
+config include 'iosbackup_wifi_nooffload'
+    option path '/etc/firewall.iosbackup-wifi-nooffload'
+    option reload '1'
+    option enabled '1'
+```
+
+确认地址和规则顺序后执行脚本，以 `iptables -S forwarding_rule` 和 `iptables -L forwarding_rule -nv` 核验两条规则的位置及命中；重复执行不应叠加。代价是这对设备的 TCP 使用常规转发。手机地址变化时需同步更新两条规则和原 SNAT，可用固定 DHCP 租约减少漂移。
+
+回滚时删除这个 include 并 `uci commit firewall`，再用相同的源/目的地址、TCP、`ESTABLISHED`、comment 和 ACCEPT 条件执行两次 `iptables -D forwarding_rule ...`，仅移除本次规则。不要覆盖整个防火墙配置，以免丢失后续修改。
+
+现场已核验运行时规则、落盘脚本和 include；未通过重启路由器或全局重载验证启动恢复。若需验证该项，应另选维护窗口。最终验收必须包含一次真实 Wi-Fi 备份的成功终态、成功记录落盘、子进程退出和占用释放；只看到 100% 不足以确认完成。本次没有执行真机恢复演练。
+
+v1.5.2 的无活动超时解决断流后的无限等待，路由器规则解决这次复现的断流原因。二者互补；增加超时时间、反复刷新 mDNS 或重建相同应用镜像都不能修复已经失效的 NAT 映射。
+
 ### 磁盘空间
 
 检查 `/backups` 后端文件系统的可用空间和 inode 数量。解包会创建第二份文件，可能需要大量额外空间。空间不足必须先修复再重试；不要为了清理而删除唯一已知可用备份。

@@ -147,6 +147,62 @@ Unlock the device before pairing, encryption changes, or backup startup. A lock-
 
 Do not repeatedly restart every component while a backup is running. Let the active task reach a terminal state, unlock and reconnect the device, inspect the preceding heartbeat/stream logs, then retry via USB. If USB works, keep Wi-Fi disabled for that device and report a sanitized Preview issue.
 
+### Wi-Fi online but backup stays at 0%: inspect idle NAT connections
+
+Discovery, heartbeats, and backup data can use different TCP connections. A visible mDNS device or a working heartbeat does not prove that the backup stream is usable. While the phone scans files and prepares its manifest locally, the backup connection can be idle for several minutes; a temporary 0% alone is not a failure.
+
+In one routed setup using SNAT, USB completed with the same version and backup set, while Wi-Fi received `Connection reset by peer` after the phone finished scanning. An independent read-only query succeeded initially but failed when reusing the same connection after 240 idle seconds. Captures at both ends showed the phone sending an ACK to the original NAT port, the router immediately returning RST, and the NAS receiving neither that phone packet nor the reset. Bypassing flow offload only for this device pair made the identical idle test pass; a complete Wi-Fi incremental backup then succeeded.
+
+This located the failure in that router's software flow-offload path: its idle NAT mapping expired early, preventing reply translation back to the NAS. A missing entry in one conntrack sample is insufficient evidence; combine captures at both ends with a connection-reuse comparison. The 240 seconds describe this test interval, not a universal NAT timeout or a defect in every router.
+
+Diagnosis order:
+
+1. Preserve the original job phase, last activity time, and logs, and confirm authorization for this backup was completed. Do not start by restarting components or deleting pairing records or the backup set.
+2. Complete a USB comparison with the same version and backup set, then identify the first phone-side error in the Wi-Fi session. A space-query error following a connection reset does not by itself mean the disk is full.
+3. Capture the target connection at both the NAS and router. Distinguish a router-generated RST from a host-generated close forwarded through NAT. Observe conntrack over time and reuse one connection before and after an idle interval.
+4. After evidence implicates offload, change only the device pair's offload policy and repeat the same test. A failed backup needs a new session and fresh phone authorization; the old stream cannot resume.
+
+#### Validated OpenWrt fw3 / iptables workaround
+
+This procedure applies to a reviewed fw3 ruleset where existing policies such as MIA still run first, `forwarding_rule` precedes `FLOWOFFLOAD`, and the normal policy already accepts established connections for this pair. Two exact `ESTABLISHED` TCP ACCEPT rules use normal forwarding for the pair while new connections and other devices retain the original rules. Do not apply it unchanged to fw4 / nftables or a different rule order.
+
+Create `/etc/firewall.iosbackup-wifi-nooffload` on the router with the following contents. The example addresses are reserved for documentation: replace them with the actual NAS and phone IPv4 addresses. SNAT relies on connection tracking; preserve any narrowly scoped SNAT rule already verified as necessary.
+
+```sh
+#!/bin/sh
+NAS_IP=192.0.2.10
+PHONE_IP=198.51.100.20
+for direction in nas_to_phone phone_to_nas; do
+    case "$direction" in
+        nas_to_phone) src=$NAS_IP; dst=$PHONE_IP ;;
+        phone_to_nas) src=$PHONE_IP; dst=$NAS_IP ;;
+    esac
+    iptables -w 5 -C forwarding_rule -s "$src/32" -d "$dst/32" -p tcp \
+        -m conntrack --ctstate ESTABLISHED \
+        -m comment --comment 'iosbackup-wifi-nooffload' -j ACCEPT 2>/dev/null ||
+    iptables -w 5 -I forwarding_rule 1 -s "$src/32" -d "$dst/32" -p tcp \
+        -m conntrack --ctstate ESTABLISHED \
+        -m comment --comment 'iosbackup-wifi-nooffload' -j ACCEPT || exit 1
+done
+```
+
+Back up `/etc/config/firewall`, add this include, and make the script executable. Running the script installs the rules; the include reloads them during firewall startup or reload. Changing the application Compose file or recreating its container does not persist router rules.
+
+```uci
+config include 'iosbackup_wifi_nooffload'
+    option path '/etc/firewall.iosbackup-wifi-nooffload'
+    option reload '1'
+    option enabled '1'
+```
+
+After reviewing the addresses and rule order, run the script and inspect `iptables -S forwarding_rule` and `iptables -L forwarding_rule -nv` for both rule placement and hits. Repeated execution must not duplicate the rules. The cost is normal forwarding for this pair's TCP traffic. If the phone address changes, update both rules and the original SNAT rule; a fixed DHCP lease can reduce address drift.
+
+To roll back, delete this include and run `uci commit firewall`, then issue two `iptables -D forwarding_rule ...` commands with the same source/destination addresses, TCP, `ESTABLISHED`, comment, and ACCEPT match. Remove only these rules; replacing the entire firewall configuration could discard later changes.
+
+The field validation checked runtime rules, the saved script, and the include. Router reboot and full firewall reload were not exercised; schedule those separately in a maintenance window if needed. Final acceptance requires a real Wi-Fi backup success state, persisted success record, child-process exit, and released job ownership. A 100% display alone is insufficient. No device restore exercise was performed.
+
+The v1.5.2 inactivity guard bounds waiting after a lost stream; the router workaround addresses the reproduced transport failure. Increasing timeouts, repeatedly refreshing mDNS, or rebuilding the same application image cannot repair an expired NAT mapping.
+
 ### Disk space
 
 Check free space and inode availability on the filesystem behind `/backups`. Unpack creates a second copy and can require substantial additional disk space. A low-space failure should be fixed before retry; do not delete the only known-good backup as cleanup.
