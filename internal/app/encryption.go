@@ -37,6 +37,9 @@ func (app *application) acquireDeviceOp(udid string) (device *device, dir string
 		return nil, "", nil, fmt.Errorf("设备 %s 当前离线", udid)
 	}
 
+	if err := app.connectionAdmissionUnsafe(dev); err != nil {
+		return nil, "", nil, err
+	}
 	dir = dirBackups
 	if cfg, ok := app.configs[udid]; ok && cfg.BackupDirectory != "" {
 		dir = cfg.BackupDirectory

@@ -4,6 +4,21 @@
 
 Use this page to decide whether to wait, act on the device, or retry after a job ends. Device presence, pairing, job success, a readable file list and successful physical-device restoration need separate checks. The names below match the current UI and state output.
 
+## Connection service states
+
+USB and Wi-Fi have separate status entries; when both use usbmuxd2, they describe the same physical service. The table below explains each service state and what to do next.
+
+| Message | Meaning | Next action |
+|---|---|---|
+| No connected devices found | The device-list query succeeded and returned an empty list | Check device connections; an empty list does not trigger a restart |
+| Connection service unavailable / device status unknown | Enumeration failed; cached devices do not establish current presence | Wait for detection; do not repeatedly unlock or pair the phone |
+| Waiting for the current operation | A service fault is confirmed, but device operations are still active | Observe the existing job; recovery will not stop it deliberately |
+| Recovering | Recovery has exclusive access and is restarting and checking the service | Wait for enumeration, registration and pairing validation |
+| Recovery failed, retrying later | The restarted service did not pass a protocol query | Allow the backoff period and retain nearby logs |
+| Automatic recovery failed / manual action required | The retry allowance is exhausted or device tools cannot execute | Inspect logs and installation; manual restart is available when idle |
+
+Failed queries retain device names and backup information, mark presence unknown, and block affected new device operations. A service error does not establish that the phone was unplugged. Service queries, device trust and backup results are verified separately; successful recovery never reruns a failed backup. API/SSE `connection_services` describes service state, and `presence_known=false` means device presence is unconfirmed; do not rely on the cached `online` boolean alone.
+
 ## Device and job states
 
 | What you see | What it establishes | Next action |

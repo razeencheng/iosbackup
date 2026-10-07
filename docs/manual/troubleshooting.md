@@ -13,6 +13,7 @@ Record version, connection type, job phase, last activity, phone prompts, and lo
 | Web page unavailable | Local health request, Compose state, recent logs | Fix local service first; inspect firewall/proxy only after local access works |
 | Incorrect password or repeated login | Correct instance, administrator password file, `/configs` mount | Do not generate a new master key; use [installation/authentication](installation.md) |
 | Old version after upgrade | `/api/version`, running image reference | Check the Compose image, configuration overrides, and project name; see [upgrade](upgrade.md) |
+| Connection service unavailable, device presence unknown | USB/Wi-Fi service messages, `connection_services`, recent logs | Wait for active operations and bounded recovery; do not repeatedly unlock or pair first |
 | USB device missing or pairing fails | Cable, phone passcode/trust prompts, USB/udev mounts | Follow [USB workflow](usb-backup.md) and preserve lockdown |
 | Manual backup cannot start | UI reason: offline, busy, battery/charging | Meet the stated condition; do not bypass concurrency guards |
 | Automatic backup never starts | Enabled/saved state, Beijing-time window, interval, battery/charging | Check [scheduling](scheduling.md) field by field, without repeatedly restarting |
@@ -47,6 +48,14 @@ Record version, connection type, job phase, last activity, phone prompts, and lo
 5. Existing `secrets.enc` without its original key, an incorrect key, or simultaneous key environment/file overrides fails startup. Restore matching `secret_key` or the original external key without generating a new value or deleting ciphertext. If initialization reports unsupported hard links, use a local filesystem supporting them; preserve the original data and follow [instance recovery](instance-recovery.md).
 
 **Expected result:** distinguish startup, network-entry, authentication, and version problems. Once service access works, move to devices; do not change network, storage, and passwords at the same time.
+
+### Process alive, device-list queries failing
+
+A live process and successful `/healthz` response do not establish USB/Wi-Fi protocol availability. By default, the app scans for devices every 4 seconds and uses that scan to check the connection services. Each service query can wait up to 3 seconds. Automatic recovery is considered only after the service has been running for 15 seconds and 3 consecutive queries have failed. Successful empty lists, untrusted phones and an unreachable individual phone IP do not trigger service restarts. `IOSBK_PRESENCE_INTERVAL` overrides the polling interval.
+
+Automatic recovery waits for all device operations to finish, restarts only the affected service, and requires a successful device-list query within 15 seconds. The app then registers known Wi-Fi devices again, refreshes the device list, and checks pairing; old pairing errors clear only after successful pairing validation. Failed recovery waits 30 seconds initially and 2 minutes thereafter. Each physical service allows at most 3 automatic recoveries in a rolling 15-minute window. Brief success does not reset that allowance. History is held in memory and starts afresh after application restart.
+
+The **Restart connection** button also checks whether any device operation is running, returning HTTP 409 while busy. When idle, it restarts the configured services and verifies them. Neither an accepted HTTP request nor process startup establishes recovery. When the allowance is exhausted or a device tool cannot execute, preserve logs and inspect installation/listener configuration. Recovery does not rerun a failed backup; start a new job after resolving the cause. This mechanism detects and recovers service faults; it does not establish that the original listener-failure trigger has been fixed.
 
 ## 2. Devices and pairing
 

@@ -35,7 +35,7 @@ func TestLoadDefaults(t *testing.T) {
 	if cfg.InsecureAllowRemote || cfg.AdminPasswordFile != "" || cfg.MinFreeBytes != 0 {
 		t.Fatalf("unexpected opt-in defaults: insecure=%v password=%q min-free=%d", cfg.InsecureAllowRemote, cfg.AdminPasswordFile, cfg.MinFreeBytes)
 	}
-	if cfg.PresenceInterval != 10*time.Second {
+	if cfg.PresenceInterval != 4*time.Second {
 		t.Fatalf("presence interval=%s", cfg.PresenceInterval)
 	}
 	if cfg.DeviceDisconnectGrace != 30*time.Second {

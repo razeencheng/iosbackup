@@ -19,7 +19,7 @@ const (
 	defaultBackupsRoot       = "/backups"
 	defaultMaxHeavyJobs      = 1
 	maxHeavyJobs             = 2
-	defaultPresenceInterval  = 10 * time.Second
+	defaultPresenceInterval  = 4 * time.Second
 	defaultDisconnectGrace   = 30 * time.Second
 	defaultSchedulerInterval = 30 * time.Second
 	defaultNetmuxdLogLevel   = "warn"

@@ -2,7 +2,7 @@
 
 [English](configuration.md) · [返回手册](../OPERATIONS.zh-CN.md)
 
-本页说明应用配置和随仓库提供的 `compose.yaml`。
+本页说明应用配置和随仓库提供的 `compose.yaml`。表中“Compose 默认”指使用该文件、未额外覆盖时的有效值。自定义镜像或覆盖配置可能使用不同的值。
 
 ## 修改配置并使其生效
 
@@ -46,7 +46,7 @@ curl -fsS --retry 12 --retry-connrefused --retry-delay 5 --retry-max-time 90 htt
 | `IOSBK_INSECURE_ALLOW_REMOTE` | `false` | `false` | true / false；认证关闭时允许非回环监听的显式例外，不是安全访问方式。 |
 | `IOSBK_ENABLE_EXPERIMENTAL_OPERATIONS` | `false` | `false` | true / false；控制本地解包和删除备份；整机恢复仍有独立设备开关。 |
 | `IOSBK_MAX_HEAVY_JOBS` | `1` | `1` | 整数 1–2；当前限制同时运行的备份任务，不能推断为所有实验操作的总并发限制。 |
-| `IOSBK_PRESENCE_INTERVAL` | `10s` | `10s` | 1s–10m；设备发现/在线检查周期，不能证明传输活跃。 |
+| `IOSBK_PRESENCE_INTERVAL` | `4s` | `4s` | 1s–10m；设备发现与连接服务健康检查周期，不能证明传输活跃。 |
 | `IOSBK_DEVICE_DISCONNECT_GRACE` | `30s` | `30s` | 5s–10m；设备短暂不可见的宽限期，不能恢复已经终止的任务。 |
 | `IOSBK_BACKUP_AUTHORIZATION_TIMEOUT` | `5m` | `5m` | 1s–24h；等待手机授权期间连续无活动的期限。 |
 | `IOSBK_BACKUP_INACTIVITY_TIMEOUT` | `10m` | `10m` | 1s–24h；发送或接收阶段连续无活动的期限。 |

@@ -212,6 +212,8 @@
     </div>
   </div>
 
+  <div id="connectionHealth" class="hidden" role="status" aria-live="polite" style="margin-bottom:14px;padding:14px 18px;border:1px solid #E7CB9A;border-radius:var(--iosbk-radius);background:#FFF8EB;color:#78521E;font-size:14px;line-height:1.6"></div>
+
   {{if .Devices}}
   <!-- ===================== DEVICE LIST ===================== -->
   <div style="display:flex;flex-direction:column;gap:14px">
@@ -220,6 +222,7 @@
     {{$backingUp := index $.BackupStatuses $d.UDID}}
     {{$disc := index $.DiscoveredIPs $d.UDID}}
     {{$conn := "offline"}}{{if $d.IsOnline}}{{if eq $d.Connection "USB 已连接"}}{{$conn = "usb"}}{{else}}{{$conn = "wifi"}}{{end}}{{end}}
+    {{if $d.PresenceUnknown}}{{$conn = "unknown"}}{{end}}
     {{$isPad := contains $d.DeviceType "iPad"}}
       <div data-udid-card="{{$d.UDID}}" style="background:#fff;border:1px solid #D8E2EA;border-radius:var(--iosbk-radius);box-shadow:0 1px 2px rgba(35,52,68,.04),0 18px 36px -28px rgba(35,52,68,.22);overflow:hidden">
 
@@ -229,14 +232,15 @@
           <div style="flex:1;min-width:180px">
             <div class="device-heading-row">
               <span id="name-{{$d.UDID}}" class="device-name" style="font-size:17px;font-weight:700;letter-spacing:-.01em;{{if eq $conn "offline"}}color:#96A3AE;{{else}}color:#213041;{{end}}">{{$d.Name}}</span>
-              <span id="battery-{{$d.UDID}}" class="device-battery">{{if $d.IsOnline}}<svg class="battery-icon" viewBox="0 0 20 12" aria-hidden="true" style="color:{{if $d.IsCharging}}#2E7D5B{{else if le $d.BatteryLevel 20}}#BD2C24{{else}}#718090{{end}}"><rect x="0.75" y="0.75" width="16" height="10.5" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"></rect><path d="M18.25 4v4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path><rect x="3" y="3" width="11" height="6" rx="1" fill="currentColor" opacity=".24"></rect></svg>{{$d.BatteryLevel}}%{{if $d.IsCharging}}<span style="color:#2E7D5B;font-weight:600">· <span data-i18n="battery.charging"></span></span>{{end}}{{end}}</span>
+              <span id="battery-{{$d.UDID}}" class="device-battery">{{if and $d.IsOnline (not $d.PresenceUnknown)}}<svg class="battery-icon" viewBox="0 0 20 12" aria-hidden="true" style="color:{{if $d.IsCharging}}#2E7D5B{{else if le $d.BatteryLevel 20}}#BD2C24{{else}}#718090{{end}}"><rect x="0.75" y="0.75" width="16" height="10.5" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"></rect><path d="M18.25 4v4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path><rect x="3" y="3" width="11" height="6" rx="1" fill="currentColor" opacity=".24"></rect></svg>{{$d.BatteryLevel}}%{{if $d.IsCharging}}<span style="color:#2E7D5B;font-weight:600">· <span data-i18n="battery.charging"></span></span>{{end}}{{end}}</span>
             </div>
             <div style="font-size:12.5px;color:#718090;margin-top:3px"><span data-i18n="device.model"></span> · {{$d.DeviceType}}</div>
             <div style="font-size:12.5px;color:#6F7E8C;margin-top:4px;display:flex;align-items:center;gap:5px"><svg class="ui-icon" style="width:13px;height:13px;color:#96A3AE" aria-hidden="true"><use href="/static/ui-icons.svg#icon-clock"></use></svg><span data-i18n="device.lastBackup"></span> · <span id="lastbackup-{{$d.UDID}}">{{if $d.LastBackup.IsZero}}<span data-i18n="device.never"></span>{{else}}{{$d.LastBackup.Format "2006-01-02 15:04"}}{{end}}</span></div>
           </div>
           <div class="device-action-row">
             <div id="connbox-{{$d.UDID}}" style="text-align:right;white-space:nowrap">
-              {{if eq $conn "usb"}}<span class="connection-badge" style="gap:7px;padding:5px 11px;background:#EAF1FC;color:#2356B8;border:1px solid #C5DAF6;font-size:12.5px;font-weight:600;white-space:nowrap"><svg class="connection-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2.2v10.1m0-10.1L7.9 4.3M10 2.2l2.1 2.1M10 8.1h3.1a2.2 2.2 0 0 1 2.2 2.2v1.2m-5.3.8H6.9a2.2 2.2 0 0 0-2.2 2.2v.9" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path><circle cx="4.7" cy="16.5" r="1.4" fill="currentColor"></circle><rect x="14" y="11.4" width="2.6" height="2.6" rx=".5" fill="currentColor"></rect></svg><span data-i18n="status.usb"></span></span>
+              {{if eq $conn "unknown"}}<span class="connection-badge" style="color:#78521E" data-i18n="status.unknown">设备状态暂时无法确认</span>
+              {{else if eq $conn "usb"}}<span class="connection-badge" style="gap:7px;padding:5px 11px;background:#EAF1FC;color:#2356B8;border:1px solid #C5DAF6;font-size:12.5px;font-weight:600;white-space:nowrap"><svg class="connection-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2.2v10.1m0-10.1L7.9 4.3M10 2.2l2.1 2.1M10 8.1h3.1a2.2 2.2 0 0 1 2.2 2.2v1.2m-5.3.8H6.9a2.2 2.2 0 0 0-2.2 2.2v.9" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path><circle cx="4.7" cy="16.5" r="1.4" fill="currentColor"></circle><rect x="14" y="11.4" width="2.6" height="2.6" rx=".5" fill="currentColor"></rect></svg><span data-i18n="status.usb"></span></span>
               {{else if eq $conn "wifi"}}<span class="connection-badge" style="gap:7px;padding:5px 11px;background:#E2F3EF;color:#0B7565;border:1px solid #B9E2DA;font-size:12.5px;font-weight:600;white-space:nowrap"><svg class="connection-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M3 7.6a10.7 10.7 0 0 1 14 0M5.7 10.5a6.7 6.7 0 0 1 8.6 0M8.4 13.3a2.7 2.7 0 0 1 3.2 0" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path><circle cx="10" cy="16" r="1.25" fill="currentColor"></circle></svg><span data-i18n="status.wifi"></span></span>
               {{else}}<span class="connection-badge" style="gap:7px;padding:5px 11px;background:#F3F7FA;color:#718090;border:1px solid #D8E2EA;font-size:12.5px;font-weight:600;white-space:nowrap"><svg class="connection-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2.6v6.1M5.5 5.7a6.2 6.2 0 1 0 9 0" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path></svg><span data-i18n="status.offline"></span></span>{{end}}
             </div>
@@ -382,8 +386,8 @@
                 <div style="display:flex;align-items:center;gap:9px;margin-bottom:9px"><span style="font-size:13.5px;font-weight:600" data-i18n="enc.toggleTitle"></span></div>
                 <div style="display:flex;flex-wrap:wrap;gap:9px;align-items:center">
                   <input type="password" id="encPw-{{$d.UDID}}" data-i18n-ph="enc.pwPlaceholder" class="iosbk-in" style="min-width:200px">
-                  <button onclick="setEncryption('{{$d.UDID}}',true)" style="display:inline-flex;align-items:center;gap:7px;padding:9px 15px;background:#B45309;color:#fff;border:none;border-radius:var(--iosbk-radius);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-lock"></use></svg><span data-i18n="enc.enable"></span></button>
-                  <button onclick="setEncryption('{{$d.UDID}}',false)" style="padding:9px 15px;background:#fff;color:#607181;border:1px solid #D8E2EA;border-radius:var(--iosbk-radius);font-size:13px;font-weight:500;cursor:pointer;font-family:inherit" data-i18n="enc.disable"></button>
+                  <button data-connection-action="{{$d.UDID}}" onclick="setEncryption('{{$d.UDID}}',true)" style="display:inline-flex;align-items:center;gap:7px;padding:9px 15px;background:#B45309;color:#fff;border:none;border-radius:var(--iosbk-radius);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-lock"></use></svg><span data-i18n="enc.enable"></span></button>
+                  <button data-connection-action="{{$d.UDID}}" onclick="setEncryption('{{$d.UDID}}',false)" style="padding:9px 15px;background:#fff;color:#607181;border:1px solid #D8E2EA;border-radius:var(--iosbk-radius);font-size:13px;font-weight:500;cursor:pointer;font-family:inherit" data-i18n="enc.disable"></button>
                 </div>
                 <div style="font-size:11.5px;color:#96A3AE;margin-top:6px" data-i18n="enc.disableHint"></div>
                 <a data-i18n-href="enc.forgotUrl" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:6px;margin-top:9px;font-size:12px;color:#2C62C6;text-decoration:none;font-weight:500"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-help"></use></svg><span data-i18n="enc.forgot"></span></a>
@@ -412,7 +416,7 @@
                 </div>
                 {{if $cfg.RestoreEnabled}}
                 <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center">
-                  <button onclick="openRestoreModal('{{$d.UDID}}',this.dataset.name)" data-name="{{$d.Name}}" {{if not $d.IsOnline}}disabled{{end}} style="display:inline-flex;align-items:center;gap:8px;padding:10px 17px;border-radius:var(--iosbk-radius);font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit;border:none;{{if $d.IsOnline}}background:#BD2C24;color:#fff;{{else}}background:#F3F7FA;color:#ADB9C2;cursor:not-allowed;{{end}}"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-restore"></use></svg><span data-i18n="danger.restoreBtn"></span></button>
+                  <button data-connection-action="{{$d.UDID}}" onclick="openRestoreModal('{{$d.UDID}}',this.dataset.name)" data-name="{{$d.Name}}" {{if not $d.IsOnline}}disabled{{end}} style="display:inline-flex;align-items:center;gap:8px;padding:10px 17px;border-radius:var(--iosbk-radius);font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit;border:none;{{if $d.IsOnline}}background:#BD2C24;color:#fff;{{else}}background:#F3F7FA;color:#ADB9C2;cursor:not-allowed;{{end}}"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-restore"></use></svg><span data-i18n="danger.restoreBtn"></span></button>
                   <button onclick="setRestoreEnabled('{{$d.UDID}}',false)" style="background:none;border:none;color:#6F7E8C;font-size:12.5px;text-decoration:underline;cursor:pointer;font-family:inherit" data-i18n="danger.disable"></button>
                 </div>
                 {{else}}
@@ -449,6 +453,7 @@
   <!-- ===================== EMPTY STATE ===================== -->
   <div style="background:#fff;border:1px solid #D8E2EA;border-radius:var(--iosbk-radius);padding:40px 28px 34px;box-shadow:0 1px 2px rgba(35,52,68,.04)">
     <div style="text-align:center;max-width:560px;margin:0 auto">
+      <div id="emptyConnectionGuide">
       <div class="empty-device-icon" data-empty-device-icon aria-hidden="true">
         <img src="/static/empty-device.png" alt="">
       </div>
@@ -473,6 +478,7 @@
       </div>
     </div>
     <div style="text-align:center;margin-top:24px">
+      </div>
       <button onclick="refreshDevices()" style="display:inline-flex;align-items:center;gap:8px;padding:11px 22px;background:#2C62C6;color:#fff;border:none;border-radius:var(--iosbk-radius);font-size:14px;font-weight:600;cursor:pointer;font-family:inherit"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-refresh"></use></svg><span data-i18n="empty.refresh"></span></button>
       <button id="emptyRemovedDevicesButton" type="button" class="hidden" onclick="openRemovedDevicesDrawer()" style="display:inline-flex;align-items:center;gap:8px;margin-left:8px;padding:11px 18px;background:#fff;color:#2356B8;border:1px solid #C5DAF6;border-radius:var(--iosbk-radius);font-size:14px;font-weight:600;cursor:pointer;font-family:inherit"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-archive"></use></svg><span data-i18n="empty.removed"></span></button>
     </div>
@@ -592,6 +598,8 @@ const IOSBK_DICT = {
 
 /* ============== i18n runtime ============== */
 function dpath(o,p){return p.split('.').reduce(function(a,k){return a&&a[k];},o);}
+const INITIAL_STATUS = {{.InitialStatus}};
+IOSBK_DICT.status.unknown={zh:"设备状态暂时无法确认",en:"Device status is temporarily unknown"};
 const PAGE_VERSION = "{{.Version}}"; // 加载时的构建版本；SSE 快照版本与此不同 → 已部署新版本
 let lang;
 try{ lang = localStorage.getItem('iosbk_lang') || ((navigator.language||'en').toLowerCase().indexOf('zh')===0?'zh':'en'); }catch(e){ lang='en'; }
@@ -606,6 +614,7 @@ function applyI18n(){
   document.querySelectorAll('.lang-btn').forEach(function(b){ b.classList.toggle('active', b.dataset.lang===lang); });
   updateAutoText();
   rerenderBackupProgress();
+  renderConnectionHealth();
   if(removedDevicesCache!==null) renderRemovedDevices(removedDevicesCache,'ready');
   else if(removedDevicesViewState) renderRemovedDevices(null,removedDevicesViewState);
 }
@@ -862,6 +871,32 @@ function updateAutoText(){
   }
 }
 
+
+let latestConnectionSnapshot=null;
+function connectionServiceMessage(service){
+  var name=service.connection==='usb'?'USB':'Wi-Fi';
+  if(service.recovery==='restarting') return L('正在恢复 '+name+' 连接服务，请稍候。','Restoring the '+name+' connection service. Please wait.');
+  if(service.recovery==='waiting_busy') return L(name+' 连接服务等待当前设备任务结束后恢复。',name+' connection service will recover after current device tasks finish.');
+  if(service.recovery==='manual_required') return service.error_code==='tool_unavailable' ? L(name+' 连接工具不可用，请检查安装和权限。',name+' connection tools are unavailable. Check installation and permissions.') : L(name+' 连接服务自动恢复失败，请查看排障说明或手动重试。',name+' connection service could not recover automatically. Check troubleshooting or retry manually.');
+  if(service.recovery==='backoff') return L(name+' 连接服务恢复失败，稍后自动重试。',name+' connection service recovery failed. Another attempt is scheduled.');
+  if(service.health==='unhealthy') return L(name+' 连接服务异常，正在准备恢复。',name+' connection service is unavailable. Preparing recovery.');
+  if(service.health==='suspect') return L(name+' 连接服务查询异常，正在重新检查。',name+' connection service query failed. Checking again.');
+  if(service.health==='unknown') return L('正在检查 '+name+' 连接服务…','Checking the '+name+' connection service…');
+  return '';
+}
+function renderConnectionHealth(){
+  var banner=document.getElementById('connectionHealth');
+  if(!banner || !latestConnectionSnapshot) return;
+  var services=latestConnectionSnapshot.connection_services||[];
+  var messages=services.map(connectionServiceMessage).filter(Boolean);
+  var uncertain=messages.length>0;
+  if(!messages.length && services.length && !(latestConnectionSnapshot.devices||[]).some(function(d){return d.online && d.presence_known!==false;})) messages.push(L('未发现已连接设备，请连接设备。','No connected devices found. Connect a device to continue.'));
+  banner.classList.toggle('hidden',messages.length===0);
+  banner.textContent=messages.join(' ');
+  var guide=document.getElementById('emptyConnectionGuide');
+  if(guide) guide.classList.toggle('hidden',uncertain);
+}
+
 /* ---- apply a status snapshot: patch DOM in place; reload only on device-set change ---- */
 function currentCardUdids(){ var s=new Set(); document.querySelectorAll('[data-udid-card]').forEach(function(e){ s.add(e.getAttribute('data-udid-card')); }); return s; }
 function maybeReload(){ if(pendingReload && !busyUI()) location.reload(); }
@@ -871,6 +906,8 @@ function checkVersion(snap){
   }
 }
 function applyStatus(snap){
+  latestConnectionSnapshot=snap;
+  renderConnectionHealth();
   checkVersion(snap); // 服务端版本变了（已部署新版本）→ 提示刷新
   updateRemovedDeviceCount(snap.removed_device_count||0);
   var dom=currentCardUdids();
@@ -890,6 +927,7 @@ function itileStyle(conn){
 }
 function badgeHTML(conn){
   var s='gap:7px;padding:5px 11px;font-size:12.5px;font-weight:600;white-space:nowrap;';
+  if(conn==='unknown') return '<span class="connection-badge" style="'+s+'background:#FFF8EB;color:#78521E">'+iconHTML('alert')+'<span data-i18n="status.unknown"></span></span>';
   if(conn==='usb') return '<span class="connection-badge" style="'+s+'background:#EAF1FC;color:#2356B8;border:1px solid #C5DAF6">'+connectionIconHTML(conn)+'<span data-i18n="status.usb"></span></span>';
   if(conn==='wifi') return '<span class="connection-badge" style="'+s+'background:#E2F3EF;color:#0B7565;border:1px solid #B9E2DA">'+connectionIconHTML(conn)+'<span data-i18n="status.wifi"></span></span>';
   return '<span class="connection-badge" style="'+s+'background:#F3F7FA;color:#718090;border:1px solid #D8E2EA">'+connectionIconHTML(conn)+'<span data-i18n="status.offline"></span></span>';
@@ -903,7 +941,7 @@ function batteryIconHTML(color){
   return '<svg class="battery-icon" viewBox="0 0 20 12" aria-hidden="true" style="color:'+color+'"><rect x="0.75" y="0.75" width="16" height="10.5" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"></rect><path d="M18.25 4v4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path><rect x="3" y="3" width="11" height="6" rx="1" fill="currentColor" opacity=".24"></rect></svg>';
 }
 function batteryHTML(d){
-  if(!d.online) return '';
+  if(!d.online || d.presence_known===false) return '';
   var col = d.charging?'#2E7D5B':(d.battery<=20?'#BD2C24':'#718090');
   return batteryIconHTML(col)+d.battery+'%'+(d.charging?'<span style="color:#2E7D5B;font-weight:600">· <span data-i18n="battery.charging"></span></span>':'');
 }
@@ -986,6 +1024,7 @@ function rerenderBackupProgress(){ Object.keys(latestDeviceStatuses).forEach(fun
 function patchDevice(d){
   var u=d.udid;
   latestDeviceStatuses[u]=d;
+  document.querySelectorAll('[data-connection-action]').forEach(function(button){if(button.getAttribute('data-connection-action')===u) button.disabled=d.operations_available===false||d.backing_up;});
   var tile=document.getElementById('itile-'+u); if(tile) tile.setAttribute('style', itileStyle(d.conn));
   var name=document.getElementById('name-'+u); if(name) name.style.color = (d.conn==='offline')?'#96A3AE':'#213041';
   var battery=document.getElementById('battery-'+u); if(battery) battery.innerHTML=batteryHTML(d);
@@ -995,7 +1034,7 @@ function patchDevice(d){
   renderBackupProgress(d);
   var btn=document.getElementById('backupBtn-'+u);
   if(btn){
-    var dis = (d.conn==='offline') || d.backing_up;
+    var dis = (d.conn==='offline') || d.presence_known===false || d.operations_available===false || d.backing_up;
     btn.disabled = dis;
     btn.setAttribute('style','gap:9px;padding:10px 17px;font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit;border:none;white-space:nowrap;min-width:132px;'+(dis?'background:#F3F7FA;color:#ADB9C2;cursor:not-allowed;':'background:#2C62C6;color:#fff;'));
     var retry=d.backup_progress && (d.backup_progress.state==='interrupted'||d.backup_progress.state==='failed');
@@ -1063,6 +1102,7 @@ function testDeviceIP(udid){
 }
 function pairDevice(udid){ csrfFetch('/api/pair/'+udid,{method:'POST'}).then(function(r){return r.json();}).then(function(data){ toast(data.error?(L('配对失败：','Pair failed: ')+data.error):L('请在设备上点「信任此电脑」','Tap “Trust this computer” on the device'), !!data.error); }).catch(function(e){ toast(L('配对失败：','Pair failed: ')+e,true); }); }
 function gateMsg(d){
+  if(d.error_code==='connection_unavailable') return L('连接服务暂时不可用，请等待服务恢复。','The connection service is unavailable. Please wait for recovery.');
   var key={offline:'gate.offline',busy:'gate.busy',not_charging:'gate.notCharging',low_battery:'gate.lowBattery',missing:'gate.missing',backup_busy:'gate.backupBusy'}[d.error_code];
   if(!key) return tr('gate.cant');
   return tr(key).replace('{b}', d.battery).replace('{m}', d.min_battery);
@@ -1200,6 +1240,7 @@ function submitRestore(){
 /* ============== boot ============== */
 window.addEventListener('DOMContentLoaded', function(){
   applyI18n();
+  applyStatus(INITIAL_STATUS);
   connectSSE();
   // 备份设置改动即标脏（输入框/下拉/时间/滑块都会冒泡 input/change；开关走 flipToggle）
   document.addEventListener('input', function(e){ markDirty(panelUdid(e.target)); });

@@ -137,6 +137,16 @@ func (app *application) runIdeviceCmd(ctx context.Context, kind cmdKind, device 
 // runIdeviceCmdEnv 与 runIdeviceCmd 相同，但额外注入 extraEnv（如 BACKUP_PASSWORD/BACKUP_PASSWORD_NEW）。
 // 密码类只走此通道（cmd.Env），绝不进 argv（避免 /proc/<pid>/cmdline 泄漏）。
 func (app *application) runIdeviceCmdEnv(ctx context.Context, kind cmdKind, device *device, extraEnv []string, bin string, extraArgs ...string) ([]byte, error) {
+	release, err := app.beginConnectionCommand()
+	if err != nil {
+		return nil, err
+	}
+	defer release()
+	linked, cancelRoot := context.WithCancel(ctx)
+	stopRoot := context.AfterFunc(app.rootCtx, cancelRoot)
+	defer cancelRoot()
+	defer stopRoot()
+	ctx = linked
 	cmdCtx, cancel, args, env := app.ideviceCommand(ctx, kind, device, extraEnv, bin, extraArgs)
 	if cancel != nil {
 		defer cancel()
@@ -190,6 +200,16 @@ func (app *application) ideviceCommand(ctx context.Context, kind cmdKind, device
 }
 
 func (app *application) runIdeviceCmdStreamEnv(ctx context.Context, kind cmdKind, device *device, extraEnv []string, bin string, stdout, stderr io.Writer, extraArgs ...string) error {
+	release, err := app.beginConnectionCommand()
+	if err != nil {
+		return err
+	}
+	defer release()
+	linked, cancelRoot := context.WithCancel(ctx)
+	stopRoot := context.AfterFunc(app.rootCtx, cancelRoot)
+	defer cancelRoot()
+	defer stopRoot()
+	ctx = linked
 	cmdCtx, cancel, args, env := app.ideviceCommand(ctx, kind, device, extraEnv, bin, extraArgs)
 	if cancel != nil {
 		defer cancel()
@@ -239,33 +259,11 @@ func nextWatchdogDelay(current time.Duration) time.Duration {
 //   - USB 列表：默认 socket 的 idevice_id -l（不加 -n，避免带出 usbmuxd2 的 Network 设备）
 //   - 网络列表：netmuxd env 的 idevice_id -l -n
 func (app *application) listDevicesFromBothSockets() (usbDevices, netDevices map[string]*device) {
-	usbDevices = make(map[string]*device)
-	netDevices = make(map[string]*device)
-
-	runner := app.cmdRunner
-	if runner == nil {
-		runner = defaultCmdRunner
-	}
-
-	// USB 列表：默认 socket，不加 -n
-	ctx1, cancel1 := context.WithTimeout(context.Background(), shortCmdTimeout)
-	defer cancel1()
-	usbEnv := os.Environ() // 不注入 USBMUXD_SOCKET_ADDRESS
-	usbOut, err := runner(ctx1, cmdIdeviceID, []string{"-l"}, usbEnv)
-	if err == nil {
-		usbDevices = parseDeviceList(string(usbOut))
-	}
-
-	// 网络列表：netmuxd 模式使用 TCP socket；usbmuxd2 模式使用默认 unix socket。
-	ctx2, cancel2 := context.WithTimeout(context.Background(), shortCmdTimeout)
-	defer cancel2()
-	netEnv := append(os.Environ(), app.networkIdeviceEnvVars()...)
-	netOut, err := runner(ctx2, cmdIdeviceID, []string{"-l", "-n"}, netEnv)
-	if err == nil {
-		netDevices = parseDeviceList(string(netOut))
-	}
-
-	return usbDevices, netDevices
+	app.scanConnections(app.rootCtx)
+	app.mu.RLock()
+	defer app.mu.RUnlock()
+	usbDevices, netDevices, _ = app.connectionListsUnsafe()
+	return
 }
 
 // parseDeviceList 解析 idevice_id 输出，格式："UDID (ConnectionType)\n"
@@ -341,8 +339,16 @@ func (app *application) replayAddDevice() {
 	if app.usesUSBMuxd2WiFi() {
 		return
 	}
-	// 1. 查询当前 netmuxd 列表
-	currentNetDevices := app.currentNetmuxdDevices()
+	release, err := app.beginConnectionTask(nil)
+	if err != nil {
+		return
+	}
+	defer release()
+	result := app.scanConnection(app.rootCtx, connectionWiFi, false)
+	if result.err != nil {
+		return
+	}
+	currentNetDevices := result.devices
 
 	// 2. 读取所有配置（持短读锁）
 	app.mu.RLock()
@@ -367,25 +373,13 @@ func (app *application) replayAddDevice() {
 }
 
 // currentNetmuxdDevices 通过 idevice_id -l -n（netmuxd env）获取当前 netmuxd 设备列表。
-func (app *application) currentNetmuxdDevices() map[string]*device {
-	return app.currentNetmuxdDevicesContext(context.Background())
+func (app *application) currentNetmuxdDevices() (map[string]*device, error) {
+	return app.currentNetmuxdDevicesContext(app.rootCtx)
 }
 
-func (app *application) currentNetmuxdDevicesContext(parent context.Context) map[string]*device {
-	runner := app.cmdRunner
-	if runner == nil {
-		runner = defaultCmdRunner
-	}
-
-	ctx, cancel := context.WithTimeout(parent, shortCmdTimeout)
-	defer cancel()
-
-	netEnv := withEnvOverride(os.Environ(), "USBMUXD_SOCKET_ADDRESS", netmuxdAddr)
-	out, err := runner(ctx, cmdIdeviceID, []string{"-l", "-n"}, netEnv)
-	if err != nil {
-		return make(map[string]*device)
-	}
-	return parseDeviceList(string(out))
+func (app *application) currentNetmuxdDevicesContext(parent context.Context) (map[string]*device, error) {
+	result := app.scanConnection(parent, app.connectionBackend(connectionWiFi), false)
+	return result.devices, result.err
 }
 
 // wifiLockdownPort 设备在 Wi-Fi 上 lockdownd 的监听端口；端口可达不代表已注册到 netmuxd。
@@ -443,6 +437,11 @@ func (app *application) callAddDevice(udid, ip string) error {
 }
 
 func (app *application) callAddDeviceContext(parent context.Context, udid, ip string) error {
+	release, taskErr := app.beginConnectionTask(nil)
+	if taskErr != nil {
+		return taskErr
+	}
+	defer release()
 	if err := parent.Err(); err != nil {
 		return err
 	}
@@ -458,7 +457,11 @@ func (app *application) callAddDeviceContext(parent context.Context, udid, ip st
 	if app.deviceRemovalBusyUnsafe(udid) {
 		app.mu.Unlock()
 		// 已注册时只是查询，不干扰正在进行的备份；未注册时禁止重连。
-		if _, exists := app.currentNetmuxdDevicesContext(parent)[udid]; exists {
+		devices, err := app.currentNetmuxdDevicesContext(parent)
+		if err != nil {
+			return errConnectionUnavailable
+		}
+		if _, exists := devices[udid]; exists {
 			return nil
 		}
 		return errDeviceBusy
@@ -483,7 +486,11 @@ func (app *application) callAddDeviceContext(parent context.Context, udid, ip st
 		return fmt.Errorf("%s", reason)
 	}
 	// 已注册设备重复添加可能触发 helper panic。
-	if _, exists := app.currentNetmuxdDevicesContext(ctx)[udid]; exists {
+	result := app.scanConnection(ctx, connectionWiFi, false)
+	if result.err != nil {
+		return errConnectionUnavailable
+	}
+	if _, exists := result.devices[udid]; exists {
 		return nil
 	}
 
@@ -506,10 +513,12 @@ func (app *application) callAddDeviceContext(parent context.Context, udid, ip st
 	// helper 可能在注册已成功时仍等待响应；以注册表复核超时/未知响应。
 	if err != nil || !strings.Contains(output, "Success") {
 		verifyCtx, verifyCancel := context.WithTimeout(parent, 2*time.Second)
-		_, registered := app.currentNetmuxdDevicesContext(verifyCtx)[udid]
+		devices, queryErr := app.currentNetmuxdDevicesContext(verifyCtx)
+		_, registered := devices[udid]
 		verifyCancel()
-		if registered {
+		if queryErr == nil && registered {
 			app.addInfoLog(udid, fmt.Sprintf("add_device 响应未确认，但注册表已确认设备上线: ip=%s", ip))
+			app.requestConnectionRefresh()
 			return nil
 		}
 	}
@@ -522,6 +531,7 @@ func (app *application) callAddDeviceContext(parent context.Context, udid, ip st
 	switch {
 	case strings.Contains(output, "Success"):
 		app.addInfoLog(udid, fmt.Sprintf("add_device 成功: ip=%s", ip))
+		app.requestConnectionRefresh()
 		return nil
 	case strings.Contains(output, "Failure"):
 		app.addWarnLog(udid, fmt.Sprintf("add_device 返回 Failure，设备未注册: ip=%s", ip))
@@ -597,6 +607,9 @@ func (app *application) superviseMux(ctx context.Context, label, name string, ar
 	first := true
 
 	for {
+		if ctx.Err() != nil {
+			return
+		}
 		proc := app.launchMux(ctx, name, args...)
 		if err := proc.Start(); err != nil {
 			app.addErrorLog("SYSTEM", fmt.Sprintf("%s 启动失败: %v", label, err))
@@ -607,6 +620,12 @@ func (app *application) superviseMux(ctx context.Context, label, name string, ar
 			continue
 		}
 
+		if name == cmdUSBMuxd {
+			app.connectionProcessStarted(connectionUSB)
+		}
+		if name == cmdNetmuxd {
+			app.connectionProcessStarted(connectionWiFi)
+		}
 		if first {
 			app.addInfoLog("SYSTEM", label+" 守护进程已启动")
 			first = false
@@ -655,6 +674,9 @@ func (app *application) StartNetmuxd() error {
 }
 
 func (app *application) startNetmuxdLocked() error {
+	if err := app.rootCtx.Err(); err != nil {
+		return err
+	}
 	if app.netMuxState == muxRunning || app.netMuxState == muxStarting {
 		return nil
 	}
@@ -687,7 +709,7 @@ func (app *application) startNetmuxdLocked() error {
 
 	// 生产环境等待端口就绪（不持锁）；测试注入工厂时跳过
 	if app.muxProcFactory == nil {
-		if !waitForSocketReady(netmuxdAddr, 10*time.Second) {
+		if !waitForDialReadyContext(ctx, "tcp", netmuxdAddr, 10*time.Second) {
 			app.addWarnLog("SYSTEM", "netmuxd 端口未在 10s 内就绪，看门狗将持续重试")
 		}
 	}
@@ -729,10 +751,10 @@ func (app *application) stopNetmuxdLocked() {
 }
 
 // RestartNetmuxd 重启 netmuxd 守护进程并重放 add_device（无固定 sleep）。
-func (app *application) RestartNetmuxd() {
+func (app *application) restartNetmuxdProcess() error {
 	if app.usesUSBMuxd2WiFi() {
 		app.addInfoLog("SYSTEM", "Wi-Fi 诊断后端为 usbmuxd2，跳过 netmuxd 重启")
-		return
+		return nil
 	}
 	app.netMuxLifecycleMu.Lock()
 	defer app.netMuxLifecycleMu.Unlock()
@@ -740,10 +762,10 @@ func (app *application) RestartNetmuxd() {
 	app.stopNetmuxdLocked()
 	if err := app.startNetmuxdLocked(); err != nil {
 		app.addErrorLog("SYSTEM", fmt.Sprintf("重启 netmuxd 失败: %v", err))
-		return
+		return err
 	}
-	go app.replayAddDevice()
 	app.addInfoLog("SYSTEM", "netmuxd 守护进程重启完成")
+	return nil
 }
 
 // ---- 就绪探测：轮询等待 socket 可连 ----
@@ -759,14 +781,22 @@ func waitForUnixSocketReady(path string, timeout time.Duration) bool {
 }
 
 func waitForDialReady(network, addr string, timeout time.Duration) bool {
-	deadline := time.Now().Add(timeout)
-	for time.Now().Before(deadline) {
-		conn, err := net.DialTimeout(network, addr, 500*time.Millisecond)
+	return waitForDialReadyContext(context.Background(), network, addr, timeout)
+}
+
+func waitForDialReadyContext(parent context.Context, network, addr string, timeout time.Duration) bool {
+	ctx, cancel := context.WithTimeout(parent, timeout)
+	defer cancel()
+	dialer := net.Dialer{Timeout: 500 * time.Millisecond}
+	for ctx.Err() == nil {
+		conn, err := dialer.DialContext(ctx, network, addr)
 		if err == nil {
 			conn.Close()
 			return true
 		}
-		time.Sleep(200 * time.Millisecond)
+		if !sleepOrDone(ctx, 200*time.Millisecond) {
+			return false
+		}
 	}
 	return false
 }
@@ -780,6 +810,9 @@ func (app *application) StartUSBMuxD() error {
 }
 
 func (app *application) startUSBMuxDLocked() error {
+	if err := app.rootCtx.Err(); err != nil {
+		return err
+	}
 	if app.usbMuxState == muxRunning || app.usbMuxState == muxStarting {
 		return nil
 	}
@@ -789,7 +822,9 @@ func (app *application) startUSBMuxDLocked() error {
 	app.usbMuxState = muxStarting
 
 	// 清理陈旧锁/socket 文件（无 pkill、无固定 sleep）；此时旧进程已停止
-	app.prepareUSBMuxD()
+	if app.muxProcFactory == nil {
+		app.prepareUSBMuxD()
+	}
 
 	ctx, cancel := context.WithCancel(app.rootCtx)
 	done := make(chan struct{})
@@ -815,7 +850,7 @@ func (app *application) startUSBMuxDLocked() error {
 
 	// 生产环境等待 unix socket 就绪（不持锁）；测试注入工厂时跳过
 	if app.muxProcFactory == nil {
-		if !waitForUnixSocketReady("/var/run/usbmuxd", 10*time.Second) {
+		if !waitForDialReadyContext(ctx, "unix", "/var/run/usbmuxd", 10*time.Second) {
 			app.addWarnLog("SYSTEM", "usbmuxd socket 未在 10s 内就绪，看门狗将持续重试")
 		}
 	}
@@ -876,7 +911,7 @@ func (app *application) stopUSBMuxDLocked() {
 }
 
 // RestartUSBMuxD 重启 usbmuxd 守护进程（无固定 sleep；停止与就绪均为事件驱动）。
-func (app *application) RestartUSBMuxD() error {
+func (app *application) restartUSBMuxDProcess() error {
 	app.usbMuxLifecycleMu.Lock()
 	defer app.usbMuxLifecycleMu.Unlock()
 	app.addInfoLog("SYSTEM", "开始重启 usbmuxd 守护进程...")

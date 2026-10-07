@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"sync"
 	"time"
 
 	"iosbackup/internal/buildinfo"
@@ -89,6 +90,9 @@ func run(ctx context.Context, cfg runtimeConfig) error {
 		return err
 	}
 
+	ctx, cancelWorkers := context.WithCancel(ctx)
+	defer cancelWorkers()
+
 	// 初始化日志级别
 	initLogLevel()
 	paths := applyRuntimeConfig(cfg)
@@ -108,6 +112,8 @@ func run(ctx context.Context, cfg runtimeConfig) error {
 		notificationManager.Disable()
 	}
 	app.replaceNotificationManager(notificationManager)
+	// 先发布事件总线，再启动任何可能广播状态的后台任务。
+	app.hub = newEventHub()
 
 	// 加载配置
 	if err := app.loadConfigs(); err != nil {
@@ -132,13 +138,25 @@ func run(ctx context.Context, cfg runtimeConfig) error {
 		log.Printf("初始刷新设备列表失败: %v", err)
 	}
 
-	// 启动定时备份协程
-	go app.autoBackupScheduler(ctx)
+	// 每条退出路径均先取消 worker，避免 HTTP 意外退出后后台再次重启进程。
+	var workers sync.WaitGroup
+	startWorker := func(work func(context.Context)) { workers.Add(1); go func() { defer workers.Done(); work(ctx) }() }
+	defer func() {
+		cancelWorkers()
+		app.mu.Lock()
+		app.connectionClosed = true
+		app.mu.Unlock()
+		workers.Wait()
+		app.connectionRecoveryWorkers.Wait()
+		app.StopNetmuxd()
+		app.StopUSBMuxD()
+	}()
+	startWorker(app.autoBackupScheduler)
 
 	// 启动 SSE 事件总线 + 中央状态轮询（实时推送设备状态给浏览器）
-	app.hub = newEventHub()
-	go app.statusPoller(ctx)
-	go app.networkRecoveryLoop(ctx)
+	startWorker(app.statusPoller)
+	startWorker(app.networkRecoveryLoop)
+	startWorker(app.connectionRecoveryLoop)
 
 	// 设置路由并启动服务器
 	mux := app.setupRoutes()
@@ -160,17 +178,14 @@ func run(ctx context.Context, cfg runtimeConfig) error {
 
 	select {
 	case err := <-serverErr:
+		cancelWorkers()
 		app.notificationManagerSnapshot().Close()
-		app.StopNetmuxd()
-		app.StopUSBMuxD()
 		return err
 	case <-ctx.Done():
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 		shutdownErr := server.Shutdown(shutdownCtx)
 		app.notificationManagerSnapshot().Close()
-		app.StopNetmuxd()
-		app.StopUSBMuxD()
 		if shutdownErr != nil {
 			return fmt.Errorf("关闭 HTTP 服务器: %w", shutdownErr)
 		}

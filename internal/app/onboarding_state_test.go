@@ -180,7 +180,7 @@ func TestPerformBackupMissingDevicePublishesFailure(t *testing.T) {
 
 func TestHandleBackupReturnsTrackableStartingState(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
+	defer cancel()
 	app := newApplicationWithRuntime(ctx, defaultRuntimeConfig())
 	app.devices["BACKUP-HTTP"] = &device{
 		UDID:       "BACKUP-HTTP",
@@ -208,6 +208,7 @@ func TestHandleBackupReturnsTrackableStartingState(t *testing.T) {
 	rr := httptest.NewRecorder()
 
 	app.handleBackup(rr, req)
+	cancel()
 
 	if rr.Code != http.StatusAccepted {
 		t.Fatalf("备份启动应返回 202，得到 %d: %s", rr.Code, rr.Body.String())

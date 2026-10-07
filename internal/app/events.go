@@ -76,6 +76,9 @@ func (h *eventHub) clientCount() int {
 // ---- 状态快照 ----
 
 type deviceStatusDTO struct {
+	PresenceKnown       bool               `json:"presence_known"`
+	LastSeen            string             `json:"last_seen,omitempty"`
+	OperationsAvailable bool               `json:"operations_available"`
 	UDID                string             `json:"udid"`
 	Name                string             `json:"name"`
 	DeviceType          string             `json:"device_type"`
@@ -106,14 +109,18 @@ type backupProgressDTO struct {
 }
 
 type statusSnapshot struct {
-	Devices            []deviceStatusDTO `json:"devices"`
-	BackupInProgress   int               `json:"backup_in_progress"`
-	RemovedDeviceCount int               `json:"removed_device_count"`
-	Version            string            `json:"version"` // 构建版本；前端比对以检测「已部署新版本」（SSE 重连即拿到新版本）
+	ConnectionServices []connectionServiceDTO `json:"connection_services"`
+	Devices            []deviceStatusDTO      `json:"devices"`
+	BackupInProgress   int                    `json:"backup_in_progress"`
+	RemovedDeviceCount int                    `json:"removed_device_count"`
+	Version            string                 `json:"version"` // 构建版本；前端比对以检测「已部署新版本」（SSE 重连即拿到新版本）
 }
 
 // connCode 把中文连接串映射为机器码（USB 优先规则已体现在 Connection 上）。
 func connCode(d *device) string {
+	if d.PresenceUnknown {
+		return "unknown"
+	}
 	if !d.IsOnline {
 		return "offline"
 	}
@@ -176,7 +183,12 @@ func (app *application) buildStatusSnapshot() statusSnapshot {
 				UpdatedAt:          updatedAt,
 			}
 		}
+		lastSeen := ""
+		if !d.LastSeen.IsZero() {
+			lastSeen = toBeijingTime(d.LastSeen).Format(time.RFC3339)
+		}
 		devs = append(devs, deviceStatusDTO{
+			PresenceKnown: !d.PresenceUnknown, LastSeen: lastSeen, OperationsAvailable: d.IsOnline && app.connectionAdmissionUnsafe(d) == nil,
 			UDID:                udid,
 			Name:                d.Name,
 			DeviceType:          d.DeviceType,
@@ -205,6 +217,7 @@ func (app *application) buildStatusSnapshot() statusSnapshot {
 		return devs[i].Name < devs[j].Name
 	})
 	return statusSnapshot{
+		ConnectionServices: app.connectionServicesUnsafe(),
 		Devices:            devs,
 		BackupInProgress:   len(app.backupInProgress),
 		RemovedDeviceCount: removedDeviceCount,
@@ -217,14 +230,25 @@ func (app *application) broadcastStatus() {
 	if app.hub == nil {
 		return
 	}
-	payload, err := json.Marshal(app.buildStatusSnapshot())
+	snapshot := app.buildStatusSnapshot()
+	payload, err := json.Marshal(snapshot)
+	if err != nil {
+		return
+	}
+	for i := range snapshot.ConnectionServices {
+		snapshot.ConnectionServices[i].LastSuccess = ""
+	}
+	for i := range snapshot.Devices {
+		snapshot.Devices[i].LastSeen = ""
+	}
+	comparison, err := json.Marshal(snapshot)
 	if err != nil {
 		return
 	}
 	app.mu.Lock()
-	changed := string(payload) != app.lastSnapshotJSON
+	changed := string(comparison) != app.lastSnapshotJSON
 	if changed {
-		app.lastSnapshotJSON = string(payload)
+		app.lastSnapshotJSON = string(comparison)
 	}
 	app.mu.Unlock()
 	if changed {
@@ -237,46 +261,82 @@ func (app *application) broadcastStatus() {
 // statusPoller 后端集中轮询设备状态，变化时经 SSE 广播。
 // presence（在线/连接类型）每 presencePollInterval 刷新；明细（电量/名称）低频刷新。
 func (app *application) statusPoller(ctx context.Context) {
+	// 一个明细 worker；队列容量为一，慢设备不会阻塞健康扫描或积累 goroutine。
+	details := make(chan struct{}, 1)
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-details:
+				app.mu.RLock()
+				pending := app.connectionRefreshPending
+				app.mu.RUnlock()
+				if pending {
+					app.refreshRecoveredConnections()
+				} else {
+					app.refreshDetails()
+				}
+				app.broadcastStatus()
+			}
+		}
+	}()
+	defer func() { <-done }()
+	scheduleDetails := func() {
+		select {
+		case details <- struct{}{}:
+		default:
+		}
+	}
 	app.refreshPresence()
-	app.refreshDetails()
+	scheduleDetails()
 	app.broadcastStatus()
-
 	interval := app.runtimeConfig.PresenceInterval
 	if interval <= 0 {
 		interval = presencePollInterval
 	}
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
-	detailEvery := int(detailPollInterval / interval)
-	if detailEvery < 1 {
-		detailEvery = 1
-	}
-	tick := 0
+	lastDetail := time.Now()
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			tick++
 			newOnline := app.refreshPresence()
-			if newOnline || tick%detailEvery == 0 {
-				app.refreshDetails()
+			app.mu.RLock()
+			pending := app.connectionRefreshPending
+			app.mu.RUnlock()
+			if newOnline || pending || time.Since(lastDetail) >= detailPollInterval {
+				scheduleDetails()
+				lastDetail = time.Now()
 			}
 			app.broadcastStatus()
 		}
 	}
+
 }
 
 // refreshPresence 轻量刷新在线状态与连接类型（不跑 getDeviceInfo）。
 // 返回是否有设备「新上线」（用于触发一次明细刷新）。
 func (app *application) refreshPresence() bool {
-	usb, net := app.listDevicesFromBothSockets()
-	online := mergeDeviceLists(usb, net)
-	newOnline, configCreated := app.applyPresenceSnapshotWithNetwork(online, net, time.Now())
-	if configCreated {
-		go app.saveConfigs() // 落盘（saveConfigs 自取读锁，必须在解锁后）
+	app.mu.RLock()
+	before := make(map[string]bool, len(app.devices))
+	for udid, d := range app.devices {
+		before[udid] = d.IsOnline
 	}
-	return newOnline
+	app.mu.RUnlock()
+	app.scanConnections(app.rootCtx)
+	app.mu.RLock()
+	defer app.mu.RUnlock()
+	for udid, d := range app.devices {
+		if d.IsOnline && !before[udid] {
+			return true
+		}
+	}
+	return false
 }
 
 // registerActiveDeviceCommand 登记可由在线状态监控取消的长设备命令。
@@ -313,6 +373,10 @@ func (app *application) applyPresenceSnapshot(online map[string]*device, now tim
 // 优先覆盖同 UDID 的 Wi-Fi 记录，但正在运行的 Wi-Fi 命令仍必须以 netmuxd 是否看见设备
 // 为准，不能因为用户中途插入 USB 就把健康的 Wi-Fi 任务误判为离线。
 func (app *application) applyPresenceSnapshotWithNetwork(online, networkOnline map[string]*device, now time.Time) (newOnline, configCreated bool) {
+	return app.applyPresenceSnapshotValid(online, networkOnline, now, [2]bool{true, true}, 0)
+}
+
+func (app *application) applyPresenceSnapshotValid(online, networkOnline map[string]*device, now time.Time, valid [2]bool, revision uint64) (newOnline, configCreated bool) {
 	grace := app.runtimeConfig.DeviceDisconnectGrace
 	if grace <= 0 {
 		grace = defaultRuntimeConfig().DeviceDisconnectGrace
@@ -330,6 +394,10 @@ func (app *application) applyPresenceSnapshotWithNetwork(online, networkOnline m
 	var presenceNotifications []pendingPresenceNotification
 
 	app.mu.Lock()
+	if revision != 0 && revision != app.connectionRevision {
+		app.mu.Unlock()
+		return
+	}
 	for udid, od := range online {
 		if app.isDeviceRemovedUnsafe(udid) {
 			delete(app.devices, udid)
@@ -345,9 +413,11 @@ func (app *application) applyPresenceSnapshotWithNetwork(online, networkOnline m
 				presenceNotifications = append(presenceNotifications, pendingPresenceNotification{udid: udid, name: d.Name, online: true})
 			}
 			d.IsOnline = true
+			d.PresenceUnknown = false
+			d.LastSeen = now
 			d.Connection = od.Connection
 		} else {
-			app.devices[udid] = &device{UDID: udid, Name: udid, IsOnline: true, Connection: od.Connection}
+			app.devices[udid] = &device{UDID: udid, Name: udid, IsOnline: true, Connection: od.Connection, LastSeen: now}
 			newOnline = true
 			presenceNotifications = append(presenceNotifications, pendingPresenceNotification{udid: udid, name: udid, online: true})
 		}
@@ -365,7 +435,16 @@ func (app *application) applyPresenceSnapshotWithNetwork(online, networkOnline m
 			continue
 		}
 		_, listed := online[udid]
-		if !listed && d.IsOnline {
+		backend := connectionUSB
+		if isNetworkConnection(d.Connection) {
+			backend = connectionWiFi
+		}
+		known := listed || valid[backend]
+		d.PresenceUnknown = !known
+		if !known {
+			delete(app.devicePresenceMissingSince, udid)
+		}
+		if known && !listed && d.IsOnline {
 			if connTypeFromDesc(d.Connection) != connectTypeNetwork {
 				d.IsOnline = false
 				presenceNotifications = append(presenceNotifications, pendingPresenceNotification{udid: udid, name: d.Name, online: false})
@@ -382,9 +461,15 @@ func (app *application) applyPresenceSnapshotWithNetwork(online, networkOnline m
 		}
 		command := app.activeDeviceCommands[udid]
 		commandOnline := listed
+		commandKnown := known
 		if command != nil && command.connection == connectTypeNetwork {
 			// 运行中的命令固定在 netmuxd socket；合并视图即使显示 USB，也不能替代网络在线证据。
 			_, commandOnline = networkOnline[udid]
+			commandKnown = valid[connectionWiFi]
+		}
+		if !commandKnown {
+			delete(app.deviceOfflineSince, udid)
+			continue
 		}
 		if commandOnline {
 			app.setBackupProgressConnectionUnsafe(udid, true, now)
@@ -426,29 +511,38 @@ func (app *application) applyPresenceSnapshotWithNetwork(online, networkOnline m
 
 // refreshDetails 在副本上跑 getDeviceInfo（无锁、慢），再回写（短锁），避免长时间持锁与数据竞争。
 func (app *application) refreshDetails() {
+	if !app.detailRefreshMu.TryLock() {
+		return
+	}
+	defer app.detailRefreshMu.Unlock()
+	release, err := app.beginConnectionTask(nil)
+	if err != nil {
+		return
+	}
+	defer release()
 	app.mu.RLock()
 	copies := make([]device, 0, len(app.devices))
+	epochs := make(map[string]uint64)
 	for _, d := range app.devices {
-		if d.IsOnline {
+		if d.IsOnline && !d.PresenceUnknown {
 			copies = append(copies, *d)
+			epochs[d.UDID] = app.connectionEpochUnsafe(d)
 		}
 	}
 	app.mu.RUnlock()
-
 	for i := range copies {
-		app.getDeviceInfo(&copies[i])
+		if app.rootCtx.Err() != nil {
+			return
+		}
+		app.getDeviceInfoInTask(&copies[i])
 	}
-
 	app.mu.Lock()
-	for i := range copies {
-		if d, ok := app.devices[copies[i].UDID]; ok && d.IsOnline {
-			d.Name = copies[i].Name
-			d.DeviceType = copies[i].DeviceType
-			d.BatteryLevel = copies[i].BatteryLevel
-			d.IsCharging = copies[i].IsCharging
+	defer app.mu.Unlock()
+	for _, copy := range copies {
+		if d := app.devices[copy.UDID]; d != nil && d.IsOnline && !d.PresenceUnknown && d.Connection == copy.Connection && app.connectionEpochUnsafe(d) == epochs[d.UDID] {
+			d.Name, d.DeviceType, d.BatteryLevel, d.IsCharging = copy.Name, copy.DeviceType, copy.BatteryLevel, copy.IsCharging
 		}
 	}
-	app.mu.Unlock()
 }
 
 // ---- SSE 端点 ----

@@ -2,7 +2,7 @@
 
 [简体中文](configuration.zh-CN.md) · [Manual index](../OPERATIONS.md)
 
-This reference describes application settings and the bundled `compose.yaml`.
+This reference describes application settings and the bundled `compose.yaml`. “Compose default” is the effective value with that file and no overrides, and may differ for custom images or overridden settings.
 
 ## Apply configuration changes
 
@@ -46,7 +46,7 @@ Only the password and master key are credentials themselves, but paths and netwo
 | `IOSBK_INSECURE_ALLOW_REMOTE` | `false` | `false` | true / false; explicit exception for unauthenticated non-loopback listening, not a secure access method. |
 | `IOSBK_ENABLE_EXPERIMENTAL_OPERATIONS` | `false` | `false` | true / false; gates local unpack and backup deletion. Device restore has a separate per-device gate. |
 | `IOSBK_MAX_HEAVY_JOBS` | `1` | `1` | Integer 1–2; currently limits concurrent backup jobs, not a universal limit on all experimental operations. |
-| `IOSBK_PRESENCE_INTERVAL` | `10s` | `10s` | 1s–10m; device presence polling interval, not proof of active transfer. |
+| `IOSBK_PRESENCE_INTERVAL` | `4s` | `4s` | 1s–10m; device presence and connection-service health polling, not proof of active transfer. |
 | `IOSBK_DEVICE_DISCONNECT_GRACE` | `30s` | `30s` | 5s–10m; grace for temporary disappearance, not a way to resume terminated jobs. |
 | `IOSBK_BACKUP_AUTHORIZATION_TIMEOUT` | `5m` | `5m` | 1s–24h; inactivity deadline while waiting for device authorization. |
 | `IOSBK_BACKUP_INACTIVITY_TIMEOUT` | `10m` | `10m` | 1s–24h; inactivity deadline during sending or receiving. |

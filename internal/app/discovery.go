@@ -191,6 +191,11 @@ func (app *application) discoveredNetworkIPs() map[string]string {
 }
 
 func (app *application) lookupNetworkIPs(ctx context.Context) (map[string]string, error) {
+	release, err := app.beginConnectionTask(nil)
+	if err != nil {
+		return nil, err
+	}
+	defer release()
 	if app.networkIPLookup != nil {
 		return app.networkIPLookup(ctx)
 	}

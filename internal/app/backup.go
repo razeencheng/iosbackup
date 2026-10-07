@@ -103,14 +103,28 @@ func (app *application) finishBackupOperation(udid string, err error, at time.Ti
 	app.broadcastStatus()
 }
 
-func (app *application) PerformBackup(udid string) (retErr error) {
+func (app *application) PerformBackup(udid string) error {
+	app.mu.RLock()
+	d := cloneDevice(app.devices[udid])
+	app.mu.RUnlock()
+	release, err := app.beginConnectionTask(d)
+	if err != nil {
+		return err
+	}
+	defer release()
+	return app.performBackupInTask(udid)
+}
+
+func (app *application) performBackupInTask(udid string) (retErr error) {
 	app.mu.Lock()
 	if err := app.deviceRemovalBlockedUnsafe(udid); err != nil {
 		app.mu.Unlock()
 		return err
 	}
 	device, exists := app.devices[udid]
+	device = cloneDevice(device)
 	config, configExists := app.configs[udid]
+	config = cloneBackupConfig(config)
 
 	// 检查设备是否已经在备份中
 	if app.backupInProgress[udid] {
@@ -294,8 +308,17 @@ func (app *application) performBackupWithConnection(udid, connectionType, sessio
 		app.mu.Unlock()
 		return err
 	}
-	_, exists := app.devices[udid]
+	device, exists := app.devices[udid]
+	device = cloneDevice(device)
+	if device != nil {
+		device.Connection = connectionType
+	}
+	if err := app.connectionAdmissionUnsafe(device); err != nil {
+		app.mu.Unlock()
+		return err
+	}
 	config, configExists := app.configs[udid]
+	config = cloneBackupConfig(config)
 
 	// 检查设备是否已经在备份中
 	if app.backupInProgress[udid] {
