@@ -6,18 +6,29 @@
 
 ## 发布流程与镜像标签
 
-[release.yml](../.github/workflows/release.yml) 由推送 `v*` 标签触发，在指定的公开 GitHub 仓库 `razeencheng/iosbackup` 发布，并检查 GHCR 包的公开可见性。
+[release.yml](../.github/workflows/release.yml) 由推送 `v*` 标签触发，在指定的公开 GitHub 仓库 `razeencheng/iosbackup` 发布，检查 GHCR 包和 Docker Hub 仓库的公开可见性，并把同一镜像推送到 `ghcr.io/razeencheng/iosbackup` 和 `docker.io/razeencheng/iosbackup`。
 
 | 版本 | GitHub Release | 镜像标签 |
 |---|---|---|
 | `vX.Y.Z` | 正式发行版 | 版本标签；当它是版本号最大的正式发行版时，同时更新 `latest` |
 | `vX.Y.Z-beta.N` 等带后缀版本 | 预发布 | 仅版本标签，不改变 `latest` |
 
-每个版本只构建一次 `linux/amd64`、`linux/arm64` 多架构镜像。镜像签名、供应链证据验证和 GitHub Release 创建成功后，发布步骤把同一 index digest 标记为 `latest` 并核对摘要，没有第二次构建。发布任务串行更新标签，并按数字比较正式版本号，防止旧版本重跑或维护分支补丁把 `latest` 指回旧版本；GitHub 的 Latest 标记在镜像摘要核对后同步更新。失败重跑时保留原标签和候选提交，检查已生成的产物，不另造版本来绕过失败。
+每个版本只构建一次 `linux/amd64`、`linux/arm64` 多架构镜像。镜像签名、供应链证据验证和 GitHub Release 创建成功后，发布步骤在两个镜像仓库把同一 index digest 标记为 `latest` 并分别核对摘要，没有第二次构建。发布任务串行更新标签，并按数字比较正式版本号，防止旧版本重跑或维护分支补丁把 `latest` 指回旧版本；GitHub 的 Latest 标记在镜像摘要核对后同步更新。失败重跑时保留原标签和候选提交，检查已生成的产物，先解决失败原因。若已打标签的工作流本身需要修改代码，应合并并验证修复后确定新版本，不能移动已发布标签或绕过校验。
 
 普通 [CI](../.github/workflows/ci.yml) 和手动 [打包检查](../.github/workflows/docker-package-test.yml) 不推送镜像，也不更新 `latest`。用户仍需执行 `docker compose pull` 和 `docker compose up -d` 才会替换运行中的容器。
 
 仓库和 GHCR 包的可见性由维护者单独管理，工作流不会自动修改。已有包必须为 public；首次包不存在时允许创建，但推送后必须通过 public 检查。GitHub 首次创建的个人包默认私有时，需要在包设置中改为 public 后重跑；未通过检查不会继续创建 Release 或更新 `latest`。参见 [GitHub 的容器仓库说明](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry)。
+
+## Docker Hub 配置
+
+1. 将 [razeencheng/iosbackup](https://hub.docker.com/r/razeencheng/iosbackup) 保持为 Public；工作流会在长时间构建前检查可见性。
+2. 在 Docker 账号的 Account settings → Personal access tokens 中创建 GitHub Actions 专用令牌，选择 **Read & Write** 权限和合适的有效期，不需要 Delete 权限。参见 [Docker 官方令牌说明](https://docs.docker.com/security/access-tokens/personal-access-tokens/)。
+3. 在 GitHub 仓库 Settings → Secrets and variables → Actions 中，添加 Repository variable `DOCKERHUB_USERNAME`，值为 `razeencheng`；添加 Repository secret `DOCKERHUB_TOKEN`，值为访问令牌。令牌不要写入源码、构建参数、日志或聊天。
+4. 发布时两个镜像仓库都必须登录成功。缺少配置、认证失败或 Docker Hub 仓库非公开/不存在时，流程在构建前停止。重试 Release 作业时也需保持令牌有效，该作业会重新登录以更新 `latest`。
+
+一次构建推送两个版本标签，Docker Hub 的 index digest 必须与构建输出一致后才能继续签名。两处均保存 index 的 keyless 签名和各平台 SBOM 证明，并针对准确的标签工作流身份验证。GitHub Release 的九个附件保留 GHCR 规范引用；Docker Hub 验证结果另见 Actions 日志，两边镜像的 index digest 相同。
+
+跨仓库写入无法保证原子性：推送或更新 `latest` 时，可能一边成功而另一边失败。工作流失败不代表完成双仓库发布；重试前核对两边版本和 `latest` 的摘要，只有两边最终摘要检查均通过才更新 GitHub Latest 标记。重跑构建可能产生新的候选镜像摘要，应保持标签源码提交不变，以成功运行的证据为准。
 
 ## 1. 同步版本和发布说明
 
@@ -64,7 +75,7 @@
 ./scripts/read_release_manifest.sh release/manifest.env
 ./scripts/read_release_manifest_test.sh
 go test -count=1 ./internal/buildinfo
-go test -count=1 -run 'TestReleaseWorkflow|TestReleaseLatestPromotion|TestReleasePublicVisibilityGates|TestReleaseManifest|TestDockerPackageTestWorkflow|TestDockerBuildContextIncludesBuildInfoPackage|TestPublicMetadataMatchesReleaseManifest|TestPublicComposeUsesOfficialReleaseImage|TestPublicReadmesDocumentReleaseDeployment' ./internal/app
+go test -count=1 -run 'TestReleaseWorkflow|TestReleaseCosign|TestReleaseDockerHub|TestReleaseLatestPromotion|TestReleasePublicVisibilityGates|TestReleaseManifest|TestDockerPackageTestWorkflow|TestDockerBuildContextIncludesBuildInfoPackage|TestPublicMetadataMatchesReleaseManifest|TestPublicComposeUsesOfficialReleaseImage|TestPublicReadmesDocumentReleaseDeployment' ./internal/app
 git diff --check
 ```
 
@@ -97,8 +108,8 @@ git diff --check
 - 仓库为 public，已有 GHCR 包为 public，推送后能够通过公开可见性检查。所需 Actions/OIDC、包写入和 Release 写入权限已经准备。
 - 支持范围、迁移/回滚说明、许可证材料和测试证据与该 commit 一致。失败重试前检查是否已产生镜像、签名或 Release，不能把失败状态等同于“什么也没发布”。
 
-成功流程构建 `linux/amd64` 与 `linux/arm64` 镜像，记录多架构 index 和各平台 digest，生成每平台 SPDX SBOM 与 BuildKit SLSA provenance，使用 Cosign 签名 index、证明各平台 SBOM，并验证结果。
+成功流程构建 `linux/amd64` 与 `linux/arm64` 镜像，记录多架构 index 和各平台 digest，生成每平台 SPDX SBOM 与 BuildKit SLSA provenance，在两个镜像仓库使用 Cosign 签名 index、证明各平台 SBOM，并验证结果。
 
 GitHub Release 正文来自 CHANGELOG；附件包括 **9 个证据文件** ：两份 SBOM、两份 provenance、平台 manifest 列表、index digest、三份 Cosign 验证结果。中间 Actions artifact 另含发布说明，共 10 个文件，当前仅保留 1 天。没有独立 Go 可执行文件或完整镜像 tar 发行附件。
 
-发布后按实际 digest 检查两架构镜像及构建身份，保存工作流运行和验证证据；参照用户[升级与回滚](manual/upgrade.zh-CN.md)进行受控验收。同时验证匿名源码访问和匿名镜像拉取；最高正式版本还需核对 `latest` 与版本标签是否指向同一个多架构 index digest。USB、加密读取、恢复等能力的证据分别记录，未验证项继续按[功能状态](FEATURE_STATUS.zh-CN.md)标注，不能由打包或签名成功推断。
+发布后按实际 digest 检查两架构镜像及构建身份，保存工作流运行和验证证据；参照用户[升级与回滚](manual/upgrade.zh-CN.md)进行受控验收。同时验证匿名源码访问和匿名镜像拉取；最高正式版本还需核对两个仓库的 `latest` 与版本标签是否均指向同一个多架构 index digest。USB、加密读取、恢复等能力的证据分别记录，未验证项继续按[功能状态](FEATURE_STATUS.zh-CN.md)标注，不能由打包或签名成功推断。

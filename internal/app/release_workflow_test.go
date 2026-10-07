@@ -40,12 +40,15 @@ var releaseWorkflowStepNames = []string{
 	"Checkout validated release source",
 	"Confirm validated release source",
 	"Check GHCR visibility before push",
+	"Check Docker Hub publication settings",
 	"Log in to GHCR",
+	"Log in to Docker Hub",
 	"Set up QEMU",
 	"Set up Docker Buildx",
 	"Build and push multi-architecture image",
 	"Confirm GHCR visibility after push",
 	"Record image index digest",
+	"Confirm Docker Hub image digest",
 	"Export platform manifests and BuildKit SLSA provenance",
 	"Generate linux/amd64 SPDX JSON SBOM",
 	"Generate linux/arm64 SPDX JSON SBOM",
@@ -55,6 +58,7 @@ var releaseWorkflowStepNames = []string{
 	"Attest linux/amd64 SPDX SBOM with Cosign keyless",
 	"Attest linux/arm64 SPDX SBOM with Cosign keyless",
 	"Verify Cosign signature and platform SBOM attestations",
+	"Verify Docker Hub signature and SBOM attestations",
 	"Generate deterministic release notes",
 	"Upload verified release assets",
 	"Download verified release assets",
@@ -62,6 +66,7 @@ var releaseWorkflowStepNames = []string{
 	"Create GitHub release",
 	"Set up Docker Buildx for promotion",
 	"Log in to GHCR for promotion",
+	"Log in to Docker Hub for promotion",
 	"Promote newest stable image to latest",
 }
 
@@ -95,7 +100,7 @@ var releaseWorkflowJobSpecs = []workflowJobSpec{
 			"arm64_digest": "${{ steps.platforms.outputs.arm64_digest }}",
 			"artifact_id":  "${{ steps.assets.outputs.artifact-id }}",
 		},
-		steps: releaseWorkflowStepNames[4:24],
+		steps: releaseWorkflowStepNames[4:28],
 	},
 	{
 		name:    "release",
@@ -105,7 +110,7 @@ var releaseWorkflowJobSpecs = []workflowJobSpec{
 			"contents": "write",
 			"packages": "write",
 		},
-		steps: releaseWorkflowStepNames[24:],
+		steps: releaseWorkflowStepNames[28:],
 	},
 }
 
@@ -182,7 +187,7 @@ func TestReleaseWorkflowJobGraphAndLeastPrivilege(t *testing.T) {
 	}
 }
 
-func TestReleaseWorkflowPinsActionsAndAvoidsDockerHub(t *testing.T) {
+func TestReleaseWorkflowPinsActionsAndRegistryDependencies(t *testing.T) {
 	workflow := loadReleaseWorkflow(t)
 	wantUses := map[string]string{
 		"actions/checkout":            "d23441a48e516b6c34aea4fa41551a30e30af803",
@@ -216,17 +221,9 @@ func TestReleaseWorkflowPinsActionsAndAvoidsDockerHub(t *testing.T) {
 		"docker.io/tonistiigi/binfmt@sha256:400a4873b838d1b89194d982c45e5fb3cda4593fbfd7e08a02e76b03b21166f0",
 		"docker.io/moby/buildkit@sha256:28a898719c18a33f4e8000685287fa36fd0dd9560c6440227d3a732d79bb41d8",
 	}
-	withoutPinnedDependencies := workflow
 	for _, image := range allowedDependencyImages {
 		if strings.Count(workflow, image) != 1 {
 			t.Errorf("release workflow must reference pinned dependency image exactly once: %s", image)
-		}
-		withoutPinnedDependencies = strings.ReplaceAll(withoutPinnedDependencies, image, "")
-	}
-	lower := strings.ToLower(withoutPinnedDependencies)
-	for _, forbidden := range []string{"docker.io", "hub.docker", "dockerhub"} {
-		if strings.Contains(lower, forbidden) {
-			t.Fatalf("release workflow must be GHCR-only; found %q", forbidden)
 		}
 	}
 	if strings.Count(workflow, "ghcr.io/razeencheng/iosbackup") == 0 {
@@ -317,7 +314,9 @@ func TestReleaseWorkflowValidatesFrozenInputsBeforePush(t *testing.T) {
 		"context: .",
 		"platforms: linux/amd64,linux/arm64",
 		"push: true",
-		"tags: ghcr.io/razeencheng/iosbackup:${{ needs.validate.outputs.version }}",
+		"tags: |",
+		"ghcr.io/razeencheng/iosbackup:${{ needs.validate.outputs.version }}",
+		"docker.io/razeencheng/iosbackup:${{ needs.validate.outputs.version }}",
 		"IOSBK_VERSION=${{ needs.validate.outputs.version }}",
 		"IOSBK_BUILD_DATE=${{ needs.validate.outputs.build_date }}",
 		"IOSBK_COMMIT=${{ needs.validate.outputs.commit }}",
@@ -536,6 +535,7 @@ func TestReleaseWorkflowPublishesPerPlatformEvidenceAfterPublicGate(t *testing.T
 			`--certificate-identity "$identity" \`,
 			`--certificate-oidc-issuer "$issuer" \`,
 			`"ghcr.io/razeencheng/iosbackup@${{ steps.platforms.outputs.amd64_digest }}" \`,
+			`| jq -s 'if all(.[]; type == "object") then . else error("expected Cosign attestation objects") end' \`,
 			"> dist/iosbackup-linux-amd64-cosign-sbom-attestation-verification.json",
 		},
 		{
@@ -543,6 +543,7 @@ func TestReleaseWorkflowPublishesPerPlatformEvidenceAfterPublicGate(t *testing.T
 			`--certificate-identity "$identity" \`,
 			`--certificate-oidc-issuer "$issuer" \`,
 			`"ghcr.io/razeencheng/iosbackup@${{ steps.platforms.outputs.arm64_digest }}" \`,
+			`| jq -s 'if all(.[]; type == "object") then . else error("expected Cosign attestation objects") end' \`,
 			"> dist/iosbackup-linux-arm64-cosign-sbom-attestation-verification.json",
 		},
 	} {
@@ -1671,8 +1672,8 @@ func validateReleaseWorkflowSafety(workflow string) error {
 		for _, line := range activeWorkflowLines(step) {
 			switch {
 			case activeUsesAction(line, "docker/login-action"):
-				initialLogin := step.name == "Log in to GHCR" && index > preflight && index < postflight
-				promotionLogin := step.name == "Log in to GHCR for promotion" && index > positions["Create GitHub release"]
+				initialLogin := (step.name == "Log in to GHCR" || step.name == "Log in to Docker Hub") && index > positions["Check Docker Hub publication settings"] && index < postflight
+				promotionLogin := (step.name == "Log in to GHCR for promotion" || step.name == "Log in to Docker Hub for promotion") && index > positions["Create GitHub release"]
 				if !initialLogin && !promotionLogin {
 					return fmt.Errorf("unexpected publishing side effect %q in step %q", line, step.name)
 				}
@@ -1693,7 +1694,7 @@ func validateReleaseWorkflowSafety(workflow string) error {
 					return fmt.Errorf("unexpected publishing side effect %q in step %q", line, step.name)
 				}
 			case strings.HasPrefix(line, "cosign verify "), strings.HasPrefix(line, "cosign verify-attestation "):
-				if step.name != "Verify Cosign signature and platform SBOM attestations" || index <= postflight {
+				if (step.name != "Verify Cosign signature and platform SBOM attestations" && step.name != "Verify Docker Hub signature and SBOM attestations") || index <= postflight {
 					return fmt.Errorf("unexpected publishing side effect %q in step %q", line, step.name)
 				}
 			case strings.HasPrefix(line, "cosign "):
