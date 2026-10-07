@@ -6,18 +6,29 @@ This page helps maintainers prepare **source versions, build metadata, and relea
 
 ## Release workflow and image tags
 
-Pushing a `v*` tag triggers [release.yml](../.github/workflows/release.yml) in the designated public GitHub repository, `razeencheng/iosbackup`. The workflow checks that the GHCR package is public.
+Pushing a `v*` tag triggers [release.yml](../.github/workflows/release.yml) in the designated public GitHub repository, `razeencheng/iosbackup`. The workflow checks that the GHCR package and Docker Hub repository are public, and pushes the same image to `ghcr.io/razeencheng/iosbackup` and `docker.io/razeencheng/iosbackup`.
 
 | Version | GitHub Release | Image tags |
 |---|---|---|
 | `vX.Y.Z` | Stable release | Version tag; also updates `latest` when it is the highest stable version |
 | Suffixed versions such as `vX.Y.Z-beta.N` | Prerelease | Version tag only; leaves `latest` unchanged |
 
-Each version builds the `linux/amd64` and `linux/arm64` multi-architecture image once. After signing, supply-chain verification, and GitHub Release creation succeed, publication assigns `latest` to the same index digest and verifies it without rebuilding. Publication jobs serialize tag updates and compare numeric stable versions, preventing older reruns or maintenance-branch patches from moving `latest` backwards. GitHub's Latest marker updates after the image digest check. When retrying failures, retain the original tag and candidate commit, inspect existing artifacts, and resolve the failure instead of inventing a new version to bypass it.
+Each version builds the `linux/amd64` and `linux/arm64` multi-architecture image once. After signing, supply-chain verification, and GitHub Release creation succeed, publication assigns `latest` to the same index digest in both registries and verifies both without rebuilding. Publication jobs serialize tag updates and compare numeric stable versions, preventing older reruns or maintenance-branch patches from moving `latest` backwards. GitHub's Latest marker updates after the image digest check. When retrying failures, retain the original tag and candidate commit, inspect existing artifacts, and resolve the failure. If the tagged workflow itself needs a code fix, merge and test that fix and choose a new release version; never move the published tag or bypass verification.
 
 Ordinary [CI](../.github/workflows/ci.yml) and the manual [packaging check](../.github/workflows/docker-package-test.yml) neither push images nor update `latest`. Users still run `docker compose pull` and `docker compose up -d` to replace a running container.
 
 Maintainers manage repository and GHCR package visibility separately; the workflow never changes it. Existing packages must be public. An absent package may be created on its first push, but the post-push public check must pass. If GitHub creates a personal package as private by default, make it public in package settings and rerun. A failed check blocks Release creation and `latest` promotion. See [GitHub's container registry documentation](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry).
+
+## Docker Hub setup
+
+1. Keep [razeencheng/iosbackup](https://hub.docker.com/r/razeencheng/iosbackup) public. The preflight checks visibility before the lengthy build.
+2. In Docker Account settings → Personal access tokens, create a token for GitHub Actions with **Read & Write** permissions and an appropriate expiration. Delete permission is unnecessary. See [Docker's PAT instructions](https://docs.docker.com/security/access-tokens/personal-access-tokens/).
+3. In GitHub repository Settings → Secrets and variables → Actions, add Repository variable `DOCKERHUB_USERNAME` with value `razeencheng`, and Repository secret `DOCKERHUB_TOKEN` with the token value. Do not paste the token into source, build arguments, logs, or chat.
+4. A release requires both registry logins. Missing settings, invalid authentication, or a private/missing Docker Hub repository stop publication before building. Keep the token valid when retrying the release job, which logs in again to promote `latest`.
+
+One build pushes both version tags. Docker Hub's index digest must match the build output before signing. Both registries receive keyless index signatures and platform SBOM attestations, verified against the exact tag workflow identity. The nine GitHub Release attachments retain the canonical GHCR references; Docker Hub verification is also recorded in Actions logs. The images share an index digest.
+
+Registry writes are not atomic across services: a push or promotion can succeed on one registry before another fails. A failed workflow is not a completed dual-registry release. Inspect both version and `latest` digests before retrying; the GitHub Latest marker changes only after both final digest checks pass. Re-running a failed build may produce a different candidate digest; preserve the tag's source commit and use evidence from the successful run.
 
 ## 1. Align the version and release notes
 
@@ -64,7 +75,7 @@ Still from the **release source root** :
 ./scripts/read_release_manifest.sh release/manifest.env
 ./scripts/read_release_manifest_test.sh
 go test -count=1 ./internal/buildinfo
-go test -count=1 -run 'TestReleaseWorkflow|TestReleaseLatestPromotion|TestReleasePublicVisibilityGates|TestReleaseManifest|TestDockerPackageTestWorkflow|TestDockerBuildContextIncludesBuildInfoPackage|TestPublicMetadataMatchesReleaseManifest|TestPublicComposeUsesOfficialReleaseImage|TestPublicReadmesDocumentReleaseDeployment' ./internal/app
+go test -count=1 -run 'TestReleaseWorkflow|TestReleaseCosign|TestReleaseDockerHub|TestReleaseLatestPromotion|TestReleasePublicVisibilityGates|TestReleaseManifest|TestDockerPackageTestWorkflow|TestDockerBuildContextIncludesBuildInfoPackage|TestPublicMetadataMatchesReleaseManifest|TestPublicComposeUsesOfficialReleaseImage|TestPublicReadmesDocumentReleaseDeployment' ./internal/app
 git diff --check
 ```
 
@@ -97,7 +108,7 @@ Arrange tag publication only after reviewing candidate contents, CI, and the tar
 - The repository is public, any existing GHCR package is public, and the post-push public check can pass. Required Actions/OIDC, package-write, and Release-write permissions are ready.
 - Support boundaries, migration/rollback notes, licenses, and test evidence describe this commit. Before retrying a failure, inspect whether images, signatures, or a Release already exist; failure does not imply nothing was published.
 
-The successful workflow builds `linux/amd64` and `linux/arm64` images, records the multi-architecture index and platform digests, generates per-platform SPDX SBOMs and BuildKit SLSA provenance, signs the index with Cosign, attests each platform's SBOM, and verifies the results.
+The successful workflow builds `linux/amd64` and `linux/arm64` images, records the multi-architecture index and platform digests, generates per-platform SPDX SBOMs and BuildKit SLSA provenance, signs the index with Cosign in both registries, attests each platform's SBOM, and verifies the results.
 
 The GitHub Release body comes from CHANGELOG. It attaches **9 evidence files** : two SBOMs, two provenance files, the platform-manifest list, the index digest, and three Cosign verification results. The intermediate Actions artifact also includes the release notes, for 10 files total, currently retained for only one day. There is no standalone Go binary or full image tar release attachment.
 

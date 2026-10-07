@@ -30,6 +30,8 @@ func TestReleaseLatestPromotion(t *testing.T) {
 		{name: "malformed release response", version: "v1.10.0", releases: `{}`, wantFailure: true},
 		{name: "push failure does not mark GitHub latest", version: "v1.10.0", releases: stable, failure: "push", wantPush: true, wantFailure: true},
 		{name: "digest mismatch does not mark GitHub latest", version: "v1.10.0", releases: stable, failure: "digest", wantPush: true, wantFailure: true},
+		{name: "Docker Hub push failure does not mark GitHub latest", version: "v1.10.0", releases: stable, failure: "hub-push", wantPush: true, wantFailure: true},
+		{name: "Docker Hub digest mismatch does not mark GitHub latest", version: "v1.10.0", releases: stable, failure: "hub-digest", wantPush: true, wantFailure: true},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -54,6 +56,13 @@ esac
 set -eu
 printf 'docker %s\n' "$*" >> "$IOSBK_TEST_LOG"
 test "$1 $2" = 'buildx imagetools'
+case "$*" in
+  *docker.io/razeencheng/iosbackup*)
+    if [ "$IOSBK_TEST_FAILURE" = hub-push ] && [ "$3" = create ]; then exit 1; fi
+    if [ "$IOSBK_TEST_FAILURE" = hub-digest ] && [ "$3" = inspect ]; then
+      printf '{"digest":"sha256:wrong"}\n'; exit 0
+    fi ;;
+esac
 case "$3" in
   create) [ "$IOSBK_TEST_FAILURE" != push ] ;;
   inspect)
@@ -86,6 +95,9 @@ esac
 			}
 			if test.wantPush && !strings.Contains(log, "--tag ghcr.io/razeencheng/iosbackup:latest ghcr.io/razeencheng/iosbackup@"+digest) {
 				t.Fatalf("latest must reuse the verified multi-architecture digest; calls: %s", log)
+			}
+			if test.wantEdit && !strings.Contains(log, "--tag docker.io/razeencheng/iosbackup:latest docker.io/razeencheng/iosbackup@"+digest) {
+				t.Fatalf("Docker Hub latest must use the same verified index; calls: %s", log)
 			}
 		})
 	}

@@ -148,6 +148,21 @@ jobs:
               ;;
           esac
 
+      - name: Check Docker Hub publication settings
+        shell: bash
+        env:
+          DOCKERHUB_USERNAME: ${{ vars.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ "$DOCKERHUB_USERNAME" != "razeencheng" ] || [ -z "$DOCKERHUB_TOKEN" ]; then
+            echo "::error::Set Actions variable DOCKERHUB_USERNAME=razeencheng and secret DOCKERHUB_TOKEN with Docker Hub Read & Write access."
+            exit 1
+          fi
+          curl --fail --silent --show-error --retry 3 \
+            https://hub.docker.com/v2/repositories/razeencheng/iosbackup/ \
+            | jq -e '.namespace == "razeencheng" and .name == "iosbackup" and .is_private == false' >/dev/null
+
       - name: Log in to GHCR
         # docker/login-action v4.6.0
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f
@@ -155,6 +170,14 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ github.token }}
+
+      - name: Log in to Docker Hub
+        # docker/login-action v4.6.0
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f
+        with:
+          registry: docker.io
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Set up QEMU
         # docker/setup-qemu-action v4.2.0; binfmt qemu-v10.2.3-68
@@ -182,7 +205,9 @@ jobs:
           pull: true
           provenance: mode=max,version=v1
           sbom: false
-          tags: ghcr.io/razeencheng/iosbackup:${{ needs.validate.outputs.version }}
+          tags: |
+            ghcr.io/razeencheng/iosbackup:${{ needs.validate.outputs.version }}
+            docker.io/razeencheng/iosbackup:${{ needs.validate.outputs.version }}
           labels: |
             org.opencontainers.image.created=${{ needs.validate.outputs.build_date }}T00:00:00Z
             org.opencontainers.image.revision=${{ needs.validate.outputs.commit }}
@@ -234,6 +259,16 @@ jobs:
           printf '%s' "$digest" | grep -Eq '^sha256:[0-9a-f]{64}$'
           printf 'ghcr.io/razeencheng/iosbackup@%s\n' "$digest" > dist/iosbackup-image-digest.txt
           echo "digest=$digest" >> "$GITHUB_OUTPUT"
+
+      - name: Confirm Docker Hub image digest
+        shell: bash
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+          IMAGE_DIGEST: ${{ steps.image.outputs.digest }}
+        run: |
+          set -euo pipefail
+          actual="$(docker buildx imagetools inspect "docker.io/razeencheng/iosbackup:$VERSION" --format '{{json .Manifest}}' | jq -er '.digest')"
+          test "$actual" = "$IMAGE_DIGEST"
 
       - name: Export platform manifests and BuildKit SLSA provenance
         id: platforms
@@ -331,18 +366,21 @@ jobs:
         run: |
           set -euo pipefail
           cosign sign --yes "ghcr.io/razeencheng/iosbackup@${{ steps.image.outputs.digest }}"
+          cosign sign --yes "docker.io/razeencheng/iosbackup@${{ steps.image.outputs.digest }}"
 
       - name: Attest linux/amd64 SPDX SBOM with Cosign keyless
         shell: bash
         run: |
           set -euo pipefail
           cosign attest --yes --type spdxjson --predicate dist/iosbackup-linux-amd64.spdx.json "ghcr.io/razeencheng/iosbackup@${{ steps.platforms.outputs.amd64_digest }}"
+          cosign attest --yes --type spdxjson --predicate dist/iosbackup-linux-amd64.spdx.json "docker.io/razeencheng/iosbackup@${{ steps.platforms.outputs.amd64_digest }}"
 
       - name: Attest linux/arm64 SPDX SBOM with Cosign keyless
         shell: bash
         run: |
           set -euo pipefail
           cosign attest --yes --type spdxjson --predicate dist/iosbackup-linux-arm64.spdx.json "ghcr.io/razeencheng/iosbackup@${{ steps.platforms.outputs.arm64_digest }}"
+          cosign attest --yes --type spdxjson --predicate dist/iosbackup-linux-arm64.spdx.json "docker.io/razeencheng/iosbackup@${{ steps.platforms.outputs.arm64_digest }}"
 
       - name: Verify Cosign signature and platform SBOM attestations
         shell: bash
@@ -359,15 +397,39 @@ jobs:
             --certificate-identity "$identity" \
             --certificate-oidc-issuer "$issuer" \
             "ghcr.io/razeencheng/iosbackup@${{ steps.platforms.outputs.amd64_digest }}" \
+            | jq -s 'if all(.[]; type == "object") then . else error("expected Cosign attestation objects") end' \
             > dist/iosbackup-linux-amd64-cosign-sbom-attestation-verification.json
           cosign verify-attestation --type spdxjson --output json \
             --certificate-identity "$identity" \
             --certificate-oidc-issuer "$issuer" \
             "ghcr.io/razeencheng/iosbackup@${{ steps.platforms.outputs.arm64_digest }}" \
+            | jq -s 'if all(.[]; type == "object") then . else error("expected Cosign attestation objects") end' \
             > dist/iosbackup-linux-arm64-cosign-sbom-attestation-verification.json
           jq -e 'type == "array" and length > 0' dist/iosbackup-cosign-signature-verification.json >/dev/null
           jq -e 'type == "array" and length > 0' dist/iosbackup-linux-amd64-cosign-sbom-attestation-verification.json >/dev/null
           jq -e 'type == "array" and length > 0' dist/iosbackup-linux-arm64-cosign-sbom-attestation-verification.json >/dev/null
+
+      - name: Verify Docker Hub signature and SBOM attestations
+        shell: bash
+        run: |
+          set -euo pipefail
+          identity="https://github.com/$GITHUB_REPOSITORY/.github/workflows/release.yml@$GITHUB_REF"
+          issuer="https://token.actions.githubusercontent.com"
+          cosign verify --output json \
+            --certificate-identity "$identity" \
+            --certificate-oidc-issuer "$issuer" \
+            "docker.io/razeencheng/iosbackup@${{ steps.image.outputs.digest }}" \
+            | jq -e 'type == "array" and length > 0' >/dev/null
+          cosign verify-attestation --type spdxjson --output json \
+            --certificate-identity "$identity" \
+            --certificate-oidc-issuer "$issuer" \
+            "docker.io/razeencheng/iosbackup@${{ steps.platforms.outputs.amd64_digest }}" \
+            | jq -s -e 'length > 0 and all(.[]; type == "object")' >/dev/null
+          cosign verify-attestation --type spdxjson --output json \
+            --certificate-identity "$identity" \
+            --certificate-oidc-issuer "$issuer" \
+            "docker.io/razeencheng/iosbackup@${{ steps.platforms.outputs.arm64_digest }}" \
+            | jq -s -e 'length > 0 and all(.[]; type == "object")' >/dev/null
 
       - name: Generate deterministic release notes
         shell: bash
@@ -527,6 +589,14 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ github.token }}
 
+      - name: Log in to Docker Hub for promotion
+        # docker/login-action v4.6.0
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f
+        with:
+          registry: docker.io
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
       - name: Promote newest stable image to latest
         shell: bash
         env:
@@ -553,8 +623,9 @@ jobs:
             echo "A newer stable release exists; latest is unchanged."
             exit 0
           fi
-          image="ghcr.io/razeencheng/iosbackup"
-          docker buildx imagetools create --tag "$image:latest" "$image@$IMAGE_DIGEST"
-          actual="$(docker buildx imagetools inspect "$image:latest" --format '{{json .Manifest}}' | jq -er '.digest')"
-          test "$actual" = "$IMAGE_DIGEST"
+          for image in ghcr.io/razeencheng/iosbackup docker.io/razeencheng/iosbackup; do
+            docker buildx imagetools create --tag "$image:latest" "$image@$IMAGE_DIGEST"
+            actual="$(docker buildx imagetools inspect "$image:latest" --format '{{json .Manifest}}' | jq -er '.digest')"
+            test "$actual" = "$IMAGE_DIGEST"
+          done
           gh release edit "$VERSION" --repo "$GITHUB_REPOSITORY" --latest
