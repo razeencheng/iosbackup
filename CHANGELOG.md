@@ -16,7 +16,7 @@ This project follows Semantic Versioning. Release dates and source metadata are 
 
 ### Compatibility
 
-- Preserve existing instance credentials, pairing records, backup settings, and backup data. Wi-Fi and encryption remain Preview; restore, unpacking, and deletion remain Experimental.
+- Preserve existing instance credentials, pairing records, backup settings, and backup data. Wi-Fi backups and encryption are documented as Core; restore, unpacking, and deletion remain Experimental and disabled by default.
 
 中文：简化首次部署并安全生成实例凭据；完善中英文使用手册；修复设备连接服务异常后的恢复和状态显示。本版本通过 GitHub Release 与 GHCR 发布双架构镜像、来源证明、SBOM 和签名，并将最新正式版同步到 `latest`。已有配置、配对及备份数据保留。
 
