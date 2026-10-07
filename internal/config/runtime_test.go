@@ -4,6 +4,7 @@ import (
 	"math"
 	"net/netip"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -278,6 +279,8 @@ func TestNewPathsDerivesAllWritablePaths(t *testing.T) {
 		NotificationConfigFile: "/srv/config/notification_configs.json",
 		SecretsFile:            "/srv/config/secrets.enc",
 		AuthCredentialsFile:    "/srv/config/auth_credentials.json",
+		AdminPasswordFile:      "/srv/config/admin_password",
+		SecretKeyFile:          "/srv/config/secret_key",
 		CSRFSecretFile:         "/srv/config/csrf_secret.json",
 	}
 	if !reflect.DeepEqual(paths, want) {
@@ -314,5 +317,43 @@ func TestBackupTimeoutConfiguration(t *testing.T) {
 				t.Errorf("%s=%s should fail startup validation", key, value)
 			}
 		}
+	}
+}
+
+func TestSecretKeyRuntimeSources(t *testing.T) {
+	for _, values := range []map[string]string{
+		{}, {"IOSBK_SECRET_KEY": "  ", "IOSBK_SECRET_KEY_FILE": ""},
+		{"IOSBK_SECRET_KEY": "encoded-key"}, {"IOSBK_SECRET_KEY_FILE": " /run/secrets/key "},
+	} {
+		cfg, err := config.Load(mapEnv(values))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if cfg.SecretKey != values["IOSBK_SECRET_KEY"] || cfg.SecretKeyFile != strings.TrimSpace(values["IOSBK_SECRET_KEY_FILE"]) {
+			t.Fatal("配置源没有正确解析")
+		}
+	}
+	for _, values := range []map[string]string{
+		{"IOSBK_SECRET_KEY": "encoded-key", "IOSBK_SECRET_KEY_FILE": "/run/secrets/key"},
+		{"IOSBK_SECRET_KEY_FILE": "relative"}, {"IOSBK_SECRET_KEY_FILE": "/"},
+	} {
+		if _, err := config.Load(mapEnv(values)); err == nil {
+			t.Fatal("冲突或非法路径应被拒绝")
+		}
+	}
+}
+
+func TestExplicitSecretFileWhitespaceIsNotUnset(t *testing.T) {
+	for _, name := range []string{"IOSBK_ADMIN_PASSWORD_FILE", "IOSBK_SECRET_KEY_FILE"} {
+		t.Run(name, func(t *testing.T) {
+			for _, value := range []string{" ", "\t\n"} {
+				if _, err := config.Load(mapEnv(map[string]string{name: value})); err == nil {
+					t.Fatalf("非空的非法显式%s不能回退默认生成", name)
+				}
+			}
+			if _, err := config.Load(mapEnv(map[string]string{name: ""})); err != nil {
+				t.Fatalf("只有空串视为未设置: %v", err)
+			}
+		})
 	}
 }

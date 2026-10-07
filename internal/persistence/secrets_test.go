@@ -522,3 +522,39 @@ func exactSizedSecretJSON(t *testing.T, size int, marker string) []byte {
 	}
 	return data
 }
+
+func TestAESSecretStoreValidateAllExistingCiphertexts(t *testing.T) {
+	path := secretPath(t)
+	store := mustStore(t, testKey(27), path)
+	if err := store.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SetSecret("first", "first-secret"); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SetSecret("second", "second-secret"); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	wrong := mustStore(t, testKey(28), path)
+	if err := wrong.Validate(); err == nil {
+		t.Fatal("错误密钥必须在初始化检查时失败")
+	}
+	entries := rawEntries(t, path)
+	entries["second"] = "broken"
+	writeRawEntries(t, path, entries)
+	if err := store.Validate(); err == nil {
+		t.Fatal("必须检查每一条密文")
+	}
+	if err := os.WriteFile(path, []byte("{"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Validate(); err == nil {
+		t.Fatal("损坏JSON必须失败")
+	}
+	if err := NewUnavailableSecretStore(path).Validate(); !errors.Is(err, ErrEncryptionUnavailable) {
+		t.Fatal("不可用存储不能通过验证")
+	}
+}

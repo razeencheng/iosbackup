@@ -10,12 +10,13 @@ import (
 	"time"
 
 	"iosbackup/internal/buildinfo"
+	"iosbackup/internal/persistence"
 )
 
 // loadConfigs 加载配置
 func (app *application) loadConfigs() error {
 	// 创建必要的目录
-	if err := os.MkdirAll(app.paths.ConfigsRoot, 0700); err != nil {
+	if err := persistence.EnsurePrivateDirectory(app.paths.ConfigsRoot); err != nil {
 		return err
 	}
 	if err := os.MkdirAll(app.paths.BackupsRoot, 0755); err != nil {
@@ -93,26 +94,9 @@ func run(ctx context.Context, cfg runtimeConfig) error {
 	paths := applyRuntimeConfig(cfg)
 
 	app := newApplicationWithRuntime(ctx, cfg)
-	authManager, generatedPassword, err := newAuthManager(cfg, paths)
-	if err != nil {
-		return fmt.Errorf("初始化管理员认证: %w", err)
+	if err := app.initializeSecurity(); err != nil {
+		return err
 	}
-	csrfManager, err := newCSRFManager(paths.CSRFSecretFile)
-	if err != nil {
-		return fmt.Errorf("初始化 CSRF 防护: %w", err)
-	}
-	app.authManager = authManager
-	app.csrfManager = csrfManager
-	if !cfg.AuthEnabled {
-		log.Printf("WARN: 管理员认证已关闭；建议在 NAS 部署中启用 IOSBK_AUTH_ENABLED=true")
-	} else if generatedPassword != "" {
-		log.Printf("首次生成管理员密码（仅显示一次）：password=%s", generatedPassword)
-	} else {
-		log.Printf("管理员密码认证已启用")
-	}
-
-	// 初始化备份密码和通知秘密的加密存储（缺 IOSBK_SECRET_KEY 时降级为不可用，不 crash）
-	app.secretStore = initSecretStore()
 	app.notificationConfigStore = newNotificationConfigStore(paths.NotificationConfigFile, app.secretStore)
 
 	// 初始化通知管理器
@@ -192,4 +176,34 @@ func run(ctx context.Context, cfg runtimeConfig) error {
 		}
 		return nil
 	}
+}
+
+// initializeSecurity 完成持久化与校验后才允许启动外部服务。
+func (app *application) initializeSecurity() error {
+	cfg, paths := app.runtimeConfig, app.paths
+	store, err := initSecretStore(cfg, paths)
+	if err != nil {
+		return fmt.Errorf("初始化加密存储: %w", err)
+	}
+	auth, generatedPassword, err := newAuthManager(cfg, paths)
+	if err != nil {
+		return fmt.Errorf("初始化管理员认证: %w", err)
+	}
+	csrf, err := newCSRFManager(paths.CSRFSecretFile)
+	if err != nil {
+		return fmt.Errorf("初始化 CSRF 防护: %w", err)
+	}
+	app.authManager, app.csrfManager, app.secretStore = auth, csrf, store
+	if !cfg.AuthEnabled {
+		log.Printf("WARN: 管理员认证已关闭；建议在 NAS 部署中启用 IOSBK_AUTH_ENABLED=true")
+	} else if generatedPassword != "" {
+		log.Printf("首次生成管理员密码（仅显示一次）：password=%s；已保存到 %s", generatedPassword, paths.AdminPasswordFile)
+	} else if cfg.AdminPasswordFile != "" {
+		log.Printf("管理员密码认证已启用；密码来源文件：%s", cfg.AdminPasswordFile)
+	} else if _, err := os.Lstat(paths.AdminPasswordFile); err == nil {
+		log.Printf("管理员密码认证已启用；密码文件：%s", paths.AdminPasswordFile)
+	} else {
+		log.Printf("管理员密码认证已启用；沿用旧认证摘要，未生成替代密码")
+	}
+	return nil
 }

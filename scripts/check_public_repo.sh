@@ -133,11 +133,17 @@ check_directory_policy() {
   [ -f "$root/$cargo_inventory" ] || fail 'component lock references a missing Cargo license inventory'
 
   for private_path in \
-    .cursor AGENTS.md CLAUDE.md designs docs/claude docs/plans docs/qa docs/release docs/research \
-    Dockerfile.spike Dockerfile.spike.entrypoint.sh release.sh backups lockdown; do
-    [ ! -e "$root/$private_path" ] || fail "private or excluded path is present: $private_path"
+    .cursor AGENTS.md CLAUDE.md CONTEXT.md designs docs/adr docs/claude docs/plans docs/qa docs/release docs/research \
+    Dockerfile.spike Dockerfile.spike.entrypoint.sh release.sh backups lockdown data; do
+    [ ! -e "$root/$private_path" ] && [ ! -L "$root/$private_path" ] || fail "private or excluded path is present: $private_path"
   done
-  if find "$root/configs" -type f \( -name 'backup_configs.json' -o -name 'notification_configs.json' -o -name '*runtime*.json' -o -name 'secrets.enc*' \) -print -quit 2>/dev/null | grep -q .; then
+  if find "$root" -maxdepth 1 -name '.env*' -print -quit | grep -q .; then
+    fail 'local environment path is present in the public tree'
+  fi
+  if find "$root/configs" \( -name 'backup_configs.json' -o -name 'notification_configs.json' -o -name '*runtime*.json' \
+    -o -name 'admin_password*' -o -name 'secret_key*' -o -name 'auth_credentials.json*' -o -name 'csrf_secret.json*' -o -name 'secrets.enc*' \
+    -o -name '.admin_password-*' -o -name '.secret_key-*' -o -name '.auth_credentials.json-*' -o -name '.csrf_secret.json-*' -o -name '.secrets.enc-*' \) \
+    -print -quit 2>/dev/null | grep -q .; then
     fail 'runtime configuration is present in the public tree'
   fi
   if find "$root" -maxdepth 1 -type f -name '*.go' -print -quit | grep -q .; then

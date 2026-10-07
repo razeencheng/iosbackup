@@ -11,6 +11,8 @@ type Paths struct {
 	NotificationConfigFile string
 	SecretsFile            string
 	AuthCredentialsFile    string
+	AdminPasswordFile      string
+	SecretKeyFile          string
 	CSRFSecretFile         string
 }
 
@@ -24,6 +26,8 @@ func NewPaths(cfg Runtime) Paths {
 		NotificationConfigFile: filepath.Join(cfg.ConfigsRoot, "notification_configs.json"),
 		SecretsFile:            filepath.Join(cfg.ConfigsRoot, "secrets.enc"),
 		AuthCredentialsFile:    filepath.Join(cfg.ConfigsRoot, "auth_credentials.json"),
+		AdminPasswordFile:      filepath.Join(cfg.ConfigsRoot, "admin_password"),
+		SecretKeyFile:          filepath.Join(cfg.ConfigsRoot, "secret_key"),
 		CSRFSecretFile:         filepath.Join(cfg.ConfigsRoot, "csrf_secret.json"),
 	}
 }

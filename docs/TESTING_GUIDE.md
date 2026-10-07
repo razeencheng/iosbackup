@@ -1,277 +1,130 @@
-# 通知系统单元测试指南
+# 测试指南
 
-## 概述
+[English](TESTING_GUIDE.en.md) · [开发入门](DEVELOPMENT.zh-CN.md)
 
-本文档描述了iOS备份通知系统的单元测试设计和运行方法。测试覆盖了通知管理器、各种通知器实现以及所有通知发送场景。
+本指南适用于当前 `cmd/`、`internal/` 包结构。所有命令从**源码仓库根目录** 执行。默认测试使用临时状态、替身命令和本地测试服务，不向真实通知渠道发消息，也不需要连接手机。这里的“离线”仍允许 `httptest` 等本机测试服务监听端口；工具链首次下载和 CI 漏洞扫描也需要单独准备。
 
-## 测试文件结构
-
-```
-iosbackup/
-├── notification_test.go      # 通知管理器核心功能测试
-├── notifiers_test.go        # 具体通知器实现测试
-├── notifiers_integration_test.go # 显式 opt-in 的真实通知测试
-├── scripts/run_tests.sh     # 默认离线测试脚本
-└── docs/TESTING_GUIDE.md    # 本测试指南
-```
-
-## 测试覆盖范围
-
-### 1. 通知管理器测试 (`notification_test.go`)
-
-#### 核心功能测试
-- ✅ **通知管理器创建和初始化**
-- ✅ **通知器添加和管理**
-- ✅ **通知消息发送和路由**
-- ✅ **启用/禁用状态管理**
-- ✅ **并发安全性测试**
-
-#### 通知场景测试
-- ✅ **备份开始通知** (`SendBackupStart`)
-- ✅ **备份成功通知** (`SendBackupSuccess`) 
-- ✅ **备份失败通知** (`SendBackupFailed`)
-- ✅ **设备上线通知** (`SendDeviceOnline`)
-- ✅ **设备离线通知** (`SendDeviceOffline`)
-- ✅ **系统错误通知** (`SendSystemError`)
-
-#### 错误处理测试
-- ✅ **禁用通知器处理**
-- ✅ **通知器发送错误处理**
-- ✅ **无效通知器验证**
-- ✅ **管理器禁用状态处理**
-
-#### 性能测试
-- ✅ **并发发送测试**
-- ✅ **基准性能测试**
-
-### 2. 通知器实现测试 (`notifiers_test.go`)
-
-#### Telegram通知器测试
-- ✅ **配置验证** (Bot Token, Chat ID)
-- ✅ **消息格式验证** (Markdown格式)
-- ✅ **HTTP请求验证** (API调用)
-- ✅ **错误场景处理**
-
-#### 邮件通知器测试
-- ✅ **SMTP配置验证** (主机、端口、认证)
-- ✅ **邮件格式验证** (主题、内容)
-- ✅ **多种SMTP服务支持** (Gmail、QQ、企业邮箱)
-- ✅ **参数验证测试**
-
-#### 企业微信通知器测试
-- ✅ **Webhook URL验证** (HTTPS要求)
-- ✅ **消息格式验证** (企业微信格式)
-- ✅ **HTTP请求验证** (POST请求)
-- ✅ **实际发送测试** (Mock服务器)
-
-#### Webhook通知器测试
-- ✅ **URL格式验证** (HTTP/HTTPS)
-- ✅ **自定义HTTP头验证**
-- ✅ **JSON消息格式验证**
-- ✅ **完整消息传输测试**
-
-### 3. 配置管理测试
-
-- ✅ **配置序列化/反序列化**
-- ✅ **配置验证逻辑**
-- ✅ **通知规则管理**
-
-## 测试运行方法
-
-### 1. 快速运行所有测试
+## 1. 先检查环境
 
 ```bash
-# 使用测试脚本（推荐）
-./scripts/run_tests.sh
-
-# 或者手动运行
-go test -v ./...
+go version
+go list -m all
+git status --short
 ```
 
-默认测试不会编译或运行真实通知测试，也不应读取真实 `/configs`。`scripts/run_tests.sh` 会先检查默认测试清单；如果出现 `TestRealNotice`，脚本立即失败。
+工具链以 [go.mod](../go.mod) 为准，目前指定 `go1.26.7`，模块应只列出 `iosbackup`。不要使用生产配置、挂载实际备份目录，或给默认测试设置真实通知凭据。
 
-### 2. 运行真实通知集成测试
+## 2. 运行默认测试
 
-真实通知会向外部服务发送消息，只能在隔离环境中双重显式启用：
+日常改动先运行相关包，再做一次全量测试：
+
+```bash
+go test -count=1 ./internal/notification
+go test -count=1 ./internal/config ./internal/persistence
+go test -count=1 ./...
+```
+
+需要静态和并发检查时：
+
+```bash
+go vet ./...
+go test -race -count=1 ./...
+```
+
+race 测试需要支持的平台和 C 工具链；不要使用静态发布构建的 `CGO_ENABLED=0` 环境来运行它。测试退出非零时保留失败包、测试名和错误输出，先定位失败再决定是否重跑。
+
+已有的 `./scripts/run_tests.sh` 会依次运行通知/配置筛选、全量测试、覆盖率、全部基准，并生成 `coverage.out` 与 `coverage.html`。它会重复执行部分测试，适合明确需要这组报告时使用；仅修改文档时不必每次运行。脚本还检查默认测试列表中不得出现 `TestRealNotice`。
+
+## 3. 定位单个测试或模块
+
+```bash
+# 应用中的通知行为和事件消息
+go test -v -count=1 -run 'TestNotification|TestSendBackup|TestDeviceStatusNotifications' ./internal/app
+
+# 新通知模块的规则与失败继续发送行为
+go test -v -count=1 -run '^TestManagerFiltersRulesAndContinuesAfterNotifierFailure$' ./internal/notification
+
+# 包依赖方向
+go test -v -count=1 -run '^TestPackageDependencyDirection$' ./internal/app
+
+# 仅列出当前测试名，不运行测试函数
+go test -list . ./internal/notification ./internal/app
+```
+
+`go test ... .` 只指向当前包，不再是应用测试的有效通用入口。应用测试用 `./internal/app`，通知模块测试用 `./internal/notification`，全项目用 `./...`。`-list` 仍会编译和初始化测试程序，不是纯文件搜索。
+
+## 4. 覆盖率与基准
+
+```bash
+go test -count=1 -coverprofile=coverage.out ./...
+go tool cover -func=coverage.out
+go tool cover -html=coverage.out -o coverage.html
+
+go test -run='^$' -bench='^BenchmarkNotificationSend$' -benchmem ./internal/app
+```
+
+覆盖率产物写在当前目录，属于本地生成文件。覆盖率百分比与单次基准结果都不能证明所有路径正确。比较基准应使用相同机器、工具链和参数，并记录变化范围；报告字段见文末。`-run='^$'` 避免在基准命令中再次运行普通测试。
+
+## 5. 真实通知测试：默认关闭
+
+`TestRealNotice` 位于 [`internal/app/notifiers_integration_test.go`](../internal/app/notifiers_integration_test.go)。它需要**双重显式启用** ：`integration` build tag 与发送确认变量；还必须给出独立配置文件路径。只有 build tag 时会跳过；确认变量已启用但缺少配置路径时会失败。测试不会自行推断生产 `/configs` 的位置。
+
+只有明确要向自己控制的测试收件人发送消息时，才在隔离环境执行下面的命令。本次文档更新没有执行它：
 
 ```bash
 IOSBK_RUN_REAL_NOTIFICATIONS=YES_I_KNOW_THIS_SENDS_MESSAGES \
 IOSBK_INTEGRATION_NOTIFICATION_CONFIG=/absolute/path/to/test-notifications.json \
-go test -tags=integration -run '^TestRealNotice$' -count=1 .
+go test -tags=integration -run '^TestRealNotice$' -count=1 ./internal/app
 ```
 
-配置路径必须显式提供，测试不会从 `dirConfigs`、`/configs` 或 package 初始化路径猜测配置。只提供 build tag 而没有确认变量时，测试会 SKIP。
+配置必须启用总开关，含至少一个已启用且通过校验的测试渠道。当前辅助函数加载 Telegram、Email、企业微信、Webhook；**不包含 Bark** 。每个已启用渠道会直接发送 6 条测试消息（开始、成功、失败、上线、离线、系统错误），不是通过事件规则筛选后的单条测试。
 
-### 3. 运行特定测试
+不要复用生产配置。配置文件可能包含 token、邮箱密码和完整目标地址，应放在仓库外并限制权限；测试结束后清理测试收件箱和凭据。不要把该命令加入默认 CI，也不要把确认变量长期导出到 shell 配置。
 
-```bash
-# 运行通知管理器测试
-go test -v -run "Test.*Notification" .
+## 6. 按职责选择或新增测试
 
-# 运行通知器实现测试  
-go test -v -run "Test.*Notifier" .
+以下索引合并测试位置与代表性职责，范围核对日期为 2026-10-06；有对应测试不代表所有设备、错误场景或第三方服务均已覆盖。
 
-# 运行配置相关测试
-go test -v -run "Test.*Config" .
-```
+| 修改对象 | 测试入口 | 代表性检查 |
+|---|---|---|
+| 通知管理器 | [manager_test.go](../internal/notification/manager_test.go) | 事件规则、模板、有界队列、消息副本、取消、单渠道失败后继续处理 |
+| 通知渠道适配器 | [adapters_test.go](../internal/notification/adapters_test.go) | Telegram/SMTP/企业微信/Bark/Webhook 的请求与错误、输入校验、出站地址限制、SMTP TLS 与超时 |
+| 应用通知接入 | [notification_test.go](../internal/app/notification_test.go)、[notification_security_test.go](../internal/app/notification_security_test.go) | 备份/设备/系统事件消息、规则接入、通知配置保存、秘密格式与保护 |
+| 启动配置与持久化 | [config](../internal/config)、[persistence](../internal/persistence) 中的 `*_test.go` | 参数校验、默认值、实验开关、原子写入与秘密存储 |
+| 应用工作流 | [app](../internal/app) 中对应行为的 `*_test.go` | HTTP 认证/CSRF、设备移除、任务占用、备份进度与超时、实验功能门禁 |
+| 包结构 | [architecture_test.go](../internal/app/architecture_test.go) | 入口与叶子模块依赖方向、应用导出边界 |
+| 分发边界 | 公开检出中 [scripts](../scripts) 下对应的 `*_test.sh` | 公开文件/敏感内容、发布元数据、许可闭包及检查器回归 |
 
-### 4. 运行覆盖率测试
+测试应检查实际行为：执行操作后，检查输出、保存的数据或对其他模块的调用。异步测试用有界 channel/context 等待确定事件，避免靠增大固定 sleep 通过。使用临时目录和固定假标识，保护共享状态并在结束时清理服务器/进程。
 
-```bash
-# 生成覆盖率报告
-go test -v -coverprofile=coverage.out .
-go tool cover -html=coverage.out -o coverage.html
+## 7. 常见失败
 
-# 查看覆盖率摘要
-go tool cover -func=coverage.out
-```
+- **无法下载工具链** ：先准备匹配 Go 版本；这不等于测试需要真实通知网络。
+- **本地端口监听被沙箱拒绝** ：确认测试环境允许本机测试服务器，不要改成真实远端服务绕过限制。
+- **race 报告或超时** ：保存第一处失败栈和相关测试输出，检查状态所有权、锁与取消；不能把重跑偶然成功当成修复。
+- **测试名不存在或没有测试运行** ：用 `-list` 核对名称和包路径，检查正则是否选中了目标。
 
-### 5. 运行基准测试
+准确 CI 顺序见 [ci.yml](../.github/workflows/ci.yml)。
 
-```bash
-# 运行性能基准测试
-go test -v -bench=. -run=^$ .
+## 8. 记录证据与验证边界
 
-# 运行特定基准测试
-go test -v -bench=BenchmarkNotification .
-```
+分别记录三类结果，不能互相替代：
 
-## 测试设计理念
+1. **默认离线测试** ：验证所选代码路径与回归断言，不证明真实设备通信或外部服务投递成功。
+2. **真实通知集成测试** ：证明本次适配器调用的发送结果；运行门禁和渠道范围见第 5 节，不代替 Web UI 配置保存、规则路由或真实备份事件验收。
+3. **设备验收** ：需要设备、存储、连接和操作者。USB/Wi-Fi 备份、加密读取和真机恢复各自记录结果，不能用 Go 测试或截图中的在线状态代替。
 
-### 1. Mock对象设计
+既有 [Beta ARM64 教程记录](images/tutorial/README.md)包含一次 USB 成功与磁盘完成标记检查；未验证加密清单读取或整机恢复。群晖手册流程也未在此次文档更新中逐步真机复验。
 
-使用 `MockNotifier` 模拟通知器行为：
-- 记录发送次数和最后消息
-- 支持模拟发送错误
-- 可配置启用/禁用状态
-- 简单的验证逻辑
+在 PR、CI 或测试记录中保留以下字段：
 
-### 2. HTTP服务器Mock
+| 字段 | 内容 |
+|---|---|
+| 代码身份 | 提交 SHA；有未提交变更时注明 |
+| 环境 | Go 版本、操作系统/架构；真机测试另记镜像摘要、设备系统与连接方式 |
+| 命令与操作 | 完整命令、标签、包路径或设备操作；秘密值用脱敏说明，不贴凭据 |
+| 结果 | 退出码、失败测试、必要日志或任务最终结果；跳过和未运行单独列出 |
+| 附件 | 覆盖率或基准报告的生成时间、对照条件；截图来源和隐私处理 |
+| 限制 | 哪些场景未执行，哪些结论仍依赖外部服务或真机 |
 
-使用 `httptest.NewServer` 模拟外部API：
-- Telegram Bot API
-- 企业微信Webhook
-- 自定义Webhook端点
-
-### 3. 异步处理测试
-
-通知系统使用goroutine异步发送：
-- 使用有界结果 channel 等待精确发送数量
-- 验证异步操作结果
-- 测试并发安全性
-
-### 4. 错误场景覆盖
-
-全面测试错误处理：
-- 网络连接错误
-- 无效配置参数
-- 权限认证失败
-- 服务器响应错误
-
-## 测试数据和场景
-
-### 1. 测试消息样例
-
-```go
-message := &NotificationMessage{
-    Type:       NotificationBackupSuccess,
-    Level:      NotificationLevelInfo,
-    Title:      "✅ 设备备份完成",
-    Content:    "设备 iPhone 15 备份成功完成",
-    DeviceName: "iPhone 15",
-    DeviceUDID: "12345-abcde",
-    Timestamp:  nowBeijing(),
-}
-```
-
-### 2. 配置测试数据
-
-```go
-config := &NotificationConfig{
-    Enabled: true,
-    TelegramConfigs: []TelegramConfig{
-        {
-            Name:     "test_bot",
-            BotToken: "test_token",
-            ChatID:   "test_chat_id",
-            Enabled:  true,
-        },
-    },
-    NotificationRules: map[string][]string{
-        "backup_success": {"test_bot"},
-        "backup_failed":  {"test_bot", "email"},
-    },
-}
-```
-
-## 测试最佳实践
-
-### 1. 测试隔离
-- 每个测试函数独立运行
-- 使用临时配置避免干扰
-- Mock外部依赖
-
-### 2. 清晰的测试命名
-- 使用描述性测试名称
-- 遵循 `Test<功能><场景>` 命名规范
-- 子测试使用 `t.Run()` 组织
-
-### 3. 完整的断言
-- 验证返回值和状态变化
-- 检查错误处理逻辑
-- 确认副作用（如日志记录）
-
-### 4. 性能考虑
-- 基准测试衡量性能
-- 并发测试验证线程安全
-- 避免测试中的实际网络请求
-
-## 常见问题和解决方案
-
-### 1. 测试超时
-**问题**: 异步通知测试偶尔超时
-**解决**: 检查生产代码是否完成发送，并使用有界同步机制；不要增加固定 `time.Sleep`
-
-### 2. Mock服务器端口冲突
-**问题**: `httptest.NewServer` 端口被占用
-**解决**: 使用 `defer server.Close()` 确保清理
-
-### 3. 配置文件冲突  
-**问题**: 测试修改全局配置常量
-**解决**: 测试配置序列化而非文件操作
-
-### 4. 并发竞争条件
-**问题**: 并发测试出现竞争条件
-**解决**: 使用适当的同步机制和等待策略
-
-## 测试维护指南
-
-### 1. 添加新通知器测试
-1. 在 `notifiers_test.go` 中添加测试函数
-2. 实现配置验证测试
-3. 添加消息发送测试
-4. 包含错误处理测试
-
-### 2. 添加新通知场景测试
-1. 在 `notification_test.go` 中添加场景测试
-2. 验证消息格式和内容
-3. 测试通知规则路由
-4. 确保错误处理覆盖
-
-### 3. 更新基准测试
-1. 新功能添加对应基准测试
-2. 定期运行性能回归测试
-3. 记录性能基线数据
-
-## 持续集成建议
-
-```yaml
-# GitHub Actions 示例
-- name: Run notification tests
-  run: |
-    cd iosbackup
-    go test -v -coverprofile=coverage.out .
-    go tool cover -func=coverage.out
-```
-
-通过完善的单元测试，确保通知系统的可靠性和维护性。
+本指南不声明当前工作区已通过所有检查。实际结果必须来自对应提交的命令输出或 CI；没有新证据时保持“未执行/待验证”，不要把旧记录中的“所有测试通过”当作当前结果。

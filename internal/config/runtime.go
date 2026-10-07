@@ -41,6 +41,8 @@ type Runtime struct {
 	EnableExperimentalOperations bool
 	InsecureAllowRemote          bool
 	AdminPasswordFile            string
+	SecretKey                    string
+	SecretKeyFile                string
 	MaxHeavyJobs                 int
 	PresenceInterval             time.Duration
 	DeviceDisconnectGrace        time.Duration
@@ -129,11 +131,24 @@ func Load(getenv func(string) string) (Runtime, error) {
 		}
 	}
 
-	if value := strings.TrimSpace(getenv("IOSBK_ADMIN_PASSWORD_FILE")); value != "" {
+	if raw := getenv("IOSBK_ADMIN_PASSWORD_FILE"); raw != "" {
+		value := strings.TrimSpace(raw)
 		cfg.AdminPasswordFile, err = cleanAbsolutePath("IOSBK_ADMIN_PASSWORD_FILE", value, true)
 		if err != nil {
 			return Runtime{}, err
 		}
+	}
+
+	cfg.SecretKey = getenv("IOSBK_SECRET_KEY")
+	if raw := getenv("IOSBK_SECRET_KEY_FILE"); raw != "" {
+		value := strings.TrimSpace(raw)
+		cfg.SecretKeyFile, err = cleanAbsolutePath("IOSBK_SECRET_KEY_FILE", value, true)
+		if err != nil {
+			return Runtime{}, err
+		}
+	}
+	if cfg.SecretKey != "" && cfg.SecretKeyFile != "" {
+		return Runtime{}, errors.New("IOSBK_SECRET_KEY 与 IOSBK_SECRET_KEY_FILE 不能同时配置")
 	}
 
 	if value := strings.TrimSpace(getenv("IOSBK_MAX_HEAVY_JOBS")); value != "" {

@@ -188,6 +188,86 @@ run_check public-index "$index_fixture" pass --public-index public-files.txt
 sed -n '1p' "$fixture" >"$index_fixture/README.md"
 run_check public-index-scope "$index_fixture" pass --public-index public-files.txt
 
+# Internal documentation stays private even when an include selects its blobs.
+for private_document in CONTEXT.md docs/adr/0001-internal.md; do
+	case "$private_document" in
+		CONTEXT.md) document_label=context; excluded_path=CONTEXT.md ;;
+		*) document_label=adr; excluded_path=docs/adr ;;
+	esac
+	private_directory="$test_root/private-$document_label-directory"
+	populate_fixture "$private_directory"
+	mkdir -p "$private_directory/$(dirname -- "$private_document")"
+	printf '# Internal project notes\n' >"$private_directory/$private_document"
+	run_check "private-$document_label-directory" "$private_directory" fail --directory .
+	if ! grep -Fq "private or excluded path is present: $excluded_path" "$test_root/output-private-$document_label-directory"; then
+		record_failure "private-$document_label-directory did not reject the internal documentation path"
+	fi
+
+	private_index="$test_root/private-$document_label-index"
+	init_index_fixture "$private_index"
+	mkdir -p "$private_index/$(dirname -- "$private_document")"
+	printf '# Internal project notes\n' >"$private_index/$private_document"
+	printf 'include\t%s\taccidentally selected internal documentation\n' "$private_document" >>"$private_index/public-files.txt"
+	git -C "$private_index" add -- "$private_document" public-files.txt
+	run_check "private-$document_label-index" "$private_index" fail --public-index public-files.txt
+	if ! grep -Fq "private or excluded path is present: $excluded_path" "$test_root/output-private-$document_label-index"; then
+		record_failure "private-$document_label-index did not reject the internal documentation path"
+	fi
+done
+
+assert_runtime_boundary() {
+    case_label=$1
+    case "$2" in
+        .env*) expected='local environment path is present' ;;
+        data*) expected='private or excluded path is present: data' ;;
+        *) expected='runtime configuration is present' ;;
+    esac
+    if ! grep -Fq "$expected" "$test_root/output-$case_label"; then
+        record_failure "$case_label did not reject the runtime filename at the policy boundary"
+    fi
+}
+
+# Filenames alone must block runtime secrets, including partial initialization
+# files, even when harmless fixture bytes evade content-based secret detection.
+for runtime_path in .env .env.local data/configs/admin_password \
+    configs/admin_password configs/secret_key configs/auth_credentials.json configs/csrf_secret.json configs/secrets.enc \
+    configs/.admin_password-example configs/.secret_key-example configs/.auth_credentials.json-example \
+    configs/.csrf_secret.json-example configs/.secrets.enc-example; do
+    runtime_label=$(printf '%s' "$runtime_path" | tr '/.' '__')
+    runtime_directory="$test_root/runtime-$runtime_label-directory"
+    populate_fixture "$runtime_directory"
+    mkdir -p "$runtime_directory/$(dirname -- "$runtime_path")"
+    printf 'harmless runtime-secret fixture\n' >"$runtime_directory/$runtime_path"
+    run_check "runtime-$runtime_label-directory" "$runtime_directory" fail --directory .
+    assert_runtime_boundary "runtime-$runtime_label-directory" "$runtime_path"
+
+    runtime_index="$test_root/runtime-$runtime_label-index"
+    init_index_fixture "$runtime_index"
+    mkdir -p "$runtime_index/$(dirname -- "$runtime_path")"
+    printf 'harmless runtime-secret fixture\n' >"$runtime_index/$runtime_path"
+    printf 'include\t%s\taccidentally selected runtime secret\n' "$runtime_path" >>"$runtime_index/public-files.txt"
+    git -C "$runtime_index" add -f -- "$runtime_path" public-files.txt
+    run_check "runtime-$runtime_label-index" "$runtime_index" fail --public-index public-files.txt
+    assert_runtime_boundary "runtime-$runtime_label-index" "$runtime_path"
+ done
+
+# The same forbidden names cannot bypass the directory gate by changing type.
+for runtime_path in .env.local data configs/secret_key configs/.admin_password-example; do
+    runtime_label=$(printf '%s' "$runtime_path" | tr '/.' '__')
+    for kind in directory symlink dangling; do
+        special="$test_root/runtime-type-$runtime_label-$kind"
+        populate_fixture "$special"
+        mkdir -p "$special/$(dirname -- "$runtime_path")"
+        case "$kind" in
+            directory) mkdir "$special/$runtime_path" ;;
+            symlink) ln -s "$special/LICENSE" "$special/$runtime_path" ;;
+            dangling) ln -s "$special/missing-target" "$special/$runtime_path" ;;
+        esac
+        run_check "runtime-type-$runtime_label-$kind" "$special" fail --directory .
+        assert_runtime_boundary "runtime-type-$runtime_label-$kind" "$runtime_path"
+    done
+done
+
 missing="$test_root/missing"
 populate_fixture "$missing"
 rm "$missing/scripts/sensitive-content-patterns.txt"

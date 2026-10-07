@@ -6,6 +6,8 @@ This project follows Semantic Versioning. Release dates and source metadata are 
 
 Released 2026-09-12.
 
+### Fixed
+
 - Stop manual and automatic backup sessions that exceed phase-specific inactivity limits, even when the device remains visible. Gracefully terminate the process group, release the job, and report `backup_stalled` without changing the last successful backup time.
 - Use payload-free mobilebackup2 activity records from the bundled tool; repeated progress output, device heartbeats, and power assertions do not keep a dead session alive. Active transfers have no total-duration deadline.
 - Show authorization, sending, receiving, and device-processing phases with the last activity time. Require a success acknowledgement from the current command before recording success.
@@ -69,4 +71,4 @@ Released 2026-09-12.
 
 `v1.5.1` 修复 Wi-Fi 心跳断连后设备长期离线的问题：后台按退避间隔重试注册，支持手动 IP 与已由 mDNS 成功注册的设备，测试 IP 以真实注册结果为准。地址仅在内存中保留最多 24 小时，应用重启后需要重新发现或使用手动 IP。此版本无需迁移配置或备份数据，Wi-Fi 仍属于预览功能。
 
-`v1.5.0-beta.1` 完成了平衡分包、公开文件/敏感内容/许可证门禁和双语文档；功能分级为 Core（USB、定时、只读查看）、Preview（Wi-Fi、加密/改密）、Experimental（恢复、解包、删除，默认关闭）。当前发布日期只由 `release/manifest.env` 冻结，避免在多处复制后漂移。
+`v1.5.0-beta.1` 将代码按职责拆分为多个包，增加公开文件、敏感内容和许可证检查，并补充双语文档；功能分级为 Core（USB、定时、只读查看）、Preview（Wi-Fi、加密/改密）、Experimental（恢复、解包、删除，默认关闭）。当前发布日期只由 `release/manifest.env` 冻结，避免多处记录的日期不一致。
