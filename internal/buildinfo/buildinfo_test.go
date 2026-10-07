@@ -8,11 +8,11 @@ func TestDevelopmentDefaults(t *testing.T) {
 		got  string
 		want string
 	}{
-		{name: "version", got: Version, want: "v1.5.2"},
+		{name: "version", got: Version, want: "v1.5.3"},
 		{name: "build date", got: BuildDate, want: "unknown"},
 		{name: "commit", got: Commit, want: "unknown"},
 		{name: "source URL", got: SourceURL, want: "https://github.com/razeencheng/iosbackup"},
-		{name: "description", got: Description, want: "Bounded backup inactivity and accurate session progress"},
+		{name: "description", got: Description, want: "Automatic setup and resilient device connection recovery"},
 		{name: "license", got: LicenseID, want: "AGPL-3.0-only"},
 	}
 

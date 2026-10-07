@@ -2,6 +2,24 @@
 
 This project follows Semantic Versioning. Release dates and source metadata are frozen in [`release/manifest.env`](release/manifest.env); this file does not duplicate the current release date.
 
+## v1.5.3
+
+### Added
+
+- Generate and securely persist instance credentials on first startup, with a simpler Compose configuration and complete English and Chinese user manuals.
+- Publish the official multi-architecture GHCR image and GitHub Release with provenance, per-platform SBOMs, and verified keyless signatures; promote the newest stable image to `latest`.
+
+### Fixed
+
+- Detect unhealthy device connection services and recover them with bounded retries while coordinating active device operations.
+- Report connection-service health and recovery state consistently in device discovery, the first-use guide, and the main console.
+
+### Compatibility
+
+- Preserve existing instance credentials, pairing records, backup settings, and backup data. Wi-Fi and encryption remain Preview; restore, unpacking, and deletion remain Experimental.
+
+中文：简化首次部署并安全生成实例凭据；完善中英文使用手册；修复设备连接服务异常后的恢复和状态显示。本版本通过 GitHub Release 与 GHCR 发布双架构镜像、来源证明、SBOM 和签名，并将最新正式版同步到 `latest`。已有配置、配对及备份数据保留。
+
 ## v1.5.2
 
 Released 2026-09-12.
