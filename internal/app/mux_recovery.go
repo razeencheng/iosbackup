@@ -353,23 +353,49 @@ func (app *application) connectionEpoch(d *device) uint64 {
 	defer app.mu.RUnlock()
 	return app.connectionEpochUnsafe(d)
 }
-func (app *application) pairingStatePublisher(d *device) func(string, string, string, string) {
-	epoch := app.connectionEpoch(d)
-	return func(udid, stateCode, code, message string) {
+func (app *application) pairingStatePublisher(d *device) func(string, string, string, string) bool {
+	return app.pairingPublisher(d, false)
+}
+
+func (app *application) pairingPublisher(d *device, automatic bool) func(string, string, string, string) bool {
+	app.mu.Lock()
+	epoch := app.connectionEpochUnsafe(d)
+	app.pairingCheckSequence++
+	check := app.pairingCheckSequence
+	state := app.deviceOperationStates[d.UDID]
+	state.pairingCheck = check
+	app.deviceOperationStates[d.UDID] = state
+	app.mu.Unlock()
+	return func(udid, stateCode, code, message string) bool {
 		app.mu.Lock()
 		current := app.devices[udid]
-		if app.connectionEpochUnsafe(d) != epoch || app.deviceRemovalBlockedUnsafe(udid) != nil || (current != nil && (current.Connection != d.Connection || current.PresenceUnknown)) {
-			app.mu.Unlock()
-			return
-		}
 		state := app.deviceOperationStates[udid]
+		if state.pairingCheck != check || app.connectionEpochUnsafe(d) != epoch || app.deviceRemovalBlockedUnsafe(udid) != nil ||
+			(current != nil && (current.Connection != d.Connection || current.PresenceUnknown)) ||
+			(automatic && (current == nil || !current.IsOnline || app.connectionAdmissionUnsafe(current) != nil)) {
+			app.mu.Unlock()
+			return false
+		}
 		state.PairingState = stateCode
+		if stateCode == pairingStatePaired {
+			state.pairingAlert = pairingAlertState{}
+		}
 		if stateCode != pairingStateChecking {
 			state.PairingErrorCode, state.PairingError = code, message
 		}
+		var notification *notificationMessage
+		if automatic {
+			notification = app.pairingNotificationUnsafe(d, &state, nowBeijing())
+		}
 		app.deviceOperationStates[udid] = state
 		app.mu.Unlock()
+		if notification != nil {
+			if manager := app.notificationManagerSnapshot(); manager != nil {
+				manager.Send(notification)
+			}
+		}
 		app.broadcastStatus()
+		return true
 	}
 }
 

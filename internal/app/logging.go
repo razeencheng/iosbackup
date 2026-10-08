@@ -120,7 +120,4 @@ func (app *application) addWarnLog(udid, message string) {
 
 func (app *application) addErrorLog(udid, message string) {
 	app.addLogWithLevel(udid, message, logLevelError)
-	if manager := app.notificationManagerSnapshot(); manager != nil {
-		manager.SendSystemError(udid, message)
-	}
 }

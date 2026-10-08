@@ -9,7 +9,7 @@ import (
 // DeviceStatus 设备状态信息
 type deviceStatus struct {
 	UDID       string
-	Connection string // "USB" 或 "Network"
+	Connection string // connectionTypeDesc 返回的连接描述，与 device.Connection 一致
 	IsOnline   bool
 }
 
@@ -105,7 +105,8 @@ func (app *application) checkAndBackup(udid string, config backupConfig, deviceS
 	}()
 
 	app.mu.RLock()
-	if app.deviceRemovalBlockedUnsafe(udid) != nil {
+	currentConfig := app.configs[udid]
+	if app.deviceRemovalBlockedUnsafe(udid) != nil || currentConfig == nil || !currentConfig.AutoBackupEnabled {
 		app.mu.RUnlock()
 		return
 	}
@@ -147,6 +148,13 @@ func (app *application) checkAndBackup(udid string, config backupConfig, deviceS
 	}
 	timeSinceLastBackup := now.Sub(lastBackupTime)
 	if timeSinceLastBackup < time.Duration(config.BackupInterval)*time.Hour {
+		return
+	}
+
+	// 到期检查先验证信任。离线/超时不触发配对，也不产生备份失败通知。
+	device.Connection = deviceStatus.Connection
+	device.IsOnline = deviceStatus.IsOnline
+	if !app.checkAutomaticBackupPairing(device) {
 		return
 	}
 

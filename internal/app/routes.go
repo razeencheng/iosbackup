@@ -570,6 +570,7 @@ func (app *application) handleStatus(w http.ResponseWriter, r *http.Request) {
 
 	writeJSON(w, http.StatusOK, map[string]interface{}{
 		"connection_services":       connectionServices,
+		"devices":                   app.buildStatusSnapshot().Devices,
 		"backup_in_progress_count":  backupCount,
 		"backup_devices":            backupDevices,
 		"backup_udids":              backupUDIDs,
@@ -1291,7 +1292,9 @@ func (app *application) handleBackupUnback(w http.ResponseWriter, r *http.Reques
 	}
 	go func() {
 		if err := app.Unback(context.Background(), udid); err != nil {
-			app.addErrorLog(udid, fmt.Sprintf("unback 失败: %v", err))
+			message := fmt.Sprintf("unback 失败: %v", err)
+			app.addErrorLog(udid, message)
+			app.notifySystemError(udid, message)
 		}
 	}()
 	writeSuccess(w, "unback 解包已开始，请查看日志了解进度")
@@ -1339,7 +1342,9 @@ func (app *application) handleEncryption(w http.ResponseWriter, r *http.Request)
 		ctx, cancel := context.WithTimeout(context.Background(), encryptionOpTimeout)
 		defer cancel()
 		if err := app.SetBackupEncryption(ctx, udid, req.Enable, req.Password); err != nil {
-			app.addErrorLog(udid, fmt.Sprintf("设置加密失败: %v", err))
+			message := fmt.Sprintf("设置加密失败: %v", err)
+			app.addErrorLog(udid, message)
+			app.notifySystemError(udid, message)
 		}
 	}()
 	writeSuccess(w, "加密设置已提交，请查看日志了解结果")
@@ -1379,7 +1384,9 @@ func (app *application) handleChangePassword(w http.ResponseWriter, r *http.Requ
 		ctx, cancel := context.WithTimeout(context.Background(), encryptionOpTimeout)
 		defer cancel()
 		if err := app.ChangeBackupPassword(ctx, udid, req.Old, req.New); err != nil {
-			app.addErrorLog(udid, fmt.Sprintf("改密失败: %v", err))
+			message := fmt.Sprintf("改密失败: %v", err)
+			app.addErrorLog(udid, message)
+			app.notifySystemError(udid, message)
 		}
 	}()
 	writeSuccess(w, "改密已提交，请查看日志了解结果")
@@ -1458,7 +1465,9 @@ func (app *application) handleRestore(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := context.WithTimeout(context.Background(), restoreOpTimeout)
 		defer cancel()
 		if err := app.Restore(ctx, udid, req.Password, req.Options); err != nil {
-			app.addErrorLog(udid, fmt.Sprintf("恢复失败: %v", err))
+			message := fmt.Sprintf("恢复失败: %v", err)
+			app.addErrorLog(udid, message)
+			app.notifySystemError(udid, message)
 		}
 	}()
 	writeSuccess(w, "恢复已开始（破坏性操作），请查看日志了解进度")

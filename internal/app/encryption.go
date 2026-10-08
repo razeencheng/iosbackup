@@ -87,7 +87,9 @@ func (app *application) SetBackupEncryption(ctx context.Context, udid string, en
 	// 同步 secretStore
 	if enable {
 		if e := app.secretStore.SetBackupPassword(udid, password); e != nil {
-			app.addErrorLog(udid, fmt.Sprintf("加密已开启但密码存储失败: %v", e))
+			message := fmt.Sprintf("加密已开启但密码存储失败: %v", e)
+			app.addErrorLog(udid, message)
+			app.notifySystemError(udid, message)
 		}
 	} else if app.secretStore != nil && app.secretStore.Available() {
 		_ = app.secretStore.DeleteBackupPassword(udid)
@@ -119,7 +121,9 @@ func (app *application) ChangeBackupPassword(ctx context.Context, udid, oldPw, n
 	}
 
 	if e := app.secretStore.SetBackupPassword(udid, newPw); e != nil {
-		app.addErrorLog(udid, fmt.Sprintf("改密成功但新密码存储失败: %v", e))
+		message := fmt.Sprintf("改密成功但新密码存储失败: %v", e)
+		app.addErrorLog(udid, message)
+		app.notifySystemError(udid, message)
 	}
 	app.addInfoLog(udid, "备份密码已修改")
 	return nil

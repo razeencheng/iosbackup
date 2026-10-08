@@ -115,7 +115,9 @@ func (app *application) Unback(ctx context.Context, udid string) error {
 		return nil
 	})
 	if err != nil {
-		app.addErrorLog(udid, fmt.Sprintf("本地 unback 失败: %v", err))
+		message := fmt.Sprintf("本地 unback 失败: %v", err)
+		app.addErrorLog(udid, message)
+		app.notifySystemError(udid, message)
 		return fmt.Errorf("unback 失败: %w", err)
 	}
 	summary.CompletedAt = nowBeijing().Format(time.RFC3339)

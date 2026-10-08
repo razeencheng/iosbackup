@@ -37,6 +37,13 @@ const (
 	notificationLevelError   = notificationpkg.LevelError
 )
 
+// 业务调用方明确决定是否告警，日志级别本身不再触发外部通知。
+func (app *application) notifySystemError(title, content string) {
+	if manager := app.notificationManagerSnapshot(); manager != nil {
+		manager.SendSystemError(title, content)
+	}
+}
+
 func notificationManagerOptions(workerCount, queueSize int) notificationpkg.Options {
 	return notificationpkg.Options{
 		Now:         nowBeijing,
