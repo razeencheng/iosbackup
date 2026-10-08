@@ -3,11 +3,11 @@ package buildinfo
 
 // These development defaults can be overridden with go build -ldflags -X.
 var (
-	Version     = "v1.5.3"
+	Version     = "v1.5.4"
 	BuildDate   = "unknown"
 	Commit      = "unknown"
 	SourceURL   = "https://github.com/razeencheng/iosbackup"
-	Description = "Automatic setup and resilient device connection recovery"
+	Description = "Verified multi-architecture releases to GHCR and Docker Hub"
 )
 
 const LicenseID = "AGPL-3.0-only"
