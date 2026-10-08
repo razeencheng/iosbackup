@@ -2,6 +2,24 @@
 
 This project follows Semantic Versioning. Release dates and source metadata are frozen in [`release/manifest.env`](release/manifest.env); this file does not duplicate the current release date.
 
+## v1.5.4
+
+### Fixed
+
+- Accept Cosign's verified SBOM attestation object stream when assembling release evidence, while preserving signature, identity, issuer, and nonempty-output checks. This fixes the validation error that stopped the v1.5.3 workflow before creating its GitHub Release and promoting `latest`.
+
+### Added
+
+- Push the same Linux amd64/arm64 image build to GHCR and Docker Hub, compare the index digests, and sign and verify each registry's index and platform SBOMs.
+- Check Docker Hub credentials and public repository visibility before building; promote the newest stable version to `latest` in both registries and verify the digests before marking the GitHub Release as Latest.
+
+### Compatibility
+
+- No application behavior, configuration, pairing records, or backup-format changes; no data migration is required. Wi-Fi backups and encryption remain Core; restore, unpacking, and deletion remain Experimental and disabled by default.
+- Keep the existing v1.5.3 source tag unchanged. Cross-registry publication is not atomic; a failed workflow may leave partial results and must be checked before retrying.
+
+中文：修复 Cosign 已验证 SBOM 证明的输出格式误判；同一次双架构构建同步发布到 GHCR 与 Docker Hub，两处均校验摘要、签名及 SBOM，并同步最新正式版的 `latest`。本版本不改变应用功能、配置或备份格式，无需数据迁移；保留原 v1.5.3 源码标签。
+
 ## v1.5.3
 
 ### Added
