@@ -190,15 +190,15 @@ func TestReleaseWorkflowJobGraphAndLeastPrivilege(t *testing.T) {
 func TestReleaseWorkflowPinsActionsAndRegistryDependencies(t *testing.T) {
 	workflow := loadReleaseWorkflow(t)
 	wantUses := map[string]string{
-		"actions/checkout":            "d23441a48e516b6c34aea4fa41551a30e30af803",
+		"actions/checkout":            "3d3c42e5aac5ba805825da76410c181273ba90b1",
 		"actions/download-artifact":   "3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
 		"actions/setup-go":            "b7ad1dad31e06c5925ef5d2fc7ad053ef454303e",
 		"actions/upload-artifact":     "043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
-		"anchore/sbom-action":         "3ad7283483fc7af8ff2b4ea19663c2d5ca935e26",
-		"docker/build-push-action":    "53b7df96c91f9c12dcc8a07bcb9ccacbed38856a",
+		"anchore/sbom-action":         "66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c",
+		"docker/build-push-action":    "c3c9e263c25d99ce0380d002d59b67737d91b0dc",
 		"docker/login-action":         "dbcb813823bdd20940b903addbd779551569679f",
-		"docker/setup-buildx-action":  "37fe631027851001ddb9b187196cc803df7f5f0e",
-		"docker/setup-qemu-action":    "96fe6ef7f33517b61c61be40b68a1882f3264fb8",
+		"docker/setup-buildx-action":  "f87e5991a6d7451dcb8d9637bfbc97413f497069",
+		"docker/setup-qemu-action":    "99012661954931238ded8c8b007157a8430204e1",
 		"sigstore/cosign-installer":   "6f9f17788090df1f26f669e9d70d6ae9567deba6",
 		"softprops/action-gh-release": "efb35369e0ad2afab669f228072c1b0d510eae64",
 	}
@@ -213,7 +213,7 @@ func TestReleaseWorkflowPinsActionsAndRegistryDependencies(t *testing.T) {
 		t.Fatal(err)
 	}
 	assertPinnedUses(t, string(ciBytes), map[string]string{
-		"actions/checkout": "d23441a48e516b6c34aea4fa41551a30e30af803",
+		"actions/checkout": "3d3c42e5aac5ba805825da76410c181273ba90b1",
 		"actions/setup-go": "b7ad1dad31e06c5925ef5d2fc7ad053ef454303e",
 	})
 
@@ -673,7 +673,7 @@ func TestReleaseWorkflowRejectsBypassMutations(t *testing.T) {
 			old:  "      - name: Check GHCR visibility before push\n",
 			replace: strings.Join([]string{
 				"      - name: Unauthorized early push",
-				"        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a",
+				"        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc",
 				"        with:",
 				"          push: true",
 				"",

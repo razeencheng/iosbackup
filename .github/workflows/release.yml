@@ -25,8 +25,8 @@ jobs:
       source_url: ${{ steps.release.outputs.source_url }}
     steps:
       - name: Checkout release tag
-        # actions/checkout v6.1.0
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        # actions/checkout v7.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -101,8 +101,8 @@ jobs:
       artifact_id: ${{ steps.assets.outputs.artifact-id }}
     steps:
       - name: Checkout validated release source
-        # actions/checkout v6.1.0
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        # actions/checkout v7.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ needs.validate.outputs.commit }}
           fetch-depth: 0
@@ -180,15 +180,15 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Set up QEMU
-        # docker/setup-qemu-action v4.2.0; binfmt qemu-v10.2.3-68
-        uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8
+        # docker/setup-qemu-action v4.4.0; binfmt qemu-v10.2.3-68
+        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1
         with:
           image: docker.io/tonistiigi/binfmt@sha256:400a4873b838d1b89194d982c45e5fb3cda4593fbfd7e08a02e76b03b21166f0
           platforms: arm64
 
       - name: Set up Docker Buildx
-        # docker/setup-buildx-action v4.3.0; Buildx v0.36.1; BuildKit v0.32.2
-        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e
+        # docker/setup-buildx-action v4.4.1; Buildx v0.36.1; BuildKit v0.32.2
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069
         with:
           version: v0.36.1
           driver-opts: |
@@ -196,8 +196,8 @@ jobs:
 
       - name: Build and push multi-architecture image
         id: build
-        # docker/build-push-action v7.3.0
-        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a
+        # docker/build-push-action v7.4.0
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc
         with:
           context: .
           platforms: linux/amd64,linux/arm64
@@ -325,8 +325,8 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       - name: Generate linux/amd64 SPDX JSON SBOM
-        # anchore/sbom-action v0.24.2 (peeled annotated-tag commit)
-        uses: anchore/sbom-action@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26
+        # anchore/sbom-action v0.24.3 (peeled annotated-tag commit)
+        uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c
         with:
           image: ghcr.io/razeencheng/iosbackup@${{ steps.platforms.outputs.amd64_digest }}
           format: spdx-json
@@ -335,8 +335,8 @@ jobs:
           upload-release-assets: false
 
       - name: Generate linux/arm64 SPDX JSON SBOM
-        # anchore/sbom-action v0.24.2 (peeled annotated-tag commit)
-        uses: anchore/sbom-action@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26
+        # anchore/sbom-action v0.24.3 (peeled annotated-tag commit)
+        uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c
         with:
           image: ghcr.io/razeencheng/iosbackup@${{ steps.platforms.outputs.arm64_digest }}
           format: spdx-json
@@ -575,8 +575,8 @@ jobs:
             dist/iosbackup-linux-arm64-cosign-sbom-attestation-verification.json
 
       - name: Set up Docker Buildx for promotion
-        # docker/setup-buildx-action v4.3.0; registry operations only, no second build
-        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e
+        # docker/setup-buildx-action v4.4.1; registry operations only, no second build
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069
         with:
           version: v0.36.1
           driver: docker
