@@ -2,6 +2,70 @@
 
 This project follows Semantic Versioning. Release dates and source metadata are frozen in [`release/manifest.env`](release/manifest.env); this file does not duplicate the current release date.
 
+## v1.5.4
+
+### Fixed
+
+- Accept Cosign's verified SBOM attestation object stream when assembling release evidence, while preserving signature, identity, issuer, and nonempty-output checks. This fixes the validation error that stopped the v1.5.3 workflow before creating its GitHub Release and promoting `latest`.
+
+### Added
+
+- Push the same Linux amd64/arm64 image build to GHCR and Docker Hub, compare the index digests, and sign and verify each registry's index and platform SBOMs.
+- Check Docker Hub credentials and public repository visibility before building; promote the newest stable version to `latest` in both registries and verify the digests before marking the GitHub Release as Latest.
+
+### Compatibility
+
+- No application behavior, configuration, pairing records, or backup-format changes; no data migration is required. Wi-Fi backups and encryption remain Core; restore, unpacking, and deletion remain Experimental and disabled by default.
+- Keep the existing v1.5.3 source tag unchanged. Cross-registry publication is not atomic; a failed workflow may leave partial results and must be checked before retrying.
+
+中文：修复 Cosign 已验证 SBOM 证明的输出格式误判；同一次双架构构建同步发布到 GHCR 与 Docker Hub，两处均校验摘要、签名及 SBOM，并同步最新正式版的 `latest`。本版本不改变应用功能、配置或备份格式，无需数据迁移；保留原 v1.5.3 源码标签。
+
+## v1.5.3
+
+### Added
+
+- Generate and securely persist instance credentials on first startup, with a simpler Compose configuration and complete English and Chinese user manuals.
+- Publish the official multi-architecture GHCR image and GitHub Release with provenance, per-platform SBOMs, and verified keyless signatures; promote the newest stable image to `latest`.
+
+### Fixed
+
+- Detect unhealthy device connection services and recover them with bounded retries while coordinating active device operations.
+- Report connection-service health and recovery state consistently in device discovery, the first-use guide, and the main console.
+
+### Compatibility
+
+- Preserve existing instance credentials, pairing records, backup settings, and backup data. Wi-Fi backups and encryption are documented as Core; restore, unpacking, and deletion remain Experimental and disabled by default.
+
+中文：简化首次部署并安全生成实例凭据；完善中英文使用手册；修复设备连接服务异常后的恢复和状态显示。本版本通过 GitHub Release 与 GHCR 发布双架构镜像、来源证明、SBOM 和签名，并将最新正式版同步到 `latest`。已有配置、配对及备份数据保留。
+
+## v1.5.2
+
+Released 2026-09-12.
+
+### Fixed
+
+- Stop manual and automatic backup sessions that exceed phase-specific inactivity limits, even when the device remains visible. Gracefully terminate the process group, release the job, and report `backup_stalled` without changing the last successful backup time.
+- Use payload-free mobilebackup2 activity records from the bundled tool; repeated progress output, device heartbeats, and power assertions do not keep a dead session alive. Active transfers have no total-duration deadline.
+- Show authorization, sending, receiving, and device-processing phases with the last activity time. Require a success acknowledgement from the current command before recording success.
+- Add configurable authorization, transfer inactivity, and preparation limits (defaults: 5, 10, and 30 minutes). Existing configs and backup sets need no migration. This bounds indefinite waits; it does not establish why an individual iOS service stopped responding.
+
+中文：修复手机仍在线时备份无限等待的问题；增加分阶段无活动超时、准确阶段和最后活动时间，正常慢速传输不会仅因总体百分比不变而中止。失败会释放任务并保留最后成功记录，配置与备份数据无需迁移。
+
+## v1.5.1
+
+### Fixed
+
+- Recover previously registered Wi-Fi devices after heartbeat disconnects with a background worker independent of automatic backups and the browser UI.
+- Reuse the last successfully registered network address for up to 24 hours in memory, including mDNS-discovered devices with no manual IP, with bounded retry backoff.
+- Serialize network registration, use the correct netmuxd socket, and check the actual device registry before reporting IP-test success, including when the helper times out.
+- Skip devices that are busy or being removed, and cancel recovery work when the application stops.
+
+### Packaging
+
+- Use the `v1.5.1` version without a prerelease suffix and update the release metadata and installation examples.
+- Keep Wi-Fi and encryption classified as Preview. Recovery requires a reachable, paired device; it does not resume an interrupted backup or prevent device sleep and network interruptions.
+- Keep the existing configuration and backup formats; no data migration is required.
+
 ## v1.5.0-beta.1
 
 ### Packaging
@@ -41,4 +105,6 @@ This project follows Semantic Versioning. Release dates and source metadata are 
 
 ## 中文摘要
 
-`v1.5.0-beta.1` 完成了平衡分包、公开文件/敏感内容/许可证门禁和双语文档；功能分级为 Core（USB、定时、只读查看）、Preview（Wi-Fi、加密/改密）、Experimental（恢复、解包、删除，默认关闭）。当前发布日期只由 `release/manifest.env` 冻结，避免在多处复制后漂移。
+`v1.5.1` 修复 Wi-Fi 心跳断连后设备长期离线的问题：后台按退避间隔重试注册，支持手动 IP 与已由 mDNS 成功注册的设备，测试 IP 以真实注册结果为准。地址仅在内存中保留最多 24 小时，应用重启后需要重新发现或使用手动 IP。此版本无需迁移配置或备份数据，Wi-Fi 仍属于预览功能。
+
+`v1.5.0-beta.1` 将代码按职责拆分为多个包，增加公开文件、敏感内容和许可证检查，并补充双语文档；功能分级为 Core（USB、定时、只读查看）、Preview（Wi-Fi、加密/改密）、Experimental（恢复、解包、删除，默认关闭）。当前发布日期只由 `release/manifest.env` 冻结，避免多处记录的日期不一致。

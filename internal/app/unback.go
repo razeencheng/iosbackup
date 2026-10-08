@@ -150,6 +150,10 @@ func (app *application) acquireLocalBackupOp(udid string) (string, func(), error
 		app.mu.Unlock()
 		return "", nil, fmt.Errorf("设备 %s 正忙，正在执行备份操作，请稍后再试", udid)
 	}
+	if err := app.connectionAdmissionUnsafe(nil); err != nil {
+		app.mu.Unlock()
+		return "", nil, err
+	}
 	root := app.paths.BackupsRoot
 	if cfg := app.configs[udid]; cfg != nil && cfg.BackupDirectory != "" {
 		root = cfg.BackupDirectory

@@ -15,7 +15,7 @@ import (
 
 var (
 	// ErrEncryptionUnavailable 表示应用未提供有效的秘密存储密钥。
-	ErrEncryptionUnavailable = errors.New("加密功能不可用：未配置有效的 IOSBK_SECRET_KEY")
+	ErrEncryptionUnavailable = errors.New("加密功能不可用：未加载有效的秘密存储主密钥")
 	// ErrSecretNotFound 表示指定秘密条目不存在；通用方法复用此历史错误以保持兼容。
 	ErrSecretNotFound = errors.New("未找到该设备的备份密码")
 )
@@ -75,6 +75,25 @@ func NewUnavailableSecretStore(path string) *AESSecretStore {
 
 func (s *AESSecretStore) Available() bool { return s.available }
 
+// Validate 在启动时验证全部密文，避免错误密钥写入后形成混合密钥存储。
+func (s *AESSecretStore) Validate() error {
+	if !s.available {
+		return ErrEncryptionUnavailable
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	entries, err := s.loadLocked()
+	if err != nil {
+		return err
+	}
+	for key, encoded := range entries {
+		if _, err := s.decrypt(key, encoded); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (s *AESSecretStore) SetBackupPassword(udid, password string) error {
 	return s.SetSecret(udid, password)
 }
@@ -118,6 +137,10 @@ func (s *AESSecretStore) GetSecret(key string) (string, error) {
 	if !ok {
 		return "", ErrSecretNotFound
 	}
+	return s.decrypt(key, encoded)
+}
+
+func (s *AESSecretStore) decrypt(key, encoded string) (string, error) {
 	raw, err := base64.StdEncoding.DecodeString(encoded)
 	if err != nil {
 		return "", fmt.Errorf("密文 base64 解码失败: %w", err)
@@ -154,23 +177,15 @@ func (s *AESSecretStore) DeleteSecret(key string) error {
 
 func (s *AESSecretStore) loadLocked() (map[string]string, error) {
 	entries := make(map[string]string)
-	file, err := os.Open(s.path)
+	data, err := ReadSecretFile(s.path, maxSecretsFileSize, true)
 	if err != nil {
-		if os.IsNotExist(err) {
+		if errors.Is(err, os.ErrNotExist) {
 			return entries, nil
 		}
 		return nil, err
 	}
-	defer file.Close()
-	data, err := io.ReadAll(io.LimitReader(file, maxSecretsFileSize+1))
-	if err != nil {
-		return nil, err
-	}
-	if len(data) > maxSecretsFileSize {
-		return nil, fmt.Errorf("秘密存储文件超过大小上限 %d 字节", maxSecretsFileSize)
-	}
 	if len(data) == 0 {
-		return entries, nil
+		return nil, errors.New("秘密存储文件为空，无法确认数据完整性")
 	}
 	if err := json.Unmarshal(data, &entries); err != nil {
 		return nil, fmt.Errorf("解析 %s 失败: %w", s.path, err)

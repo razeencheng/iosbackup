@@ -86,7 +86,7 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
   publish:
-    name: Publish signed private multi-architecture image
+    name: Publish signed multi-architecture image
     needs: validate
     runs-on: ubuntu-24.04
     timeout-minutes: 180
@@ -122,7 +122,7 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          jq -e '.repository.private == true' "$GITHUB_EVENT_PATH" >/dev/null
+          jq -e '.repository.private == false' "$GITHUB_EVENT_PATH" >/dev/null
           api="https://api.github.com/users/razeencheng/packages/container/iosbackup"
           body="$(mktemp "$RUNNER_TEMP/iosbackup-package-preflight.XXXXXX")"
           trap 'rm -f "$body"' EXIT
@@ -134,19 +134,34 @@ jobs:
           case "$status" in
             200)
               visibility="$(jq -er '.visibility | select(type == "string")' "$body")"
-              if [ "$visibility" != "private" ]; then
-                echo "::error::Existing GHCR package is not private; refusing to publish."
+              if [ "$visibility" != "public" ]; then
+                echo "::error::Existing GHCR package is not public; configure package visibility before publishing."
                 exit 1
               fi
               ;;
             404)
-              echo "GHCR package is absent; first private publication is allowed."
+              echo "GHCR package is absent; the first push creates it. Publication requires public visibility at the post-push gate."
               ;;
             *)
               echo "::error::GHCR visibility preflight returned HTTP $status."
               exit 1
               ;;
           esac
+
+      - name: Check Docker Hub publication settings
+        shell: bash
+        env:
+          DOCKERHUB_USERNAME: ${{ vars.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ "$DOCKERHUB_USERNAME" != "razeencheng" ] || [ -z "$DOCKERHUB_TOKEN" ]; then
+            echo "::error::Set Actions variable DOCKERHUB_USERNAME=razeencheng and secret DOCKERHUB_TOKEN with Docker Hub Read & Write access."
+            exit 1
+          fi
+          curl --fail --silent --show-error --retry 3 \
+            https://hub.docker.com/v2/repositories/razeencheng/iosbackup/ \
+            | jq -e '.namespace == "razeencheng" and .name == "iosbackup" and .is_private == false' >/dev/null
 
       - name: Log in to GHCR
         # docker/login-action v4.6.0
@@ -155,6 +170,14 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ github.token }}
+
+      - name: Log in to Docker Hub
+        # docker/login-action v4.6.0
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f
+        with:
+          registry: docker.io
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Set up QEMU
         # docker/setup-qemu-action v4.2.0; binfmt qemu-v10.2.3-68
@@ -182,7 +205,9 @@ jobs:
           pull: true
           provenance: mode=max,version=v1
           sbom: false
-          tags: ghcr.io/razeencheng/iosbackup:${{ needs.validate.outputs.version }}
+          tags: |
+            ghcr.io/razeencheng/iosbackup:${{ needs.validate.outputs.version }}
+            docker.io/razeencheng/iosbackup:${{ needs.validate.outputs.version }}
           labels: |
             org.opencontainers.image.created=${{ needs.validate.outputs.build_date }}T00:00:00Z
             org.opencontainers.image.revision=${{ needs.validate.outputs.commit }}
@@ -218,7 +243,11 @@ jobs:
           done
           test "$status" = "200"
           visibility="$(jq -er '.visibility | select(type == "string")' "$body")"
-          test "$visibility" = "private"
+          if [ "$visibility" != "public" ]; then
+            echo "::error::GHCR package must be public. Configure its visibility manually, then rerun the workflow."
+            exit 1
+          fi
+          test "$visibility" = "public"
 
       - name: Record image index digest
         id: image
@@ -230,6 +259,16 @@ jobs:
           printf '%s' "$digest" | grep -Eq '^sha256:[0-9a-f]{64}$'
           printf 'ghcr.io/razeencheng/iosbackup@%s\n' "$digest" > dist/iosbackup-image-digest.txt
           echo "digest=$digest" >> "$GITHUB_OUTPUT"
+
+      - name: Confirm Docker Hub image digest
+        shell: bash
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+          IMAGE_DIGEST: ${{ steps.image.outputs.digest }}
+        run: |
+          set -euo pipefail
+          actual="$(docker buildx imagetools inspect "docker.io/razeencheng/iosbackup:$VERSION" --format '{{json .Manifest}}' | jq -er '.digest')"
+          test "$actual" = "$IMAGE_DIGEST"
 
       - name: Export platform manifests and BuildKit SLSA provenance
         id: platforms
@@ -327,18 +366,21 @@ jobs:
         run: |
           set -euo pipefail
           cosign sign --yes "ghcr.io/razeencheng/iosbackup@${{ steps.image.outputs.digest }}"
+          cosign sign --yes "docker.io/razeencheng/iosbackup@${{ steps.image.outputs.digest }}"
 
       - name: Attest linux/amd64 SPDX SBOM with Cosign keyless
         shell: bash
         run: |
           set -euo pipefail
           cosign attest --yes --type spdxjson --predicate dist/iosbackup-linux-amd64.spdx.json "ghcr.io/razeencheng/iosbackup@${{ steps.platforms.outputs.amd64_digest }}"
+          cosign attest --yes --type spdxjson --predicate dist/iosbackup-linux-amd64.spdx.json "docker.io/razeencheng/iosbackup@${{ steps.platforms.outputs.amd64_digest }}"
 
       - name: Attest linux/arm64 SPDX SBOM with Cosign keyless
         shell: bash
         run: |
           set -euo pipefail
           cosign attest --yes --type spdxjson --predicate dist/iosbackup-linux-arm64.spdx.json "ghcr.io/razeencheng/iosbackup@${{ steps.platforms.outputs.arm64_digest }}"
+          cosign attest --yes --type spdxjson --predicate dist/iosbackup-linux-arm64.spdx.json "docker.io/razeencheng/iosbackup@${{ steps.platforms.outputs.arm64_digest }}"
 
       - name: Verify Cosign signature and platform SBOM attestations
         shell: bash
@@ -355,15 +397,39 @@ jobs:
             --certificate-identity "$identity" \
             --certificate-oidc-issuer "$issuer" \
             "ghcr.io/razeencheng/iosbackup@${{ steps.platforms.outputs.amd64_digest }}" \
+            | jq -s 'if all(.[]; type == "object") then . else error("expected Cosign attestation objects") end' \
             > dist/iosbackup-linux-amd64-cosign-sbom-attestation-verification.json
           cosign verify-attestation --type spdxjson --output json \
             --certificate-identity "$identity" \
             --certificate-oidc-issuer "$issuer" \
             "ghcr.io/razeencheng/iosbackup@${{ steps.platforms.outputs.arm64_digest }}" \
+            | jq -s 'if all(.[]; type == "object") then . else error("expected Cosign attestation objects") end' \
             > dist/iosbackup-linux-arm64-cosign-sbom-attestation-verification.json
           jq -e 'type == "array" and length > 0' dist/iosbackup-cosign-signature-verification.json >/dev/null
           jq -e 'type == "array" and length > 0' dist/iosbackup-linux-amd64-cosign-sbom-attestation-verification.json >/dev/null
           jq -e 'type == "array" and length > 0' dist/iosbackup-linux-arm64-cosign-sbom-attestation-verification.json >/dev/null
+
+      - name: Verify Docker Hub signature and SBOM attestations
+        shell: bash
+        run: |
+          set -euo pipefail
+          identity="https://github.com/$GITHUB_REPOSITORY/.github/workflows/release.yml@$GITHUB_REF"
+          issuer="https://token.actions.githubusercontent.com"
+          cosign verify --output json \
+            --certificate-identity "$identity" \
+            --certificate-oidc-issuer "$issuer" \
+            "docker.io/razeencheng/iosbackup@${{ steps.image.outputs.digest }}" \
+            | jq -e 'type == "array" and length > 0' >/dev/null
+          cosign verify-attestation --type spdxjson --output json \
+            --certificate-identity "$identity" \
+            --certificate-oidc-issuer "$issuer" \
+            "docker.io/razeencheng/iosbackup@${{ steps.platforms.outputs.amd64_digest }}" \
+            | jq -s -e 'length > 0 and all(.[]; type == "object")' >/dev/null
+          cosign verify-attestation --type spdxjson --output json \
+            --certificate-identity "$identity" \
+            --certificate-oidc-issuer "$issuer" \
+            "docker.io/razeencheng/iosbackup@${{ steps.platforms.outputs.arm64_digest }}" \
+            | jq -s -e 'length > 0 and all(.[]; type == "object")' >/dev/null
 
       - name: Generate deterministic release notes
         shell: bash
@@ -414,12 +480,16 @@ jobs:
           include-hidden-files: false
 
   release:
-    name: Publish GitHub prerelease
+    name: Publish GitHub release
     needs: [validate, publish]
     runs-on: ubuntu-24.04
     timeout-minutes: 15
+    concurrency:
+      group: iosbackup-release-promotion
+      cancel-in-progress: false
     permissions:
       contents: write
+      packages: write
     steps:
       - name: Download verified release assets
         # actions/download-artifact v8.0.1
@@ -480,14 +550,15 @@ jobs:
           test "$(grep -Ec '^## ' dist/iosbackup-release-notes.md)" = "0"
           grep -Eq '^### ' dist/iosbackup-release-notes.md
 
-      - name: Create GitHub prerelease
+      - name: Create GitHub release
         # softprops/action-gh-release v3.0.3 (peeled annotated-tag commit)
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64
         with:
           tag_name: ${{ needs.validate.outputs.version }}
           target_commitish: ${{ needs.validate.outputs.commit }}
           body_path: dist/iosbackup-release-notes.md
-          prerelease: true
+          prerelease: ${{ contains(needs.validate.outputs.version, '-') }}
+          make_latest: false
           draft: false
           generate_release_notes: false
           append_body: false
@@ -502,3 +573,59 @@ jobs:
             dist/iosbackup-cosign-signature-verification.json
             dist/iosbackup-linux-amd64-cosign-sbom-attestation-verification.json
             dist/iosbackup-linux-arm64-cosign-sbom-attestation-verification.json
+
+      - name: Set up Docker Buildx for promotion
+        # docker/setup-buildx-action v4.3.0; registry operations only, no second build
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e
+        with:
+          version: v0.36.1
+          driver: docker
+
+      - name: Log in to GHCR for promotion
+        # docker/login-action v4.6.0
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Log in to Docker Hub for promotion
+        # docker/login-action v4.6.0
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f
+        with:
+          registry: docker.io
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Promote newest stable image to latest
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.validate.outputs.version }}
+          IMAGE_DIGEST: ${{ needs.publish.outputs.image_digest }}
+        run: |
+          set -euo pipefail
+          if ! printf '%s' "$VERSION" | grep -Eq '^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'; then
+            echo "Prerelease keeps its version tag only; latest is unchanged."
+            exit 0
+          fi
+          printf '%s' "$IMAGE_DIGEST" | grep -Eq '^sha256:[0-9a-f]{64}$'
+          newest="$(gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/releases?per_page=100" | jq -er --arg version "$VERSION" '
+            [.[][]
+              | select(.draft == false and .prerelease == false)
+              | .tag_name
+              | select(test("^v(0|[1-9][0-9]*)[.](0|[1-9][0-9]*)[.](0|[1-9][0-9]*)$"))
+            ]
+            | if index($version) == null then error("current stable release is missing")
+              else max_by(ltrimstr("v") | split(".") | map(tonumber)) end
+          ')"
+          if [ "$VERSION" != "$newest" ]; then
+            echo "A newer stable release exists; latest is unchanged."
+            exit 0
+          fi
+          for image in ghcr.io/razeencheng/iosbackup docker.io/razeencheng/iosbackup; do
+            docker buildx imagetools create --tag "$image:latest" "$image@$IMAGE_DIGEST"
+            actual="$(docker buildx imagetools inspect "$image:latest" --format '{{json .Manifest}}' | jq -er '.digest')"
+            test "$actual" = "$IMAGE_DIGEST"
+          done
+          gh release edit "$VERSION" --repo "$GITHUB_REPOSITORY" --latest

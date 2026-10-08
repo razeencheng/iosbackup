@@ -166,6 +166,9 @@ func (app *application) DeleteDeviceBackup(udid string) error {
 func (app *application) backupGateReason(udid string) (code string, battery, minBattery int) {
 	app.mu.RLock()
 	defer app.mu.RUnlock()
+	if app.connectionAdmissionUnsafe(app.devices[udid]) != nil {
+		return "connection_unavailable", 0, 0
+	}
 	if err := app.deviceRemovalBlockedUnsafe(udid); errors.Is(err, errDeviceRemoved) {
 		return "removed", 0, 0
 	} else if errors.Is(err, errDeviceRemovalPending) {
@@ -358,6 +361,11 @@ func (app *application) BackupInfo(ctx context.Context, udid string) ([]byte, er
 	if err != nil {
 		return nil, err
 	}
+	release, err := app.beginConnectionTask(device)
+	if err != nil {
+		return nil, err
+	}
+	defer release()
 	// 加密备份的 info 需要 BACKUP_PASSWORD 才能解密 manifest
 	const maxBackupInfoBytes = 1 << 20
 	out := newHeadBuffer(maxBackupInfoBytes)
@@ -399,6 +407,11 @@ func (app *application) streamBackupList(ctx context.Context, udid string, onRow
 	if err != nil {
 		return 0, err
 	}
+	release, err := app.beginConnectionTask(device)
+	if err != nil {
+		return 0, err
+	}
+	defer release()
 	// 加密备份的 list 需要 BACKUP_PASSWORD 才能解密 manifest
 	pwEnv := app.backupPasswordEnv(udid)
 	cmdCtx, cancel := context.WithCancel(ctx)

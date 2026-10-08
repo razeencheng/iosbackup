@@ -41,6 +41,7 @@ func (app *application) deviceRemovalBlock(udid string) error {
 // 调用方必须已持有 app.mu。
 func (app *application) deviceRemovalBusyUnsafe(udid string) bool {
 	return app.backupInProgress[udid] ||
+		app.networkRegistrations[udid] ||
 		app.checkInProgress[udid] ||
 		app.activeDeviceCommands[udid] != nil
 }

@@ -2,145 +2,54 @@
 
 [简体中文](OPERATIONS.zh-CN.md) · [Back to README](../README.md)
 
-This runbook covers the official Linux Docker Beta. It does not promise native Windows/macOS device support or guaranteed restore. Keep an independently tested backup.
+This manual is for people who run and manage iOS Backup at home. Its steps have been checked against the current code, interface, and available test records. Use Docker Compose on a general Linux host, or follow the separate Synology guide. Chinese and English cover the same tasks. If this is your first installation, start with the illustrated [Quick start](QUICKSTART.md).
 
-## Security boundary
+Before enabling a schedule, **complete one USB backup on a non-critical device** , reserving **space for a complete device backup** . There is no record of a successful physical-device restore using this manual yet. Check backup completion, file-list readability, and device restoration separately.
 
-The service needs `--privileged`, `--network host`, `/dev/bus/usb:/dev/bus/usb`, and `/run/udev:/run/udev:ro`. Privileged mode grants host-level access. Restrict the container to a trusted host and trusted LAN/VPN, keep authentication enabled, and do not expose it to the public Internet. Use an authenticated HTTPS reverse proxy if access must cross the trusted network.
+## Choose a task
 
-Persist and protect all three data locations:
+| Task | What you should be able to confirm |
+|---|---|
+| [Check prerequisites and support boundaries](manual/overview.md) | Decide whether the host, access and feature maturity fit your needs |
+| [Install, log in and change the administrator password](manual/installation.md) | Create a new instance and verify version and persistence |
+| [Deploy on Synology DSM](manual/synology.md) | Check Container Manager, Compose, USB and directory permissions |
+| [Pair over USB and complete a first backup](manual/usb-backup.md) | Respond to passcode or trust prompts, pair, start and confirm the actual result |
+| [Schedule automatic backups](manual/scheduling.md) | Set window, interval, battery and charging rules, then observe a run |
+| [Enable and validate Wi-Fi backup](manual/wifi.md) | Prepare on a computer, pair on the NAS, validate Wi-Fi and fall back to USB |
+| [Manage backup encryption and passwords](manual/encryption.md) | Distinguish four credentials and handle existing encrypted backups |
+| [Inspect backups and export file lists](manual/inspection.md) | Understand the 5,000-entry limit and what CSV contains |
+| [Configure and verify notifications](manual/notifications.md) | Save rules, check test delivery and observe a real event |
+| [Manage devices and storage](manual/device-storage.md) | Remove and re-add devices, check capacity and protect copies |
+| [Back up, migrate and recover the instance](manual/instance-recovery.md) | Protect the key, configuration, pairing records and backup sets together |
+| [Upgrade and rollback](manual/upgrade.md) | Pin images, validate the upgrade and retain a rollback path |
+| [Evaluate experimental operations](manual/experimental.md) | Understand the requirements, risks, and tested scope of unpack, deletion, and device restore |
+| [Troubleshoot by symptom](manual/troubleshooting.md) | Use the page and logs for simple checks, then decide whether to retry or request help |
+| [Look up configuration, paths and applying changes](manual/configuration.md) | Distinguish program/Compose defaults and per-device settings |
+| [Understand states, progress and errors](manual/states.md) | Interpret phases, inactivity deadlines and success criteria |
+| [Investigate advanced Wi-Fi / NAT issues](manual/wifi-nat.md) | Investigate routed networks and idle connections after a USB comparison |
 
-- `/backups`: device backups and optional unpack output
-- `/configs`: settings, authentication, CSRF state, and encrypted secrets
-- `/var/lib/lockdown`: pairing records
+## Routine checks
 
-Treat `.env`, `data/configs/admin_password`, `IOSBK_SECRET_KEY`, pairing records, device identifiers, and backup contents as secrets. Do not include them in an Issue or log excerpt.
-
-## Daily checks
+Run in the actual Compose deployment directory, replacing `9000` if changed:
 
 ```bash
 docker compose ps
 curl -fsS http://127.0.0.1:9000/healthz
-curl -u "iosbackup:$(cat data/configs/admin_password)" \
-  http://127.0.0.1:9000/api/version
+curl --user iosbackup http://127.0.0.1:9000/api/version
 docker compose logs --tail=200 iosbackup
 ```
 
-`/healthz` proves only that the HTTP process is responding. It does not prove that a device is paired, a backup is readable, or Wi-Fi transport is healthy. Check the UI status and a completed test backup as well.
+curl prompts for the administrator password. `/healthz` confirms only that HTTP responds, not device readiness, writable storage or recoverable backups. Logs may include device/network details; sanitize before sharing. There is no public log-download API.
 
-Application and device logs go to container stdout. Use `docker compose logs`; there is no public log-download API. Redact device identifiers, network addresses, notification targets, and file paths before sharing excerpts.
+## Access and data boundaries to retain
 
-## First USB pairing and Trust
+The privileged container uses host networking and USB/udev mounts. Deploy only on a trusted host and restricted LAN/VPN, keep authentication enabled, and do not expose it to the public Internet. Use suitable HTTPS and access control across networks.
 
-1. Unlock the device and keep the screen awake.
-2. Connect it directly by a known-good USB data cable.
-3. Tap **Trust** and enter the device passcode.
-4. Refresh the UI. If prompted, start pairing and accept Trust again.
-5. Keep the device connected until the first USB backup completes.
+Persist and protect `/backups`, all of `/configs` (including default `secret_key`, password, and digest), `/var/lib/lockdown`, all Compose configuration files, and external credentials in use. Keep administrator passwords, master keys, backup passwords, pairing records and user data out of public issues. The container image does not include this data. See [feature status](FEATURE_STATUS.md) for Core and Experimental boundaries.
 
-If pairing repeatedly fails, reconnect the USB cable, unlock the device, and retry. Confirm that `/dev/bus/usb:/dev/bus/usb` and `/run/udev:/run/udev:ro` are present. Do not delete `/var/lib/lockdown` as routine troubleshooting; that discards pairing state and forces every device to pair again.
+## Documentation and verification materials
 
-## Scheduled backups
+- [Development guide](DEVELOPMENT.md) and [offline testing guide](TESTING_GUIDE.en.md): reproduce software checks; these are not device-compatibility or restoration guarantees.
+- [Support](../SUPPORT.md), [privacy](PRIVACY.md) and [security reporting](../SECURITY.md): collect sanitized context/logs for ordinary issues and use private reporting for vulnerabilities.
 
-The scheduler checks eligible devices against the configured backup window, minimum interval, battery threshold, and charging requirement. User-visible schedule times use Beijing time. A per-device lock prevents overlapping backup/check work, and refresh is blocked while a backup is active. If a condition is not met, the device is considered again on a later scheduler check.
-
-Start with a successful manual USB backup. Then enable the schedule for one device, observe at least one complete run, and confirm the resulting backup information before adding more devices.
-
-## Backup progress semantics
-
-The main bar is the overall progress for the backup. When the device tool reports it, a separate current file progress value restarts for each file. The UI deliberately does not display the filename and does not estimate remaining time. If the Wi-Fi device briefly disappears, the state can show **waiting for device reconnection** while retaining the last trusted progress. Once a task has ended, it is not resumed automatically; start a new backup after connectivity is restored.
-
-## Wi-Fi prerequisites and fallback
-
-Wi-Fi backup is Preview. Before using it:
-
-1. Complete USB pairing and preserve `/var/lib/lockdown`.
-2. Enable wireless visibility once in Finder on a Mac or Apple Devices/iTunes on Windows; this prepares the iOS device but does not mean iOS Backup itself runs natively on those systems.
-3. Put the device and host on a mutually reachable network; host networking is required for discovery.
-4. Keep the default netmuxd backend unless diagnosing a known compatibility issue.
-5. Keep `IOSBK_WIFI_POWER_ASSERTION=true` unless a documented device incompatibility requires a temporary diagnostic fallback.
-6. Verify one manual Wi-Fi backup before scheduling it.
-
-If discovery briefly disappears during an active stream, the application allows a bounded reconnect grace period. A finished failed task is not resumed automatically. For `Could not receive from mobilebackup2 (-4)`, repeated reconnect, sleep, or lock-screen failures, unlock/reconnect the device and retry over USB. USB is the supported fallback; do not interpret a visible device card as proof that an active Wi-Fi stream is healthy.
-
-## Back up the volumes
-
-Before an upgrade or an experimental operation:
-
-1. Confirm that no backup, unpack, delete, or restore operation is running.
-2. Stop the service so configuration and pairing files cannot change during the snapshot.
-3. Copy `.env` and all three data directories to protected storage.
-
-Reserve enough free space for a complete device backup, plus any temporary copy created by a volume snapshot or Experimental unpack operation.
-
-Example archive from the repository directory:
-
-```bash
-docker compose stop
-umask 077
-tar -czf iosbackup-state-backup.tgz \
-  .env data/backups data/configs data/lockdown
-docker compose start
-```
-
-The archive contains credentials, pairing records, and personal data. Encrypt it at rest and test that it can be listed and restored. A container image is not a backup of these volumes.
-
-## Upgrade
-
-1. Read [CHANGELOG.md](../CHANGELOG.md) and [Feature status](FEATURE_STATUS.md).
-2. Make and verify the volume backup above.
-3. Change `IOSBK_IMAGE` in `.env` to an explicit reviewed tag such as `ghcr.io/razeencheng/iosbackup:v1.5.0-beta.1`.
-4. Pull and recreate the service.
-5. Verify health, build identity, logs, pairing, and read-only inspection; then complete one USB backup on a non-critical device and verify the result.
-
-```bash
-docker compose pull
-docker compose up -d
-curl -fsS http://127.0.0.1:9000/healthz
-docker compose logs --tail=200 iosbackup
-```
-
-Do not use an unreviewed floating image tag.
-
-## Rollback
-
-Set `IOSBK_IMAGE` back to the exact previously working tag or digest and run `docker compose up -d`. Verify `/api/version` after the rollback. Keep the current volume snapshot until the older application has been checked.
-
-Do not automatically restore old `/backups`, `/configs`, or `/var/lib/lockdown` over newer data. Restore a volume snapshot only when release notes identify an incompatible format or the current data is known to be damaged, and preserve the failed state for diagnosis.
-
-## Experimental operations
-
-Whole-device restore remains off per device with `restore_enabled=false`. Local unpack and local backup deletion remain off globally with `IOSBK_ENABLE_EXPERIMENTAL_OPERATIONS=false`; the Compose file explicitly forwards that default. Only set it to strict `true` after reviewing [Feature status](FEATURE_STATUS.md) and taking a volume backup.
-
-Even when enabled, unpack/delete still require authenticated UI/API access, CSRF protection, validation, and operation-specific confirmation. Restore has separate per-device opt-in and multiple confirmations. None is a routine recovery promise.
-
-## Troubleshooting
-
-### Device not visible or pairing fails
-
-- Unlock the device, reconnect a known-good USB data cable, and accept Trust.
-- Check that the USB and udev mounts exist in the container configuration.
-- Review `docker compose logs --tail=200 iosbackup` for pairing/usbmux messages.
-- Preserve `/var/lib/lockdown`; replace it only as a deliberate last resort with a backup available.
-
-### Device locked or passcode error
-
-Unlock the device before pairing, encryption changes, or backup startup. A lock-screen transition can also affect Preview Wi-Fi behavior. Reconnect and retry over USB if the command has already failed.
-
-### `mobilebackup2 (-4)`, Wi-Fi disconnect, or reconnect loop
-
-Do not repeatedly restart every component while a backup is running. Let the active task reach a terminal state, unlock and reconnect the device, inspect the preceding heartbeat/stream logs, then retry via USB. If USB works, keep Wi-Fi disabled for that device and report a sanitized Preview issue.
-
-### Disk space
-
-Check free space and inode availability on the filesystem behind `/backups`. Unpack creates a second copy and can require substantial additional disk space. A low-space failure should be fixed before retry; do not delete the only known-good backup as cleanup.
-
-### Permission or read-only filesystem
-
-Verify that host directories exist, are mounted at `/backups`, `/configs`, and `/var/lib/lockdown`, and are writable by the container. Keep the container root filesystem read-only; fix the bind-mount path/permission instead of weakening unrelated host permissions.
-
-### UI unavailable but container is running
-
-Check `/healthz`, port `9000`, host firewall rules, and `docker compose logs`. With host networking there is no separate port-publishing rule. If a reverse proxy is used, test the local endpoint first, then proxy authentication/TLS separately.
-
-For support boundaries and safe report contents, see [SUPPORT.md](../SUPPORT.md) and [SECURITY.md](../SECURITY.md).
+“Source checked” means the procedure matches the current implementation. Existing device test records apply only to the devices, versions, and operations recorded. Other devices need their own tests.

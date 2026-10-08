@@ -1,0 +1,229 @@
+--- a/tools/idevicebackup2.c
++++ b/tools/idevicebackup2.c
+@@ -72,6 +72,59 @@
+ #define CODE_ERROR_LOCAL 0x06
+ #define CODE_ERROR_REMOTE 0x0b
+ #define CODE_FILE_DATA 0x0c
++
++
++/* iOS Backup: optional payload-free activity records for the process supervisor.
++ * Only successful protocol reads/writes advance the counter. A timeout or a
++ * progress repaint is not activity. Called exclusively from the main thread. */
++static int iosbk_activity_enabled = 0;
++static uint64_t iosbk_activity_sequence = 0;
++static const char *iosbk_activity_phase = "preparing";
++static const char *iosbk_activity_emitted_phase = NULL;
++static time_t iosbk_activity_emitted_second = 0;
++
++static void iosbk_activity(const char *phase, uint32_t bytes, int force)
++{
++	if (!iosbk_activity_enabled) return;
++	struct timespec ts;
++	if (clock_gettime(CLOCK_MONOTONIC, &ts) != 0) return;
++	iosbk_activity_sequence += bytes;
++	iosbk_activity_phase = phase;
++	int changed = !iosbk_activity_emitted_phase || strcmp(phase, iosbk_activity_emitted_phase);
++	if (force || changed || (bytes && ts.tv_sec != iosbk_activity_emitted_second)) {
++		fprintf(stderr, "IOSBK_ACTIVITY %llu %s\n", (unsigned long long)iosbk_activity_sequence, phase);
++		fflush(stderr);
++		iosbk_activity_emitted_second = ts.tv_sec;
++		iosbk_activity_emitted_phase = phase;
++	}
++}
++
++static mobilebackup2_error_t iosbk_send_raw(mobilebackup2_client_t client, const char *data, uint32_t length, uint32_t *sent)
++{
++	iosbk_activity("sending", 0, 0);
++	*sent = 0;
++	mobilebackup2_error_t result = mobilebackup2_send_raw(client, data, length, sent);
++	iosbk_activity("sending", *sent, 0);
++	return result;
++}
++
++static mobilebackup2_error_t iosbk_receive_raw(mobilebackup2_client_t client, char *data, uint32_t length, uint32_t *received)
++{
++	iosbk_activity("receiving", 0, 0);
++	*received = 0;
++	mobilebackup2_error_t result = mobilebackup2_receive_raw(client, data, length, received);
++	iosbk_activity("receiving", *received, 0);
++	return result;
++}
++
++static mobilebackup2_error_t iosbk_receive_message(mobilebackup2_client_t client, plist_t *message, char **identifier)
++{
++	/* A receive timeout while waiting for a passcode is still authorization. */
++	if (strcmp(iosbk_activity_phase, "waiting_authorization")) iosbk_activity("waiting_device", 0, 0);
++	mobilebackup2_error_t result = mobilebackup2_receive_message(client, message, identifier);
++	if (result == MOBILEBACKUP2_E_SUCCESS) iosbk_activity("waiting_device", 1, 0);
++	return result;
++}
+ 
+ static int verbose = 1;
+ static int quit_flag = 0;
+@@ -998,7 +1051,7 @@
+ 
+ 	/* send path length */
+ 	nlen = htobe32(pathlen);
+-	err = mobilebackup2_send_raw(mobilebackup2, (const char*)&nlen, sizeof(nlen), &bytes);
++	err = iosbk_send_raw(mobilebackup2, (const char*)&nlen, sizeof(nlen), &bytes);
+ 	if (err != MOBILEBACKUP2_E_SUCCESS) {
+ 		goto leave_proto_err;
+ 	}
+@@ -1008,7 +1061,7 @@
+ 	}
+ 
+ 	/* send path */
+-	err = mobilebackup2_send_raw(mobilebackup2, path, pathlen, &bytes);
++	err = iosbk_send_raw(mobilebackup2, path, pathlen, &bytes);
+ 	if (err != MOBILEBACKUP2_E_SUCCESS) {
+ 		goto leave_proto_err;
+ 	}
+@@ -1055,7 +1108,7 @@
+ 		nlen = htobe32(length+1);
+ 		memcpy(buf, &nlen, sizeof(nlen));
+ 		buf[4] = CODE_FILE_DATA;
+-		err = mobilebackup2_send_raw(mobilebackup2, (const char*)buf, 5, &bytes);
++		err = iosbk_send_raw(mobilebackup2, (const char*)buf, 5, &bytes);
+ 		if (err != MOBILEBACKUP2_E_SUCCESS) {
+ 			goto leave_proto_err;
+ 		}
+@@ -1070,7 +1123,7 @@
+ 			errcode = errno;
+ 			goto leave;
+ 		}
+-		err = mobilebackup2_send_raw(mobilebackup2, buf, r, &bytes);
++		err = iosbk_send_raw(mobilebackup2, buf, r, &bytes);
+ 		if (err != MOBILEBACKUP2_E_SUCCESS) {
+ 			goto leave_proto_err;
+ 		}
+@@ -1092,7 +1145,7 @@
+ 		nlen = htobe32(nlen);
+ 		memcpy(buf, &nlen, 4);
+ 		buf[4] = CODE_SUCCESS;
+-		mobilebackup2_send_raw(mobilebackup2, buf, 5, &bytes);
++		iosbk_send_raw(mobilebackup2, buf, 5, &bytes);
+ 	} else {
+ 		if (!*errplist) {
+ 			*errplist = plist_new_dict();
+@@ -1107,7 +1160,7 @@
+ 		slen = 5;
+ 		memcpy(buf+slen, errdesc, length);
+ 		slen += length;
+-		err = mobilebackup2_send_raw(mobilebackup2, (const char*)buf, slen, &bytes);
++		err = iosbk_send_raw(mobilebackup2, (const char*)buf, slen, &bytes);
+ 		if (err != MOBILEBACKUP2_E_SUCCESS) {
+ 			progress_printf("could not send message\n");
+ 		}
+@@ -1158,7 +1211,7 @@
+ 
+ 	/* send terminating 0 dword */
+ 	uint32_t zero = 0;
+-	mobilebackup2_send_raw(mobilebackup2, (char*)&zero, 4, &sent);
++	iosbk_send_raw(mobilebackup2, (char*)&zero, 4, &sent);
+ 
+ 	if (!errplist) {
+ 		plist_t emptydict = plist_new_dict();
+@@ -1178,7 +1231,7 @@
+ 	do {
+ 		nlen = 0;
+ 		rlen = 0;
+-		mobilebackup2_receive_raw(mobilebackup2, (char*)&nlen, 4, &rlen);
++		iosbk_receive_raw(mobilebackup2, (char*)&nlen, 4, &rlen);
+ 		nlen = be32toh(nlen);
+ 
+ 		if ((nlen == 0) && (rlen == 4)) {
+@@ -1203,7 +1256,7 @@
+ 		*filename = (char*)malloc(nlen+1);
+ 
+ 		rlen = 0;
+-		mobilebackup2_receive_raw(mobilebackup2, *filename, nlen, &rlen);
++		iosbk_receive_raw(mobilebackup2, *filename, nlen, &rlen);
+ 		if (rlen != nlen) {
+ 			progress_printf("ERROR: %s: could not read filename\n", __func__);
+ 			return 0;
+@@ -1284,7 +1337,7 @@
+ 
+ 		r = 0;
+ 		nlen = 0;
+-		mobilebackup2_receive_raw(mobilebackup2, (char*)&nlen, 4, &r);
++		iosbk_receive_raw(mobilebackup2, (char*)&nlen, 4, &r);
+ 		if (r != 4) {
+ 			progress_printf("ERROR: %s: could not receive code length!\n", __func__);
+ 			break;
+@@ -1294,7 +1347,7 @@
+ 		last_code = code;
+ 		code = 0;
+ 
+-		mobilebackup2_receive_raw(mobilebackup2, &code, 1, &r);
++		iosbk_receive_raw(mobilebackup2, &code, 1, &r);
+ 		if (r != 1) {
+ 			progress_printf("ERROR: %s: could not receive code!\n", __func__);
+ 			break;
+@@ -1317,7 +1370,7 @@
+ 				} else {
+ 					rlen = sizeof(buf);
+ 				}
+-				mobilebackup2_receive_raw(mobilebackup2, buf, rlen, &r);
++				iosbk_receive_raw(mobilebackup2, buf, rlen, &r);
+ 				if ((int)r <= 0) {
+ 					break;
+ 				}
+@@ -1333,11 +1386,11 @@
+ 			if (quit_flag)
+ 				break;
+ 			nlen = 0;
+-			mobilebackup2_receive_raw(mobilebackup2, (char*)&nlen, 4, &r);
++			iosbk_receive_raw(mobilebackup2, (char*)&nlen, 4, &r);
+ 			nlen = be32toh(nlen);
+ 			if (nlen > 0) {
+ 				last_code = code;
+-				mobilebackup2_receive_raw(mobilebackup2, &code, 1, &r);
++				iosbk_receive_raw(mobilebackup2, &code, 1, &r);
+ 			} else {
+ 				break;
+ 			}
+@@ -1359,7 +1412,7 @@
+ 		if (code == CODE_ERROR_REMOTE) {
+ 			/* error message */
+ 			char *msg = (char*)malloc(nlen);
+-			mobilebackup2_receive_raw(mobilebackup2, msg, nlen-1, &r);
++			iosbk_receive_raw(mobilebackup2, msg, nlen-1, &r);
+ 			msg[r] = 0;
+ 			/* If sent using CODE_FILE_DATA, end marker will be CODE_ERROR_REMOTE which is not an error! */
+ 			if (last_code != CODE_FILE_DATA) {
+@@ -1376,7 +1429,7 @@
+ 	if ((int)nlen-1 > 0) {
+ 		progress_printf("Discarding current data hunk.\n");
+ 		fname = (char*)malloc(nlen-1);
+-		mobilebackup2_receive_raw(mobilebackup2, fname, nlen-1, &r);
++		iosbk_receive_raw(mobilebackup2, fname, nlen-1, &r);
+ 		free(fname);
+ 		remove_file(bname);
+ 	}
+@@ -1690,6 +1743,9 @@
+ 
+ int main(int argc, char *argv[])
+ {
++	const char *activity_env = getenv("IOSBK_BACKUP_ACTIVITY");
++	iosbk_activity_enabled = activity_env && !strcmp(activity_env, "1");
++	iosbk_activity("preparing", 0, 1);
+ 	idevice_error_t ret = IDEVICE_E_UNKNOWN_ERROR;
+ 	lockdownd_error_t ldret = LOCKDOWN_E_UNKNOWN_ERROR;
+ 	int i = 0;
+@@ -2274,6 +2330,7 @@
+ 						usleep(100000);
+ 					}
+ 					if (passcode_requested) {
++						iosbk_activity("waiting_authorization", 0, 0);
+ 						printf("*** Waiting for passcode to be entered on the device ***\n");
+ 					}
+ 				}
+@@ -2504,7 +2561,7 @@
+ 			do {
+ 				free(dlmsg);
+ 				dlmsg = NULL;
+-				mberr = mobilebackup2_receive_message(mobilebackup2, &message, &dlmsg);
++				mberr = iosbk_receive_message(mobilebackup2, &message, &dlmsg);
+ 				if (mberr == MOBILEBACKUP2_E_RECEIVE_TIMEOUT) {
+ 					PRINT_VERBOSE(2, "Device is not ready yet, retrying...\n");
+ 					goto files_out;

@@ -13,7 +13,7 @@ func TestDocsExplainBackupProgressSemantics(t *testing.T) {
 		markers []string
 	}{
 		{
-			path: "docs/OPERATIONS.md",
+			path: "docs/manual/states.md",
 			markers: []string{
 				"## Backup progress semantics",
 				"overall progress",
@@ -25,7 +25,7 @@ func TestDocsExplainBackupProgressSemantics(t *testing.T) {
 			},
 		},
 		{
-			path: "docs/OPERATIONS.zh-CN.md",
+			path: "docs/manual/states.zh-CN.md",
 			markers: []string{
 				"## 备份进度说明",
 				"整次备份的总体进度",

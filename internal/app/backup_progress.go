@@ -29,11 +29,13 @@ type backupProgress struct {
 	CurrentBytes       *int64
 	CurrentTotalBytes  *int64
 	UpdatedAt          time.Time
+	LastActivityAt     time.Time
 }
 
 // backupProgressUpdate 只包含一行输出能够确认的事实。文件路径不会进入结构化状态，
 // 避免通过状态接口暴露照片、应用或其他私有目录名称。
 type backupProgressUpdate struct {
+	LastActivityAt     time.Time
 	Phase              string
 	OverallPercent     *float64
 	CurrentFilePercent *float64
@@ -174,6 +176,10 @@ func (app *application) applyBackupProgressUpdate(udid string, update backupProg
 	}
 
 	changed := false
+	if !update.LastActivityAt.IsZero() && update.LastActivityAt.After(progress.LastActivityAt) {
+		progress.LastActivityAt = toBeijingTime(update.LastActivityAt)
+		changed = true
+	}
 	forceBroadcast := progress.State != backupProgressRunning || (update.Phase != "" && progress.Phase != update.Phase)
 	if progress.State != backupProgressRunning {
 		progress.State = backupProgressRunning
@@ -227,6 +233,11 @@ func (app *application) applyBackupProgressUpdate(udid string, update backupProg
 func (app *application) finishBackupProgress(udid string, err error, at time.Time) {
 	app.mu.Lock()
 	defer app.mu.Unlock()
+	app.finishBackupProgressUnsafe(udid, err, at)
+}
+
+// 调用者持有 app.mu，以便终态与任务占用一起提交。
+func (app *application) finishBackupProgressUnsafe(udid string, err error, at time.Time) {
 	progress, ok := app.backupProgress[udid]
 	if !ok {
 		return

@@ -180,7 +180,7 @@ func TestPerformBackupMissingDevicePublishesFailure(t *testing.T) {
 
 func TestHandleBackupReturnsTrackableStartingState(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
+	defer cancel()
 	app := newApplicationWithRuntime(ctx, defaultRuntimeConfig())
 	app.devices["BACKUP-HTTP"] = &device{
 		UDID:       "BACKUP-HTTP",
@@ -194,10 +194,21 @@ func TestHandleBackupReturnsTrackableStartingState(t *testing.T) {
 		MinBatteryLevel:  0,
 		OnlyWhenCharging: false,
 	}
+	// handleBackup 同步占用并发槽，后台任务退出时才释放；先等它结束再清理临时目录。
+	t.Cleanup(func() {
+		deadline := time.Now().Add(2 * time.Second)
+		for app.backupSem.inUse() != 0 {
+			if time.Now().After(deadline) {
+				t.Fatal("备份后台任务未在清理临时目录前退出")
+			}
+			time.Sleep(time.Millisecond)
+		}
+	})
 	req := httptest.NewRequest(http.MethodPost, "/api/backup/BACKUP-HTTP", nil)
 	rr := httptest.NewRecorder()
 
 	app.handleBackup(rr, req)
+	cancel()
 
 	if rr.Code != http.StatusAccepted {
 		t.Fatalf("备份启动应返回 202，得到 %d: %s", rr.Code, rr.Body.String())

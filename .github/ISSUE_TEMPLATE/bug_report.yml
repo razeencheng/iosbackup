@@ -1,5 +1,5 @@
 name: Bug report
-description: Report a reproducible problem in the latest Beta
+description: Report a reproducible problem in the latest release
 title: "[Bug]: "
 labels:
   - bug
@@ -13,7 +13,7 @@ body:
     attributes:
       label: Pre-submission checks
       options:
-        - label: I reproduced this on the latest published Beta.
+        - label: I reproduced this on the latest published release.
           required: true
         - label: I searched existing issues and found no matching report.
           required: true
@@ -24,7 +24,7 @@ body:
     attributes:
       label: Version and commit
       description: Copy the version and commit from /api/version.
-      placeholder: v1.5.0-beta.1, commit 0123456...
+      placeholder: v1.5.2, commit 0123456...
     validations:
       required: true
   - type: input

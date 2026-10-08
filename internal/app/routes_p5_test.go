@@ -12,6 +12,7 @@ import (
 
 // homePayload 与 handleHome 渲染用的数据结构一致。
 type homePayload struct {
+	InitialStatus                 statusSnapshot
 	Devices                       []*device
 	Configs                       map[string]*backupConfig
 	BackupStatuses                map[string]bool

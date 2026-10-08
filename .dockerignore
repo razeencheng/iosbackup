@@ -17,5 +17,17 @@ lockdown
 data
 configs/backup_configs.json
 configs/notification_configs.json
-configs/secrets.enc
 secrets.enc
+
+# 包括首次初始化中断时遗留的秘密临时文件
+.env*
+configs/admin_password*
+configs/secret_key*
+configs/auth_credentials.json*
+configs/csrf_secret.json*
+configs/secrets.enc*
+configs/.admin_password-*
+configs/.secret_key-*
+configs/.auth_credentials.json-*
+configs/.csrf_secret.json-*
+configs/.secrets.enc-*

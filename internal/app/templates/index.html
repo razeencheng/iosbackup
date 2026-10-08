@@ -212,6 +212,8 @@
     </div>
   </div>
 
+  <div id="connectionHealth" class="hidden" role="status" aria-live="polite" style="margin-bottom:14px;padding:14px 18px;border:1px solid #E7CB9A;border-radius:var(--iosbk-radius);background:#FFF8EB;color:#78521E;font-size:14px;line-height:1.6"></div>
+
   {{if .Devices}}
   <!-- ===================== DEVICE LIST ===================== -->
   <div style="display:flex;flex-direction:column;gap:14px">
@@ -220,6 +222,7 @@
     {{$backingUp := index $.BackupStatuses $d.UDID}}
     {{$disc := index $.DiscoveredIPs $d.UDID}}
     {{$conn := "offline"}}{{if $d.IsOnline}}{{if eq $d.Connection "USB 已连接"}}{{$conn = "usb"}}{{else}}{{$conn = "wifi"}}{{end}}{{end}}
+    {{if $d.PresenceUnknown}}{{$conn = "unknown"}}{{end}}
     {{$isPad := contains $d.DeviceType "iPad"}}
       <div data-udid-card="{{$d.UDID}}" style="background:#fff;border:1px solid #D8E2EA;border-radius:var(--iosbk-radius);box-shadow:0 1px 2px rgba(35,52,68,.04),0 18px 36px -28px rgba(35,52,68,.22);overflow:hidden">
 
@@ -229,14 +232,15 @@
           <div style="flex:1;min-width:180px">
             <div class="device-heading-row">
               <span id="name-{{$d.UDID}}" class="device-name" style="font-size:17px;font-weight:700;letter-spacing:-.01em;{{if eq $conn "offline"}}color:#96A3AE;{{else}}color:#213041;{{end}}">{{$d.Name}}</span>
-              <span id="battery-{{$d.UDID}}" class="device-battery">{{if $d.IsOnline}}<svg class="battery-icon" viewBox="0 0 20 12" aria-hidden="true" style="color:{{if $d.IsCharging}}#2E7D5B{{else if le $d.BatteryLevel 20}}#BD2C24{{else}}#718090{{end}}"><rect x="0.75" y="0.75" width="16" height="10.5" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"></rect><path d="M18.25 4v4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path><rect x="3" y="3" width="11" height="6" rx="1" fill="currentColor" opacity=".24"></rect></svg>{{$d.BatteryLevel}}%{{if $d.IsCharging}}<span style="color:#2E7D5B;font-weight:600">· <span data-i18n="battery.charging"></span></span>{{end}}{{end}}</span>
+              <span id="battery-{{$d.UDID}}" class="device-battery">{{if and $d.IsOnline (not $d.PresenceUnknown)}}<svg class="battery-icon" viewBox="0 0 20 12" aria-hidden="true" style="color:{{if $d.IsCharging}}#2E7D5B{{else if le $d.BatteryLevel 20}}#BD2C24{{else}}#718090{{end}}"><rect x="0.75" y="0.75" width="16" height="10.5" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"></rect><path d="M18.25 4v4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path><rect x="3" y="3" width="11" height="6" rx="1" fill="currentColor" opacity=".24"></rect></svg>{{$d.BatteryLevel}}%{{if $d.IsCharging}}<span style="color:#2E7D5B;font-weight:600">· <span data-i18n="battery.charging"></span></span>{{end}}{{end}}</span>
             </div>
             <div style="font-size:12.5px;color:#718090;margin-top:3px"><span data-i18n="device.model"></span> · {{$d.DeviceType}}</div>
             <div style="font-size:12.5px;color:#6F7E8C;margin-top:4px;display:flex;align-items:center;gap:5px"><svg class="ui-icon" style="width:13px;height:13px;color:#96A3AE" aria-hidden="true"><use href="/static/ui-icons.svg#icon-clock"></use></svg><span data-i18n="device.lastBackup"></span> · <span id="lastbackup-{{$d.UDID}}">{{if $d.LastBackup.IsZero}}<span data-i18n="device.never"></span>{{else}}{{$d.LastBackup.Format "2006-01-02 15:04"}}{{end}}</span></div>
           </div>
           <div class="device-action-row">
             <div id="connbox-{{$d.UDID}}" style="text-align:right;white-space:nowrap">
-              {{if eq $conn "usb"}}<span class="connection-badge" style="gap:7px;padding:5px 11px;background:#EAF1FC;color:#2356B8;border:1px solid #C5DAF6;font-size:12.5px;font-weight:600;white-space:nowrap"><svg class="connection-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2.2v10.1m0-10.1L7.9 4.3M10 2.2l2.1 2.1M10 8.1h3.1a2.2 2.2 0 0 1 2.2 2.2v1.2m-5.3.8H6.9a2.2 2.2 0 0 0-2.2 2.2v.9" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path><circle cx="4.7" cy="16.5" r="1.4" fill="currentColor"></circle><rect x="14" y="11.4" width="2.6" height="2.6" rx=".5" fill="currentColor"></rect></svg><span data-i18n="status.usb"></span></span>
+              {{if eq $conn "unknown"}}<span class="connection-badge" style="color:#78521E" data-i18n="status.unknown">设备状态暂时无法确认</span>
+              {{else if eq $conn "usb"}}<span class="connection-badge" style="gap:7px;padding:5px 11px;background:#EAF1FC;color:#2356B8;border:1px solid #C5DAF6;font-size:12.5px;font-weight:600;white-space:nowrap"><svg class="connection-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2.2v10.1m0-10.1L7.9 4.3M10 2.2l2.1 2.1M10 8.1h3.1a2.2 2.2 0 0 1 2.2 2.2v1.2m-5.3.8H6.9a2.2 2.2 0 0 0-2.2 2.2v.9" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path><circle cx="4.7" cy="16.5" r="1.4" fill="currentColor"></circle><rect x="14" y="11.4" width="2.6" height="2.6" rx=".5" fill="currentColor"></rect></svg><span data-i18n="status.usb"></span></span>
               {{else if eq $conn "wifi"}}<span class="connection-badge" style="gap:7px;padding:5px 11px;background:#E2F3EF;color:#0B7565;border:1px solid #B9E2DA;font-size:12.5px;font-weight:600;white-space:nowrap"><svg class="connection-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M3 7.6a10.7 10.7 0 0 1 14 0M5.7 10.5a6.7 6.7 0 0 1 8.6 0M8.4 13.3a2.7 2.7 0 0 1 3.2 0" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path><circle cx="10" cy="16" r="1.25" fill="currentColor"></circle></svg><span data-i18n="status.wifi"></span></span>
               {{else}}<span class="connection-badge" style="gap:7px;padding:5px 11px;background:#F3F7FA;color:#718090;border:1px solid #D8E2EA;font-size:12.5px;font-weight:600;white-space:nowrap"><svg class="connection-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2.6v6.1M5.5 5.7a6.2 6.2 0 1 0 9 0" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path></svg><span data-i18n="status.offline"></span></span>{{end}}
             </div>
@@ -257,7 +261,7 @@
           </div>
           <div id="bkprogress-status-{{$d.UDID}}" class="backup-status-message">
             <svg class="ui-icon" aria-hidden="true"><use id="bkprogress-status-icon-{{$d.UDID}}" href="/static/ui-icons.svg#icon-info"></use></svg>
-            <div><strong id="bkprogress-status-title-{{$d.UDID}}" data-i18n="progress.preparingTitle"></strong><span data-i18n="progress.separator" aria-hidden="true">。 </span><span id="bkprogress-status-hint-{{$d.UDID}}" data-i18n="progress.preparingHint"></span></div>
+            <div><strong id="bkprogress-status-title-{{$d.UDID}}" data-i18n="progress.preparingTitle"></strong><span data-i18n="progress.separator" aria-hidden="true">。 </span><span id="bkprogress-status-hint-{{$d.UDID}}" data-i18n="progress.preparingHint"></span><div id="bkprogress-activity-{{$d.UDID}}" style="margin-top:6px;font-size:12px;opacity:.8"></div></div>
           </div>
         </div>
 
@@ -315,12 +319,12 @@
                 <div style="display:flex;flex-wrap:wrap;gap:6px 18px;align-items:center">
                   <div style="width:170px;min-width:140px;font-size:13.5px;font-weight:600"><span data-i18n="bset.ip"></span> <span style="font-weight:400;color:#96A3AE;font-size:12px">(<span data-i18n="bset.ipOptional"></span>)</span></div>
                   <input type="text" value="{{$cfg.NetworkAddress}}" id="networkAddress-{{$d.UDID}}" data-i18n-ph="bset.ipPlaceholder" class="iosbk-in" style="flex:1;min-width:200px;font-family:'IBM Plex Mono',monospace;font-size:13px">
-                  <button onclick="testDeviceIP('{{$d.UDID}}')" style="display:inline-flex;align-items:center;justify-content:center;min-width:104px;gap:7px;padding:9px 14px;background:#fff;color:#27384A;border:1px solid #D8E2EA;border-radius:var(--iosbk-radius);font-size:13px;font-weight:500;cursor:pointer;font-family:inherit;white-space:nowrap"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-network-check"></use></svg><span data-i18n="bset.testConn"></span></button>
+                  <button id="testIPBtn-{{$d.UDID}}" onclick="testDeviceIP('{{$d.UDID}}')" style="display:inline-flex;align-items:center;justify-content:center;min-width:104px;gap:7px;padding:9px 14px;background:#fff;color:#27384A;border:1px solid #D8E2EA;border-radius:var(--iosbk-radius);font-size:13px;font-weight:500;cursor:pointer;font-family:inherit;white-space:nowrap"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-network-check"></use></svg><span data-i18n="bset.testConn"></span></button>
                 </div>
                 <div id="ipResult-{{$d.UDID}}" class="hidden" style="font-size:12px;margin-top:7px;line-height:1.5;font-weight:500"></div>
                 <div style="font-size:11.5px;color:#718090;margin-top:6px;line-height:1.5" data-i18n="bset.ipHint"></div>
                 {{if $disc}}<div style="font-size:12px;color:#0B7565;margin-top:6px;display:flex;align-items:center;gap:6px"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-search"></use></svg><span data-i18n="bset.discovered"></span>:&nbsp;<span style="font-family:'IBM Plex Mono',monospace;font-weight:500">{{$disc}}</span></div>{{end}}
-                {{if not $d.IsOnline}}<div style="margin-top:9px;display:flex;gap:9px;align-items:flex-start;background:#FBF1E2;border:1px solid #F0DBB6;border-radius:var(--iosbk-radius);padding:10px 12px;font-size:12px;color:#8A5A12;line-height:1.6"><svg class="ui-icon" style="margin-top:2px" aria-hidden="true"><use href="/static/ui-icons.svg#icon-info"></use></svg><span data-i18n="bset.offlineHelp"></span></div>{{end}}
+                {{if not $d.IsOnline}}<div id="offlineHelp-{{$d.UDID}}" style="margin-top:9px;display:flex;gap:9px;align-items:flex-start;background:#FBF1E2;border:1px solid #F0DBB6;border-radius:var(--iosbk-radius);padding:10px 12px;font-size:12px;color:#8A5A12;line-height:1.6"><svg class="ui-icon" style="margin-top:2px" aria-hidden="true"><use href="/static/ui-icons.svg#icon-info"></use></svg><span data-i18n="bset.offlineHelp"></span></div>{{end}}
               </div>
               <div style="display:flex;gap:9px;align-items:flex-start;font-size:12px;color:#6F7E8C;background:#fff;border:1px dashed #D8E2EA;border-radius:var(--iosbk-radius);padding:11px 13px;line-height:1.5"><svg class="ui-icon" style="color:#2C62C6;margin-top:2px" aria-hidden="true"><use href="/static/ui-icons.svg#icon-pair"></use></svg><span data-i18n="bset.pairHint"></span></div>
               <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:flex-end;padding-top:2px">
@@ -372,7 +376,6 @@
               <div style="font-size:14px;font-weight:700;color:#8A5A12;display:flex;align-items:center;gap:8px"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-key"></use></svg><span data-i18n="enc.unavailTitle"></span></div>
               <div style="font-size:12.5px;color:#8A5A12;margin-top:7px;line-height:1.55" data-i18n="enc.unavailBody"></div>
               <div style="font-size:12px;color:#8A5A12;margin-top:9px" data-i18n="enc.unavailCmd"></div>
-              <pre style="background:#FBF6EC;border:1px solid #EAD3A4;border-radius:var(--iosbk-radius);padding:10px 12px;margin:8px 0 0;font-family:'IBM Plex Mono',monospace;font-size:12px;color:#7A4E10;overflow:auto">docker run … -e IOSBK_SECRET_KEY="$(openssl rand -base64 32)" …</pre>
             </div>
             {{end}}
             <div id="encState-{{$d.UDID}}" style="margin-bottom:15px;display:inline-flex;align-items:center;gap:8px;padding:7px 13px;border-radius:var(--iosbk-radius);font-size:12.5px;font-weight:600;background:#F3F7FA;color:#718090"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-help"></use></svg><span data-i18n="enc.stateUnknown"></span></div>
@@ -383,8 +386,8 @@
                 <div style="display:flex;align-items:center;gap:9px;margin-bottom:9px"><span style="font-size:13.5px;font-weight:600" data-i18n="enc.toggleTitle"></span></div>
                 <div style="display:flex;flex-wrap:wrap;gap:9px;align-items:center">
                   <input type="password" id="encPw-{{$d.UDID}}" data-i18n-ph="enc.pwPlaceholder" class="iosbk-in" style="min-width:200px">
-                  <button onclick="setEncryption('{{$d.UDID}}',true)" style="display:inline-flex;align-items:center;gap:7px;padding:9px 15px;background:#B45309;color:#fff;border:none;border-radius:var(--iosbk-radius);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-lock"></use></svg><span data-i18n="enc.enable"></span></button>
-                  <button onclick="setEncryption('{{$d.UDID}}',false)" style="padding:9px 15px;background:#fff;color:#607181;border:1px solid #D8E2EA;border-radius:var(--iosbk-radius);font-size:13px;font-weight:500;cursor:pointer;font-family:inherit" data-i18n="enc.disable"></button>
+                  <button data-connection-action="{{$d.UDID}}" onclick="setEncryption('{{$d.UDID}}',true)" style="display:inline-flex;align-items:center;gap:7px;padding:9px 15px;background:#B45309;color:#fff;border:none;border-radius:var(--iosbk-radius);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-lock"></use></svg><span data-i18n="enc.enable"></span></button>
+                  <button data-connection-action="{{$d.UDID}}" onclick="setEncryption('{{$d.UDID}}',false)" style="padding:9px 15px;background:#fff;color:#607181;border:1px solid #D8E2EA;border-radius:var(--iosbk-radius);font-size:13px;font-weight:500;cursor:pointer;font-family:inherit" data-i18n="enc.disable"></button>
                 </div>
                 <div style="font-size:11.5px;color:#96A3AE;margin-top:6px" data-i18n="enc.disableHint"></div>
                 <a data-i18n-href="enc.forgotUrl" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:6px;margin-top:9px;font-size:12px;color:#2C62C6;text-decoration:none;font-weight:500"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-help"></use></svg><span data-i18n="enc.forgot"></span></a>
@@ -413,7 +416,7 @@
                 </div>
                 {{if $cfg.RestoreEnabled}}
                 <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center">
-                  <button onclick="openRestoreModal('{{$d.UDID}}',this.dataset.name)" data-name="{{$d.Name}}" {{if not $d.IsOnline}}disabled{{end}} style="display:inline-flex;align-items:center;gap:8px;padding:10px 17px;border-radius:var(--iosbk-radius);font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit;border:none;{{if $d.IsOnline}}background:#BD2C24;color:#fff;{{else}}background:#F3F7FA;color:#ADB9C2;cursor:not-allowed;{{end}}"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-restore"></use></svg><span data-i18n="danger.restoreBtn"></span></button>
+                  <button data-connection-action="{{$d.UDID}}" onclick="openRestoreModal('{{$d.UDID}}',this.dataset.name)" data-name="{{$d.Name}}" {{if not $d.IsOnline}}disabled{{end}} style="display:inline-flex;align-items:center;gap:8px;padding:10px 17px;border-radius:var(--iosbk-radius);font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit;border:none;{{if $d.IsOnline}}background:#BD2C24;color:#fff;{{else}}background:#F3F7FA;color:#ADB9C2;cursor:not-allowed;{{end}}"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-restore"></use></svg><span data-i18n="danger.restoreBtn"></span></button>
                   <button onclick="setRestoreEnabled('{{$d.UDID}}',false)" style="background:none;border:none;color:#6F7E8C;font-size:12.5px;text-decoration:underline;cursor:pointer;font-family:inherit" data-i18n="danger.disable"></button>
                 </div>
                 {{else}}
@@ -450,6 +453,7 @@
   <!-- ===================== EMPTY STATE ===================== -->
   <div style="background:#fff;border:1px solid #D8E2EA;border-radius:var(--iosbk-radius);padding:40px 28px 34px;box-shadow:0 1px 2px rgba(35,52,68,.04)">
     <div style="text-align:center;max-width:560px;margin:0 auto">
+      <div id="emptyConnectionGuide">
       <div class="empty-device-icon" data-empty-device-icon aria-hidden="true">
         <img src="/static/empty-device.png" alt="">
       </div>
@@ -474,6 +478,7 @@
       </div>
     </div>
     <div style="text-align:center;margin-top:24px">
+      </div>
       <button onclick="refreshDevices()" style="display:inline-flex;align-items:center;gap:8px;padding:11px 22px;background:#2C62C6;color:#fff;border:none;border-radius:var(--iosbk-radius);font-size:14px;font-weight:600;cursor:pointer;font-family:inherit"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-refresh"></use></svg><span data-i18n="empty.refresh"></span></button>
       <button id="emptyRemovedDevicesButton" type="button" class="hidden" onclick="openRemovedDevicesDrawer()" style="display:inline-flex;align-items:center;gap:8px;margin-left:8px;padding:11px 18px;background:#fff;color:#2356B8;border:1px solid #C5DAF6;border-radius:var(--iosbk-radius);font-size:14px;font-weight:600;cursor:pointer;font-family:inherit"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-archive"></use></svg><span data-i18n="empty.removed"></span></button>
     </div>
@@ -572,7 +577,7 @@ const IOSBK_DICT = {
   header: { langName:{zh:"中文",en:"English"}, autoOn:{zh:"实时更新已开启",en:"Live updates on"}, autoOff:{zh:"实时更新已暂停",en:"Live updates paused"}, autoBusy:{zh:"实时更新 · {n} 台备份中",en:"Live · {n} backing up"}, pauseAuto:{zh:"暂停",en:"Pause"}, resumeAuto:{zh:"开启",en:"Resume"}, refresh:{zh:"刷新设备",en:"Refresh devices"}, restart:{zh:"重启连接服务",en:"Restart connection"}, restartHint:{zh:"没找到设备时点这里：重启底层的 USB 与 Wi-Fi 连接服务，不影响你的备份文件。",en:"Tap this if a device isn't detected: restarts the underlying USB & Wi-Fi connection service. Your backups are not affected."}, notifications:{zh:"通知设置",en:"Notifications"}, tz:{zh:"时间为北京时间 (UTC+8)",en:"Times shown in Beijing time (UTC+8)"} },
   empty: { title:{zh:"还没有连接任何设备",en:"No devices yet"}, subtitle:{zh:"三步即可完成第一次备份，全程不需要懂任何专业名词。",en:"Three steps to your first backup — no technical terms required."}, s1t:{zh:"1 · 接上设备",en:"1 · Connect the device"}, s1b:{zh:"用数据线把 iPhone / iPad 插到本机，或让它和本机连同一个 Wi-Fi。",en:"Plug the iPhone / iPad into this machine with a cable, or put it on the same Wi-Fi."}, s2t:{zh:"2 · 在设备上点「信任」",en:"2 · Tap “Trust” on the device"}, s2b:{zh:"设备会弹出「要信任此电脑吗？」，点「信任」并输入锁屏密码。",en:"The device asks “Trust this computer?” — tap Trust and enter its passcode."}, s3t:{zh:"3 · 回到这里点「立即备份」",en:"3 · Come back and tap “Back up now”"}, s3b:{zh:"设备会出现在下面，点一下就开始备份；之后可设为自动。",en:"The device appears below — one tap starts the backup. You can make it automatic afterwards."}, refresh:{zh:"我已接好，刷新看看",en:"I've connected it — refresh"}, removed:{zh:"查看已移除设备",en:"View removed devices"} },
   device: { model:{zh:"型号",en:"Model"}, lastBackup:{zh:"上次备份",en:"Last backup"}, never:{zh:"从未备份",en:"Never backed up"}, backupNow:{zh:"立即备份",en:"Back up now"}, backingUp:{zh:"备份中",en:"Backing up"} },
-  progress: { preparingTitle:{zh:"正在建立备份会话",en:"Preparing the backup session"}, preparingSubtitle:{zh:"正在取得可计算的总体进度",en:"Waiting for measurable overall progress"}, preparingHint:{zh:"请在 iPhone 上留意授权提示，并保持设备可解锁。",en:"Watch the iPhone for an authorization prompt and keep it ready to unlock."}, runningTitle:{zh:"正在备份",en:"Backup in progress"}, overallSubtitle:{zh:"整次备份的总体进度",en:"Overall progress for this backup"}, runningHint:{zh:"正在接收备份数据，请保持设备连接稳定。",en:"Receiving backup data. Keep the device connection stable."}, overallOnlyHint:{zh:"当前没有可靠的文件字节信息，页面只展示总体进度。",en:"Reliable per-file byte counts are unavailable, so only overall progress is shown."}, currentFile:{zh:"当前文件",en:"Current file"}, currentFileHint:{zh:"当前正在传输的文件进度",en:"Progress of the file currently being transferred"}, separator:{zh:"。 ",en:". "}, reconnectingTitle:{zh:"等待设备重新连接",en:"Waiting for the device to reconnect"}, reconnectingHint:{zh:"Wi-Fi 连接暂时中断，正在保留最后进度并等待设备重新上线。",en:"Wi-Fi was interrupted. The last progress is preserved while waiting for the device."}, interruptedTitle:{zh:"备份已中断",en:"Backup interrupted"}, interruptedHint:{zh:"设备持续离线，本次备份已安全停止。重新连接后可再次开始备份。",en:"The device stayed offline, so this backup stopped safely. Reconnect it to start a new backup."}, completedTitle:{zh:"备份已完成",en:"Backup completed"}, completedHint:{zh:"本次备份已正常结束。",en:"This backup finished successfully."}, failedTitle:{zh:"备份失败",en:"Backup failed"}, failedHint:{zh:"请保持设备在线并重新尝试。",en:"Keep the device online and try again."}, storageHint:{zh:"请检查保存位置的剩余空间和写入权限。",en:"Check free space and write access for the backup location."}, lockedHint:{zh:"请解锁设备，并按提示输入设备锁屏密码。",en:"Unlock the device and enter its passcode when prompted."}, retry:{zh:"重新备份",en:"Back up again"}, overallAria:{zh:"总体备份进度",en:"Overall backup progress"} },
+  progress: { waitingAuthorizationTitle:{zh:"等待手机授权",en:"Waiting for device authorization"}, waitingAuthorizationHint:{zh:"请查看 iPhone，并按提示输入锁屏密码。超过等待期限后本次备份会停止。",en:"Check your iPhone and enter its passcode when prompted. This backup stops if the wait times out."}, waitingDeviceTitle:{zh:"等待手机处理",en:"Waiting for the device"}, waitingDeviceHint:{zh:"正在等待手机的下一步响应。较大的加密备份在准备阶段可能需要几分钟，总体进度暂时不变。",en:"Waiting for the device response. Preparing a large encrypted backup can take several minutes without changing the overall percentage."}, sendingTitle:{zh:"正在向手机发送数据",en:"Sending data to the device"}, sendingHint:{zh:"正在发送备份所需的数据；增量备份会先发送已有清单。",en:"Sending data needed by the backup. Incremental backups first send the existing manifest."}, stalledHint:{zh:"长时间未检测到备份活动，本次任务已停止。请检查手机授权和网络后重新备份。",en:"No backup activity was detected within the time limit, so this job stopped. Check device authorization and the network, then retry."}, lastActivity:{zh:"最后备份活动（北京时间）：",en:"Last backup activity (Beijing): "}, noActivity:{zh:"尚未检测到备份活动",en:"No backup activity detected yet"}, preparingTitle:{zh:"正在建立备份会话",en:"Preparing the backup session"}, preparingSubtitle:{zh:"正在取得可计算的总体进度",en:"Waiting for measurable overall progress"}, preparingHint:{zh:"请在 iPhone 上留意授权提示，并保持设备可解锁。",en:"Watch the iPhone for an authorization prompt and keep it ready to unlock."}, runningTitle:{zh:"正在备份",en:"Backup in progress"}, overallSubtitle:{zh:"整次备份的总体进度",en:"Overall progress for this backup"}, runningHint:{zh:"正在接收备份数据，请保持设备连接稳定。",en:"Receiving backup data. Keep the device connection stable."}, overallOnlyHint:{zh:"当前没有可靠的文件字节信息，页面只展示总体进度。",en:"Reliable per-file byte counts are unavailable, so only overall progress is shown."}, currentFile:{zh:"当前文件",en:"Current file"}, currentFileHint:{zh:"当前正在传输的文件进度",en:"Progress of the file currently being transferred"}, separator:{zh:"。 ",en:". "}, reconnectingTitle:{zh:"等待设备重新连接",en:"Waiting for the device to reconnect"}, reconnectingHint:{zh:"Wi-Fi 连接暂时中断，正在保留最后进度并等待设备重新上线。",en:"Wi-Fi was interrupted. The last progress is preserved while waiting for the device."}, interruptedTitle:{zh:"备份已中断",en:"Backup interrupted"}, interruptedHint:{zh:"设备持续离线，本次备份已安全停止。重新连接后可再次开始备份。",en:"The device stayed offline, so this backup stopped safely. Reconnect it to start a new backup."}, completedTitle:{zh:"备份已完成",en:"Backup completed"}, completedHint:{zh:"本次备份已正常结束。",en:"This backup finished successfully."}, failedTitle:{zh:"备份失败",en:"Backup failed"}, failedHint:{zh:"请保持设备在线并重新尝试。",en:"Keep the device online and try again."}, storageHint:{zh:"请检查保存位置的剩余空间和写入权限。",en:"Check free space and write access for the backup location."}, lockedHint:{zh:"请解锁设备，并按提示输入设备锁屏密码。",en:"Unlock the device and enter its passcode when prompted."}, retry:{zh:"重新备份",en:"Back up again"}, overallAria:{zh:"总体备份进度",en:"Overall backup progress"} },
   status: { usb:{zh:"USB 已连接",en:"USB connected"}, wifi:{zh:"Wi-Fi 已连接",en:"Wi-Fi connected"}, offline:{zh:"离线",en:"Offline"}, backingUp:{zh:"备份中",en:"Backing up"}, success:{zh:"成功",en:"Success"}, failed:{zh:"失败",en:"Failed"} },
   gate: { offline:{zh:"设备离线，无法备份",en:"Device is offline — can't back up"}, busy:{zh:"设备正忙（已有备份或操作进行中）",en:"Device is busy (a backup or operation is already running)"}, notCharging:{zh:"该设备开了「仅充电时备份」，请充电后再试",en:"This device has “Only while charging” on — please plug it in and try again."}, lowBattery:{zh:"电量 {b}% 低于设定的最低 {m}%，已跳过",en:"Battery {b}% is below the set minimum {m}% — skipped"}, missing:{zh:"设备不存在",en:"Device not found"}, backupBusy:{zh:"已有其他设备在备份，请稍后再试",en:"Another device is backing up — please try again shortly."}, cant:{zh:"暂时无法备份",en:"Can't back up right now"} },
   menu: { title:{zh:"菜单",en:"Menu"}, onboarding:{zh:"首次使用向导",en:"First-use guide"}, onboardingHint:{zh:"连接、信任并完成第一次备份",en:"Connect, trust, and complete the first backup"}, notifHint:{zh:"配置备份成功/失败等事件的通知",en:"Set up notifications for backup success, failure, and more"}, refreshHint:{zh:"立即重扫 USB / Wi-Fi 设备",en:"Re-scan USB / Wi-Fi devices now"}, logout:{zh:"退出登录",en:"Sign out"}, logoutHint:{zh:"结束当前浏览器会话",en:"End this browser session"} },
@@ -580,9 +585,9 @@ const IOSBK_DICT = {
   battery: { charging:{zh:"充电中",en:"Charging"} },
   migration: { text:{zh:"这台设备以前是用 Wi-Fi 备份的，现在离线了。如果它换了网络（本机自动发现不到），在「备份设置」里填上它的 IP 就能继续无线备份。",en:"This device used to back up over Wi-Fi and is now offline. If it changed networks (and can't be auto-discovered), add its IP under Backup settings to keep backing up wirelessly."}, action:{zh:"去填写 IP",en:"Add its IP"} },
   sec: { backup:{zh:"备份设置",en:"Backup settings"}, backups:{zh:"备份管理",en:"Backups"}, encryption:{zh:"加密",en:"Encryption"}, danger:{zh:"备份恢复",en:"Restore"}, remove:{zh:"移除设备",en:"Remove device"} },
-  bset: { unsaved:{zh:"有未保存的修改",en:"Unsaved changes"}, window:{zh:"备份时间段",en:"Backup window"}, windowHint:{zh:"只在这个时间段内自动备份（例如夜里）。",en:"Auto-backups run only inside this window (e.g. overnight)."}, to:{zh:"至",en:"to"}, interval:{zh:"备份间隔",en:"Backup interval"}, h6:{zh:"每 6 小时",en:"Every 6 hours"}, h12:{zh:"每 12 小时",en:"Every 12 hours"}, h24:{zh:"每 24 小时",en:"Every 24 hours"}, h48:{zh:"每 48 小时",en:"Every 48 hours"}, minBattery:{zh:"最低电量",en:"Minimum battery"}, minBatteryHint:{zh:"电量低于这个值就不自动备份，避免耗光电。",en:"Skip auto-backups below this level so the device never runs flat."}, onlyCharging:{zh:"仅在充电时备份",en:"Only back up while charging"}, autoBackup:{zh:"自动备份",en:"Automatic backup"}, autoBackupHint:{zh:"关闭后只能手动点「立即备份」。",en:"When off, you back up manually with “Back up now”."}, dir:{zh:"保存位置",en:"Save location"}, dirHint:{zh:"备份文件存放的文件夹。",en:"The folder where backups are stored."}, ip:{zh:"设备 IP",en:"Device IP"}, ipOptional:{zh:"可选",en:"optional"}, ipPlaceholder:{zh:"留空即可 — 同一 Wi-Fi 会自动找到",en:"Leave blank — auto-found on the same Wi-Fi"}, ipHint:{zh:"同一个 Wi-Fi 下会自动发现，留空就好。只有跨网段或用 Tailscale 时才需要手动填。",en:"Auto-discovered on the same Wi-Fi, so leave it blank. Only fill it in for a different subnet or Tailscale."}, testConn:{zh:"测试连接",en:"Test connection"}, passcodeNote:{zh:"由于 iOS 安全机制，每次备份开始时都需要在设备上输入锁屏密码。请在备份时段保持手机可解锁、留意提示并及时输入，否则备份会一直等待。",en:"Due to iOS security, every backup asks for the device passcode when it starts. Keep the device unlockable during the backup window and enter it promptly, or the backup will wait."}, testing:{zh:"测试中…",en:"Testing…"}, testOk:{zh:"连得上，保存后即可 Wi-Fi 备份",en:"Reachable — save and you can back up over Wi-Fi"}, checkDir:{zh:"检查",en:"Check"}, dirChecking:{zh:"检查中…",en:"Checking…"}, dirOk:{zh:"保存位置可用，保存设置后生效",en:"Save location is usable — it takes effect after you save"}, dirBad:{zh:"保存位置不可用，请重新填写",en:"Save location isn't usable — please enter another path"}, offlineHelp:{zh:"设备显示离线？① 确认它亮屏、和本机在同一个 Wi-Fi；② 在设备上断开重连 Wi-Fi（或到「设置 → Wi-Fi → ⓘ → 私有 Wi-Fi 地址」切换一下）来刷新连接；③ 知道 IP 就填到上面点「测试连接」。",en:"Device shows offline? ① Make sure it's awake and on the same Wi-Fi as this server. ② On the device, toggle Wi-Fi off/on (or switch Settings → Wi-Fi → ⓘ → Private Wi-Fi Address) to refresh its connection. ③ If you know its IP, enter it above and tap “Test connection”."}, discovered:{zh:"已自动发现",en:"Auto-discovered"}, save:{zh:"保存设置",en:"Save settings"}, saved:{zh:"设置已保存",en:"Settings saved"}, pair:{zh:"配对设备",en:"Pair device"}, repair:{zh:"重新配对",en:"Re-pair"}, pairHint:{zh:"第一次连接需要在设备上点「信任此电脑」。",en:"Needed on first connection: tap “Trust this computer” on the device."} },
+  bset: { unsaved:{zh:"有未保存的修改",en:"Unsaved changes"}, window:{zh:"备份时间段",en:"Backup window"}, windowHint:{zh:"只在这个时间段内自动备份（例如夜里）。",en:"Auto-backups run only inside this window (e.g. overnight)."}, to:{zh:"至",en:"to"}, interval:{zh:"备份间隔",en:"Backup interval"}, h6:{zh:"每 6 小时",en:"Every 6 hours"}, h12:{zh:"每 12 小时",en:"Every 12 hours"}, h24:{zh:"每 24 小时",en:"Every 24 hours"}, h48:{zh:"每 48 小时",en:"Every 48 hours"}, minBattery:{zh:"最低电量",en:"Minimum battery"}, minBatteryHint:{zh:"电量低于这个值就不自动备份，避免耗光电。",en:"Skip auto-backups below this level so the device never runs flat."}, onlyCharging:{zh:"仅在充电时备份",en:"Only back up while charging"}, autoBackup:{zh:"自动备份",en:"Automatic backup"}, autoBackupHint:{zh:"关闭后只能手动点「立即备份」。",en:"When off, you back up manually with “Back up now”."}, dir:{zh:"保存位置",en:"Save location"}, dirHint:{zh:"备份文件存放的文件夹。",en:"The folder where backups are stored."}, ip:{zh:"设备 IP",en:"Device IP"}, ipOptional:{zh:"可选",en:"optional"}, ipPlaceholder:{zh:"留空即可 — 同一 Wi-Fi 会自动找到",en:"Leave blank — auto-found on the same Wi-Fi"}, ipHint:{zh:"同一个 Wi-Fi 下会自动发现，留空就好。只有跨网段或用 Tailscale 时才需要手动填。",en:"Auto-discovered on the same Wi-Fi, so leave it blank. Only fill it in for a different subnet or Tailscale."}, testConn:{zh:"测试连接",en:"Test connection"}, passcodeNote:{zh:"由于 iOS 安全机制，每次备份开始时都需要在设备上输入锁屏密码。请在备份时段保持手机可解锁、留意提示并及时输入，超过等待期限后本次备份会停止。",en:"Due to iOS security, every backup asks for the device passcode when it starts. Keep the device unlockable during the backup window and enter it promptly, or this backup will stop after the waiting period."}, testing:{zh:"测试中…",en:"Testing…"}, testOk:{zh:"设备已连接，保存设置可保留此 IP",en:"Device connected. Save settings to keep this IP."}, checkDir:{zh:"检查",en:"Check"}, dirChecking:{zh:"检查中…",en:"Checking…"}, dirOk:{zh:"保存位置可用，保存设置后生效",en:"Save location is usable — it takes effect after you save"}, dirBad:{zh:"保存位置不可用，请重新填写",en:"Save location isn't usable — please enter another path"}, offlineHelp:{zh:"设备显示离线？① 确认它亮屏、和本机在同一个 Wi-Fi；② 在设备上断开重连 Wi-Fi（或到「设置 → Wi-Fi → ⓘ → 私有 Wi-Fi 地址」切换一下）来刷新连接；③ 知道 IP 就填到上面点「测试连接」。",en:"Device shows offline? ① Make sure it's awake and on the same Wi-Fi as this server. ② On the device, toggle Wi-Fi off/on (or switch Settings → Wi-Fi → ⓘ → Private Wi-Fi Address) to refresh its connection. ③ If you know its IP, enter it above and tap “Test connection”."}, discovered:{zh:"已自动发现",en:"Auto-discovered"}, save:{zh:"保存设置",en:"Save settings"}, saved:{zh:"设置已保存",en:"Settings saved"}, pair:{zh:"配对设备",en:"Pair device"}, repair:{zh:"重新配对",en:"Re-pair"}, pairHint:{zh:"第一次连接需要在设备上点「信任此电脑」。",en:"Needed on first connection: tap “Trust this computer” on the device."} },
   bmgmt: { infoTitle:{zh:"备份概况",en:"Backup overview"}, infoRefresh:{zh:"刷新",en:"Refresh"}, size:{zh:"占用空间",en:"Size on disk"}, count:{zh:"备份文件数",en:"File count"}, encrypted:{zh:"是否加密",en:"Encrypted"}, latest:{zh:"最新备份",en:"Latest backup"}, filesTitle:{zh:"备份文件",en:"Backup files"}, filesNote:{zh:"仅本机 / 内网可见，请勿外传。",en:"Visible on your LAN only — don't share."}, search:{zh:"搜索文件…",en:"Search files…"}, prev:{zh:"上一页",en:"Prev"}, next:{zh:"下一页",en:"Next"}, page:{zh:"第 {a} / {b} 页",en:"Page {a} of {b}"}, total:{zh:"共 {n} 项",en:"{n} items"}, downloadCsv:{zh:"下载 CSV",en:"Download CSV"}, deleteTitle:{zh:"解包成可浏览的文件",en:"Unpack into browsable files"}, deleteNote:{zh:"备份里的文件是哈希命名的，没法直接翻看。解包会按原始路径还原成一份可浏览的文件夹副本（额外占磁盘、较耗时；不会改动原备份）。",en:"Files inside a backup have hashed names and aren't directly browsable. Unpacking rebuilds them into a browsable folder copy by original path (extra disk, takes a while; the original backup is untouched)."}, deleteBtn:{zh:"解包…",en:"Unpack…"}, delDataTitle:{zh:"删除此设备的备份",en:"Delete this device's backup"}, delDataNote:{zh:"把这台设备在本机的备份整份删除以释放空间。不可恢复；不影响设备本身，下次会重新做一次完整备份。",en:"Permanently delete this device's local backup to free space. Irreversible; the device itself is unaffected, and the next backup will be a full one."}, delDataBtn:{zh:"删除备份…",en:"Delete backup…"}, deleting:{zh:"删除中…",en:"Deleting…"}, offlineNote:{zh:"设备离线，备份管理暂不可用。",en:"Device offline — backup management is unavailable."}, loadHint:{zh:"点上方「刷新」加载备份文件清单。清单要从设备下载，备份文件越大、加载越久（小则几秒，大备份可能要十几秒到几分钟）。",en:"Click “Refresh” above to load the backup file list. It's fetched from the device, so the larger the backup, the longer it takes (seconds for small ones, up to minutes for large backups)."}, noBackup:{zh:"这台设备还没有备份。点右上角「立即备份」做第一次备份吧。",en:"No backup yet for this device. Tap “Back up now” at the top to make the first one."} },
-  enc: { unavailTitle:{zh:"加密功能未启用",en:"Encryption is turned off"}, unavailBody:{zh:"服务端还没有配置主密钥（IOSBK_SECRET_KEY）。没有它，备份密码无法安全保存，所以加密和恢复功能暂时停用 —— 但普通（不加密）备份照常可用。",en:"The service has no master key (IOSBK_SECRET_KEY) configured yet. Without it, backup passwords can't be stored safely, so encryption and restore are disabled — but ordinary (unencrypted) backups keep working."}, unavailCmd:{zh:"生成一个并在启动容器时传入（之后请保持不变）：",en:"Generate one and pass it when starting the container (keep it stable afterwards):"}, explainTitle:{zh:"两个「密码」别搞混",en:"Two “passwords” — don't mix them up"}, explainIntro:{zh:"界面里出现两样东西，作用完全不同：",en:"Two different things show up here, with completely different jobs:"}, k1Tag:{zh:"① 设备备份密码",en:"① Device backup password"}, k1Sub:{zh:"每台设备各一个",en:"One per device"}, k1What:{zh:"你给这台 iPad 的备份设的密码，加密的是备份数据本身。",en:"The password you set for THIS iPad's backup — it encrypts the backup data itself."}, k1Like:{zh:"等同 iTunes / 访达里的「加密本地备份」。",en:"Same as “Encrypt local backup” in iTunes / Finder."}, k1Scope:{zh:"只影响这一台设备。",en:"Affects this one device only."}, k1Lost:{zh:"丢了 = 这台设备的加密备份永久无法恢复。",en:"Lost = this device's encrypted backups can never be restored."}, k2Tag:{zh:"② 服务主密钥",en:"② Service master key"}, k2Sub:{zh:"整个服务共用一个",en:"One for the whole service"}, k2What:{zh:"服务用它把上面①的密码加密后安全存档，方便日后改密 / 关加密 / 恢复时取用。",en:"The service uses it to securely store password ① so it can be retrieved later for change-password, turn-off-encryption, or restore."}, k2Like:{zh:"它不加密 iPad 的备份。",en:"It does NOT encrypt the iPad's backup."}, k2Scope:{zh:"没配置它时，加密 / 恢复停用，普通备份不受影响。",en:"When it's not set, encryption / restore are disabled; ordinary backups are unaffected."}, k2Lost:{zh:"一旦用过就不能更换或丢失，否则已存的密码再也读不出。",en:"Once used it must not change or be lost, or stored passwords become unreadable."}, vs:{zh:"简单说：① 锁的是备份；② 只是帮你把①的钥匙安全收好。",en:"In short: ① locks the backup; ② just keeps ①'s key safe for you."}, warn:{zh:"开启后，这台设备之后每次备份都会加密。健康、钥匙串、Wi-Fi 密码等只在加密备份里。密码丢失 = 永久无法恢复。",en:"Once on, every future backup of this device is encrypted. Health, Keychain and Wi-Fi passwords are only in encrypted backups. A lost password means they can never be recovered."}, toggleTitle:{zh:"备份加密",en:"Backup encryption"}, pwPlaceholder:{zh:"设备备份密码",en:"Device backup password"}, enable:{zh:"开启加密",en:"Turn on"}, disable:{zh:"关闭加密",en:"Turn off"}, disableHint:{zh:"关闭需要输入当前密码。",en:"Turning off requires the current password."}, forgot:{zh:"忘记备份密码？",en:"Forgot the backup password?"}, forgotUrl:{zh:"https://support.apple.com/zh-cn/108313",en:"https://support.apple.com/en-us/108313"}, changeTitle:{zh:"修改备份密码",en:"Change backup password"}, oldPw:{zh:"当前密码",en:"Current password"}, newPw:{zh:"新密码",en:"New password"}, changeBtn:{zh:"修改密码",en:"Change password"}, offlineNote:{zh:"加密操作需要设备在线。",en:"The device must be online to change encryption."}, on:{zh:"已开启",en:"On"}, off:{zh:"已关闭",en:"Off"}, stateOn:{zh:"当前：已开启备份加密",en:"Currently: backup encryption ON"}, stateOff:{zh:"当前：未加密备份",en:"Currently: backups not encrypted"}, stateOffline:{zh:"设备离线，无法读取加密状态",en:"Device offline — can't read encryption state"}, stateUnknown:{zh:"加密状态读取中…",en:"Reading encryption state…"}, stateErr:{zh:"无法读取加密状态",en:"Couldn't read encryption state"} },
+  enc: { unavailTitle:{zh:"加密存储不可用",en:"Encrypted storage is unavailable"}, unavailBody:{zh:"服务未加载有效的主密钥，无法安全保存备份密码。请检查启动日志和配置目录权限；已有加密数据必须使用原主密钥。",en:"The service has not loaded a valid master key and cannot safely store backup passwords. Check the startup logs and configuration directory permissions; existing encrypted data requires its original master key."}, unavailCmd:{zh:"新实例默认自动生成并保存主密钥；如使用 IOSBK_SECRET_KEY 或 IOSBK_SECRET_KEY_FILE 自定义，请核对启动配置，不要直接替换原密钥。",en:"New instances generate and save a master key automatically. If you customize it with IOSBK_SECRET_KEY or IOSBK_SECRET_KEY_FILE, check the startup configuration without replacing the original key."}, explainTitle:{zh:"两个「密码」别搞混",en:"Two “passwords” — don't mix them up"}, explainIntro:{zh:"界面里出现两样东西，作用完全不同：",en:"Two different things show up here, with completely different jobs:"}, k1Tag:{zh:"① 设备备份密码",en:"① Device backup password"}, k1Sub:{zh:"每台设备各一个",en:"One per device"}, k1What:{zh:"你给这台 iPad 的备份设的密码，加密的是备份数据本身。",en:"The password you set for THIS iPad's backup — it encrypts the backup data itself."}, k1Like:{zh:"等同 iTunes / 访达里的「加密本地备份」。",en:"Same as “Encrypt local backup” in iTunes / Finder."}, k1Scope:{zh:"只影响这一台设备。",en:"Affects this one device only."}, k1Lost:{zh:"丢了 = 这台设备的加密备份永久无法恢复。",en:"Lost = this device's encrypted backups can never be restored."}, k2Tag:{zh:"② 服务主密钥",en:"② Service master key"}, k2Sub:{zh:"整个服务共用一个",en:"One for the whole service"}, k2What:{zh:"服务用它把上面①的密码加密后安全存档，方便日后改密 / 关加密 / 恢复时取用。",en:"The service uses it to securely store password ① so it can be retrieved later for change-password, turn-off-encryption, or restore."}, k2Like:{zh:"它不加密 iPad 的备份。",en:"It does NOT encrypt the iPad's backup."}, k2Scope:{zh:"新实例默认自动生成并持久保存；自动生成的主密钥需与配置目录一起备份。",en:"New instances generate and persist it automatically; back up the generated master key together with the configuration directory."}, k2Lost:{zh:"一旦用过就不能更换或丢失，否则已存的密码再也读不出。",en:"Once used it must not change or be lost, or stored passwords become unreadable."}, vs:{zh:"简单说：① 锁的是备份；② 只是帮你把①的钥匙安全收好。",en:"In short: ① locks the backup; ② just keeps ①'s key safe for you."}, warn:{zh:"开启后，这台设备之后每次备份都会加密。健康、钥匙串、Wi-Fi 密码等只在加密备份里。密码丢失 = 永久无法恢复。",en:"Once on, every future backup of this device is encrypted. Health, Keychain and Wi-Fi passwords are only in encrypted backups. A lost password means they can never be recovered."}, toggleTitle:{zh:"备份加密",en:"Backup encryption"}, pwPlaceholder:{zh:"设备备份密码",en:"Device backup password"}, enable:{zh:"开启加密",en:"Turn on"}, disable:{zh:"关闭加密",en:"Turn off"}, disableHint:{zh:"关闭需要输入当前密码。",en:"Turning off requires the current password."}, forgot:{zh:"忘记备份密码？",en:"Forgot the backup password?"}, forgotUrl:{zh:"https://support.apple.com/zh-cn/108313",en:"https://support.apple.com/en-us/108313"}, changeTitle:{zh:"修改备份密码",en:"Change backup password"}, oldPw:{zh:"当前密码",en:"Current password"}, newPw:{zh:"新密码",en:"New password"}, changeBtn:{zh:"修改密码",en:"Change password"}, offlineNote:{zh:"加密操作需要设备在线。",en:"The device must be online to change encryption."}, on:{zh:"已开启",en:"On"}, off:{zh:"已关闭",en:"Off"}, stateOn:{zh:"当前：已开启备份加密",en:"Currently: backup encryption ON"}, stateOff:{zh:"当前：未加密备份",en:"Currently: backups not encrypted"}, stateOffline:{zh:"设备离线，无法读取加密状态",en:"Device offline — can't read encryption state"}, stateUnknown:{zh:"加密状态读取中…",en:"Reading encryption state…"}, stateErr:{zh:"无法读取加密状态",en:"Couldn't read encryption state"} },
   danger: { title:{zh:"备份恢复（会覆盖设备现有数据）",en:"Restore (overwrites current device data)"}, intro:{zh:"恢复会用备份覆盖设备上的现有数据，不可逆。请逐条确认下面的提示。",en:"Restoring overwrites the data currently on the device and cannot be undone. Read each note below first."}, findMy:{zh:"恢复前，先在设备上关闭「查找我的 iPhone」（设置 → Apple ID → 查找）。否则会被系统拦下。",en:"Before restoring, turn off “Find My iPhone” on the device (Settings → Apple ID → Find My). Otherwise it will be blocked."}, reboot:{zh:"恢复后设备会重启；解锁一次后，约 1–2 分钟会自动经 Wi-Fi 重新上线，配对仍有效。",en:"After restoring the device reboots; unlock it once and it comes back over Wi-Fi on its own in ~1–2 minutes. Pairing stays valid."}, usb:{zh:"备份较大时，建议插 USB 恢复，更快也更稳。",en:"For large backups, restore over USB — it's faster and more reliable."}, latch:{zh:"「允许恢复」是第二道保险，默认关闭。",en:"“Allow restore” is a second safety latch, off by default."}, allow:{zh:"允许恢复（高级）",en:"Allow restore (advanced)"}, disable:{zh:"关闭恢复功能",en:"Turn off restore"}, disabled:{zh:"恢复功能已关闭。确需恢复时，请先打开「允许恢复」。",en:"Restore is turned off. To restore, switch on “Allow restore” first."}, restoreBtn:{zh:"恢复此设备的备份…",en:"Restore this device…"} },
   restore: { title:{zh:"确认恢复",en:"Confirm restore"}, lead:{zh:"将用备份覆盖此设备的全部数据 —— 此操作不可逆。",en:"This overwrites all data on the device with the backup — it cannot be undone."}, findMy:{zh:"已在设备上关闭「查找我的 iPhone」",en:"“Find My iPhone” is turned off on the device"}, findMyHint:{zh:"没关会被系统拦下（Error 211）。",en:"If it's on, restore is blocked (Error 211)."}, understand:{zh:"我已理解：这会覆盖 / 清除设备上的现有数据",en:"I understand this will overwrite / erase the data on the device"}, typeName:{zh:"输入设备名以确认",en:"Type the device name to confirm"}, typeHint:{zh:"需与下面完全一致：",en:"Must match exactly:"}, pwLabel:{zh:"备份密码",en:"Backup password"}, pwOptional:{zh:"加密备份才需要，可留空",en:"only for encrypted backups; leave blank otherwise"}, optReboot:{zh:"恢复后重启设备",en:"Reboot after restore"}, optSettings:{zh:"一并恢复设备设置",en:"Also restore device settings"}, optSystem:{zh:"一并恢复系统文件",en:"Also restore system files"}, cancel:{zh:"取消",en:"Cancel"}, confirm:{zh:"确认恢复",en:"Restore device"} },
   remove: { title:{zh:"移除这台设备",en:"Remove this device"}, intro:{zh:"不再使用这台设备时，可将它从控制台隐藏并停止后续任务。",en:"Hide a device you no longer use and stop future tasks."}, reversible:{zh:"可恢复",en:"Reversible"}, stopTitle:{zh:"停止所有备份",en:"Stop all backups"}, stopBody:{zh:"手动和定时任务都不会再为这台设备启动。",en:"Manual and scheduled jobs will no longer start for this device."}, hideTitle:{zh:"从设备列表隐藏",en:"Hide from the device list"}, hideBody:{zh:"即使仍在同一网络，也不会自动重新出现。",en:"It will not reappear automatically, even on the same network."}, keepTitle:{zh:"完整保留已有数据",en:"Keep existing data"}, keepBody:{zh:"不会删除已有备份、配置和配对信息。",en:"Existing backups, settings, and pairing information are not deleted."}, restoreHint:{zh:"之后可在“设置 → 已移除设备”中恢复，不会自动开始备份。",en:"Restore it later from Settings → Removed devices; restoration does not start a backup."}, action:{zh:"移除设备…",en:"Remove device…"}, dialogTitle:{zh:"从控制台移除此设备？",en:"Remove this device from the console?"}, dialogSubtitle:{zh:"这是可恢复操作，不会删除任何备份。",en:"This is reversible and does not delete any backup."}, dialogStop:{zh:"停止这台设备的自动与手动备份",en:"Stop automatic and manual backups for this device"}, dialogHide:{zh:"从当前设备列表隐藏",en:"Hide it from the active device list"}, dialogKeep:{zh:"保留 NAS 上的已有备份与设置",en:"Keep existing backups and settings on the NAS"}, dialogPairing:{zh:"不影响设备数据和配对记录",en:"Keep device data and pairing records unchanged"}, dialogPairingBody:{zh:"以后恢复到列表即可继续使用原有设置。",en:"Restore it to the list later to continue with the existing settings."}, close:{zh:"关闭",en:"Close"}, cancel:{zh:"取消",en:"Cancel"}, confirm:{zh:"从控制台移除",en:"Remove from console"}, removing:{zh:"正在移除…",en:"Removing…"}, busy:{zh:"设备正在执行任务，请完成后再移除",en:"The device is busy. Finish the current task before removing it."}, failed:{zh:"移除失败，请稍后重试",en:"Removal failed. Please try again."}, success:{zh:"设备已从控制台移除，备份和设置均已保留",en:"Device removed from the console; backups and settings are preserved."} },
@@ -593,6 +598,8 @@ const IOSBK_DICT = {
 
 /* ============== i18n runtime ============== */
 function dpath(o,p){return p.split('.').reduce(function(a,k){return a&&a[k];},o);}
+const INITIAL_STATUS = {{.InitialStatus}};
+IOSBK_DICT.status.unknown={zh:"设备状态暂时无法确认",en:"Device status is temporarily unknown"};
 const PAGE_VERSION = "{{.Version}}"; // 加载时的构建版本；SSE 快照版本与此不同 → 已部署新版本
 let lang;
 try{ lang = localStorage.getItem('iosbk_lang') || ((navigator.language||'en').toLowerCase().indexOf('zh')===0?'zh':'en'); }catch(e){ lang='en'; }
@@ -607,6 +614,7 @@ function applyI18n(){
   document.querySelectorAll('.lang-btn').forEach(function(b){ b.classList.toggle('active', b.dataset.lang===lang); });
   updateAutoText();
   rerenderBackupProgress();
+  renderConnectionHealth();
   if(removedDevicesCache!==null) renderRemovedDevices(removedDevicesCache,'ready');
   else if(removedDevicesViewState) renderRemovedDevices(null,removedDevicesViewState);
 }
@@ -863,6 +871,32 @@ function updateAutoText(){
   }
 }
 
+
+let latestConnectionSnapshot=null;
+function connectionServiceMessage(service){
+  var name=service.connection==='usb'?'USB':'Wi-Fi';
+  if(service.recovery==='restarting') return L('正在恢复 '+name+' 连接服务，请稍候。','Restoring the '+name+' connection service. Please wait.');
+  if(service.recovery==='waiting_busy') return L(name+' 连接服务等待当前设备任务结束后恢复。',name+' connection service will recover after current device tasks finish.');
+  if(service.recovery==='manual_required') return service.error_code==='tool_unavailable' ? L(name+' 连接工具不可用，请检查安装和权限。',name+' connection tools are unavailable. Check installation and permissions.') : L(name+' 连接服务自动恢复失败，请查看排障说明或手动重试。',name+' connection service could not recover automatically. Check troubleshooting or retry manually.');
+  if(service.recovery==='backoff') return L(name+' 连接服务恢复失败，稍后自动重试。',name+' connection service recovery failed. Another attempt is scheduled.');
+  if(service.health==='unhealthy') return L(name+' 连接服务异常，正在准备恢复。',name+' connection service is unavailable. Preparing recovery.');
+  if(service.health==='suspect') return L(name+' 连接服务查询异常，正在重新检查。',name+' connection service query failed. Checking again.');
+  if(service.health==='unknown') return L('正在检查 '+name+' 连接服务…','Checking the '+name+' connection service…');
+  return '';
+}
+function renderConnectionHealth(){
+  var banner=document.getElementById('connectionHealth');
+  if(!banner || !latestConnectionSnapshot) return;
+  var services=latestConnectionSnapshot.connection_services||[];
+  var messages=services.map(connectionServiceMessage).filter(Boolean);
+  var uncertain=messages.length>0;
+  if(!messages.length && services.length && !(latestConnectionSnapshot.devices||[]).some(function(d){return d.online && d.presence_known!==false;})) messages.push(L('未发现已连接设备，请连接设备。','No connected devices found. Connect a device to continue.'));
+  banner.classList.toggle('hidden',messages.length===0);
+  banner.textContent=messages.join(' ');
+  var guide=document.getElementById('emptyConnectionGuide');
+  if(guide) guide.classList.toggle('hidden',uncertain);
+}
+
 /* ---- apply a status snapshot: patch DOM in place; reload only on device-set change ---- */
 function currentCardUdids(){ var s=new Set(); document.querySelectorAll('[data-udid-card]').forEach(function(e){ s.add(e.getAttribute('data-udid-card')); }); return s; }
 function maybeReload(){ if(pendingReload && !busyUI()) location.reload(); }
@@ -872,6 +906,8 @@ function checkVersion(snap){
   }
 }
 function applyStatus(snap){
+  latestConnectionSnapshot=snap;
+  renderConnectionHealth();
   checkVersion(snap); // 服务端版本变了（已部署新版本）→ 提示刷新
   updateRemovedDeviceCount(snap.removed_device_count||0);
   var dom=currentCardUdids();
@@ -891,6 +927,7 @@ function itileStyle(conn){
 }
 function badgeHTML(conn){
   var s='gap:7px;padding:5px 11px;font-size:12.5px;font-weight:600;white-space:nowrap;';
+  if(conn==='unknown') return '<span class="connection-badge" style="'+s+'background:#FFF8EB;color:#78521E">'+iconHTML('alert')+'<span data-i18n="status.unknown"></span></span>';
   if(conn==='usb') return '<span class="connection-badge" style="'+s+'background:#EAF1FC;color:#2356B8;border:1px solid #C5DAF6">'+connectionIconHTML(conn)+'<span data-i18n="status.usb"></span></span>';
   if(conn==='wifi') return '<span class="connection-badge" style="'+s+'background:#E2F3EF;color:#0B7565;border:1px solid #B9E2DA">'+connectionIconHTML(conn)+'<span data-i18n="status.wifi"></span></span>';
   return '<span class="connection-badge" style="'+s+'background:#F3F7FA;color:#718090;border:1px solid #D8E2EA">'+connectionIconHTML(conn)+'<span data-i18n="status.offline"></span></span>';
@@ -904,7 +941,7 @@ function batteryIconHTML(color){
   return '<svg class="battery-icon" viewBox="0 0 20 12" aria-hidden="true" style="color:'+color+'"><rect x="0.75" y="0.75" width="16" height="10.5" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"></rect><path d="M18.25 4v4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path><rect x="3" y="3" width="11" height="6" rx="1" fill="currentColor" opacity=".24"></rect></svg>';
 }
 function batteryHTML(d){
-  if(!d.online) return '';
+  if(!d.online || d.presence_known===false) return '';
   var col = d.charging?'#2E7D5B':(d.battery<=20?'#BD2C24':'#718090');
   return batteryIconHTML(col)+d.battery+'%'+(d.charging?'<span style="color:#2E7D5B;font-weight:600">· <span data-i18n="battery.charging"></span></span>':'');
 }
@@ -916,6 +953,9 @@ function backupProgressMode(progress){
   if(progress.state==='completed') return 'completed';
   if(progress.state==='failed') return 'failed';
   if(progress.state==='running'){
+    if(progress.phase==='preparing') return 'preparing';
+    if(progress.phase==='waiting_authorization') return 'waiting-authorization';
+    if(progress.phase==='waiting_device') return 'waiting-device';
     if(isBackupProgressNumber(progress.current_bytes) && isBackupProgressNumber(progress.current_total_bytes)) return 'transferring';
     return 'overall-only';
   }
@@ -933,6 +973,9 @@ function formatBackupBytes(value){
   return size.toLocaleString(lang==='zh'?'zh-CN':'en',{minimumFractionDigits:0,maximumFractionDigits:digits})+' '+units[unit];
 }
 function backupProgressCopy(mode,d){
+  if(mode==='waiting-authorization') return {title:'progress.waitingAuthorizationTitle',subtitle:'progress.overallSubtitle',hint:'progress.waitingAuthorizationHint',tone:'warning',icon:'info'};
+  if(mode==='waiting-device') return {title:'progress.waitingDeviceTitle',subtitle:'progress.overallSubtitle',hint:'progress.waitingDeviceHint',tone:'',icon:'info'};
+  if((mode==='transferring'||mode==='overall-only') && d.backup_progress.phase==='sending') return {title:'progress.sendingTitle',subtitle:'progress.overallSubtitle',hint:'progress.sendingHint',tone:'',icon:'info'};
   if(mode==='preparing') return {title:'progress.preparingTitle',subtitle:'progress.preparingSubtitle',hint:'progress.preparingHint',tone:'',icon:'info'};
   if(mode==='transferring') return {title:'progress.runningTitle',subtitle:'progress.overallSubtitle',hint:'progress.runningHint',tone:'',icon:'info'};
   if(mode==='overall-only') return {title:'progress.runningTitle',subtitle:'progress.overallSubtitle',hint:'progress.overallOnlyHint',tone:'',icon:'info'};
@@ -940,7 +983,8 @@ function backupProgressCopy(mode,d){
   if(mode==='interrupted') return {title:'progress.interruptedTitle',subtitle:'progress.overallSubtitle',hint:'progress.interruptedHint',tone:'error',icon:'x-circle'};
   if(mode==='completed') return {title:'progress.completedTitle',subtitle:'progress.overallSubtitle',hint:'progress.completedHint',tone:'success',icon:'check-circle'};
   var hint='progress.failedHint';
-  if(d.last_backup_error_code==='storage_unavailable') hint='progress.storageHint';
+  if(d.last_backup_error_code==='backup_stalled') hint='progress.stalledHint';
+  else if(d.last_backup_error_code==='storage_unavailable') hint='progress.storageHint';
   else if(d.last_backup_error_code==='device_locked') hint='progress.lockedHint';
   return {title:'progress.failedTitle',subtitle:'progress.overallSubtitle',hint:hint,tone:'error',icon:'alert'};
 }
@@ -971,21 +1015,26 @@ function renderBackupProgress(d){
   var status=document.getElementById('bkprogress-status-'+u), statusTitle=document.getElementById('bkprogress-status-title-'+u), statusHint=document.getElementById('bkprogress-status-hint-'+u), statusIcon=document.getElementById('bkprogress-status-icon-'+u);
   status.className='backup-status-message'+(copy.tone?' '+copy.tone:'');
   statusTitle.textContent=tr(copy.title); statusHint.textContent=tr(copy.hint);
+  var activity=document.getElementById('bkprogress-activity-'+u);
+  var lastActivity=progress.last_activity_at ? new Date(progress.last_activity_at) : null;
+  activity.textContent=lastActivity && !isNaN(lastActivity.getTime()) ? tr('progress.lastActivity')+lastActivity.toLocaleString(lang==='zh'?'zh-CN':'en',{timeZone:'Asia/Shanghai',hour12:false}) : tr('progress.noActivity');
   statusIcon.setAttribute('href','/static/ui-icons.svg#icon-'+copy.icon);
 }
 function rerenderBackupProgress(){ Object.keys(latestDeviceStatuses).forEach(function(udid){ renderBackupProgress(latestDeviceStatuses[udid]); }); }
 function patchDevice(d){
   var u=d.udid;
   latestDeviceStatuses[u]=d;
+  document.querySelectorAll('[data-connection-action]').forEach(function(button){if(button.getAttribute('data-connection-action')===u) button.disabled=d.operations_available===false||d.backing_up;});
   var tile=document.getElementById('itile-'+u); if(tile) tile.setAttribute('style', itileStyle(d.conn));
   var name=document.getElementById('name-'+u); if(name) name.style.color = (d.conn==='offline')?'#96A3AE':'#213041';
   var battery=document.getElementById('battery-'+u); if(battery) battery.innerHTML=batteryHTML(d);
   var box=document.getElementById('connbox-'+u); if(box) box.innerHTML = badgeHTML(d.conn);
+  var offlineHelp=document.getElementById('offlineHelp-'+u); if(offlineHelp) offlineHelp.classList.toggle('hidden',d.conn!=='offline');
   var lb=document.getElementById('lastbackup-'+u); if(lb){ if(d.last_backup){ lb.textContent=d.last_backup; } else { lb.innerHTML='<span data-i18n="device.never"></span>'; } }
   renderBackupProgress(d);
   var btn=document.getElementById('backupBtn-'+u);
   if(btn){
-    var dis = (d.conn==='offline') || d.backing_up;
+    var dis = (d.conn==='offline') || d.presence_known===false || d.operations_available===false || d.backing_up;
     btn.disabled = dis;
     btn.setAttribute('style','gap:9px;padding:10px 17px;font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit;border:none;white-space:nowrap;min-width:132px;'+(dis?'background:#F3F7FA;color:#ADB9C2;cursor:not-allowed;':'background:#2C62C6;color:#fff;'));
     var retry=d.backup_progress && (d.backup_progress.state==='interrupted'||d.backup_progress.state==='failed');
@@ -1038,17 +1087,22 @@ function checkBackupDir(udid){
   }).catch(function(e){ showInlineResult(box,false,String(e)); });
 }
 function testDeviceIP(udid){
+  var btn=document.getElementById('testIPBtn-'+udid);
+  if(btn.disabled) return;
   var ip=(document.getElementById('networkAddress-'+udid).value||'').trim();
   var box=document.getElementById('ipResult-'+udid);
   box.classList.remove('hidden'); box.style.color='#718090'; box.textContent=tr('bset.testing');
   if(!ip){ showInlineResult(box,false,L('请先填写设备 IP','Enter the device IP first')); return; }
+  btn.disabled=true; btn.style.opacity='.6';
   postJSON('/api/test-ip/'+udid, {ip:ip}).then(function(d){
+    if(d.status) applyStatus(d.status);
     if(d.ok){ showInlineResult(box,true,tr('bset.testOk')); }
-    else { showInlineResult(box,false,d.reason||L('连不上','Unreachable')); }
-  }).catch(function(e){ showInlineResult(box,false,String(e)); });
+    else { showInlineResult(box,false,d.reason||d.error||L('连不上','Unreachable')); }
+  }).catch(function(e){ showInlineResult(box,false,String(e)); }).finally(function(){ btn.disabled=false; btn.style.opacity=''; });
 }
 function pairDevice(udid){ csrfFetch('/api/pair/'+udid,{method:'POST'}).then(function(r){return r.json();}).then(function(data){ toast(data.error?(L('配对失败：','Pair failed: ')+data.error):L('请在设备上点「信任此电脑」','Tap “Trust this computer” on the device'), !!data.error); }).catch(function(e){ toast(L('配对失败：','Pair failed: ')+e,true); }); }
 function gateMsg(d){
+  if(d.error_code==='connection_unavailable') return L('连接服务暂时不可用，请等待服务恢复。','The connection service is unavailable. Please wait for recovery.');
   var key={offline:'gate.offline',busy:'gate.busy',not_charging:'gate.notCharging',low_battery:'gate.lowBattery',missing:'gate.missing',backup_busy:'gate.backupBusy'}[d.error_code];
   if(!key) return tr('gate.cant');
   return tr(key).replace('{b}', d.battery).replace('{m}', d.min_battery);
@@ -1186,6 +1240,7 @@ function submitRestore(){
 /* ============== boot ============== */
 window.addEventListener('DOMContentLoaded', function(){
   applyI18n();
+  applyStatus(INITIAL_STATUS);
   connectSSE();
   // 备份设置改动即标脏（输入框/下拉/时间/滑块都会冒泡 input/change；开关走 flipToggle）
   document.addEventListener('input', function(e){ markDirty(panelUdid(e.target)); });

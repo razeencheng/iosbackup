@@ -474,12 +474,14 @@ func (app *application) handleHome(w http.ResponseWriter, r *http.Request) {
 		EncryptionAvailable           bool
 		ExperimentalOperationsEnabled bool
 		DiscoveredIPs                 map[string]string
+		InitialStatus                 statusSnapshot
 		Version                       string
 		Commit                        string
 		SourceURL                     string
 		CSRFToken                     string
 		AuthEnabled                   bool
 	}{
+		InitialStatus:                 app.buildStatusSnapshot(),
 		Devices:                       devices,
 		Configs:                       configs,
 		BackupStatuses:                backupStatuses,
@@ -548,6 +550,8 @@ func (app *application) handleStatus(w http.ResponseWriter, r *http.Request) {
 	}
 
 	app.mu.RLock()
+	connectionServices := app.connectionServicesUnsafe()
+	canRefresh := app.connectionAdmissionUnsafe(nil) == nil
 	backupCount := len(app.backupInProgress)
 	backupDevices := make([]string, 0, backupCount)
 	backupUDIDs := make([]string, 0, backupCount)
@@ -565,10 +569,11 @@ func (app *application) handleStatus(w http.ResponseWriter, r *http.Request) {
 	encAvailable := app.secretStore != nil && app.secretStore.Available()
 
 	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"connection_services":       connectionServices,
 		"backup_in_progress_count":  backupCount,
 		"backup_devices":            backupDevices,
 		"backup_udids":              backupUDIDs,
-		"can_refresh":               backupCount == 0,
+		"can_refresh":               backupCount == 0 && canRefresh,
 		"encryption_available":      encAvailable,
 		"encryption_key_configured": encAvailable,
 	})
@@ -607,27 +612,12 @@ func (app *application) handleRestartUSBMuxD(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	app.muxRestartMu.Lock()
-	if app.muxRestartInProgress {
-		app.muxRestartMu.Unlock()
-		writeError(w, http.StatusConflict, "设备连接服务正在重启")
+	targets := app.connectionTargets()
+	if err := app.reserveConnectionRecovery(targets, true); err != nil {
+		writeError(w, http.StatusConflict, err.Error())
 		return
 	}
-	app.muxRestartInProgress = true
-	app.muxRestartMu.Unlock()
-
-	// 只允许一个有界后台重启任务；重复请求返回 409，不再累积 goroutine。
-	go func() {
-		defer func() {
-			app.muxRestartMu.Lock()
-			app.muxRestartInProgress = false
-			app.muxRestartMu.Unlock()
-		}()
-		if err := app.RestartUSBMuxD(); err != nil {
-			app.addErrorLog("SYSTEM", fmt.Sprintf("重启 usbmuxd 失败: %v", err))
-		}
-		app.RestartNetmuxd()
-	}()
+	go func() { _ = app.executeConnectionRecovery(app.rootCtx, targets, true) }()
 
 	writeSuccess(w, "设备连接服务（usbmuxd + netmuxd）重启已开始，请查看日志了解进度")
 }
@@ -660,11 +650,21 @@ func (app *application) handleBackup(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusConflict, map[string]interface{}{"error_code": "backup_busy"})
 		return
 	}
+	app.mu.RLock()
+	dev := cloneDevice(app.devices[udid])
+	app.mu.RUnlock()
+	release, err := app.beginConnectionTask(dev)
+	if err != nil {
+		app.backupSem.release()
+		writeError(w, http.StatusConflict, err.Error())
+		return
+	}
 	app.markBackupStarting(udid)
 
 	go func() {
 		defer app.backupSem.release()
-		if err := app.PerformBackup(udid); err != nil {
+		defer release()
+		if err := app.performBackupInTask(udid); err != nil {
 			app.addLog(udid, fmt.Sprintf("备份失败: %v", err))
 		}
 	}()
@@ -759,7 +759,7 @@ func (app *application) handleSaveConfig(w http.ResponseWriter, r *http.Request)
 	switch netmuxdSyncDecision(oldIP, newIP) {
 	case netmuxdReset:
 		app.addInfoLog(udid, fmt.Sprintf("设备 IP 由 %q 变为 %q，重启 netmuxd 以更新", oldIP, newIP))
-		go app.RestartNetmuxd()
+		app.queueNetworkServiceRestart()
 	case netmuxdReplay:
 		go app.replayAddDevice()
 	}
@@ -854,7 +854,13 @@ func (app *application) handleEncryptionStatus(w http.ResponseWriter, r *http.Re
 		writeJSON(w, http.StatusOK, map[string]interface{}{"online": false})
 		return
 	}
-	out, err := app.runIdeviceCmd(context.Background(), cmdKindShort, &devCopy, cmdIdeviceInfo, "-q", "com.apple.mobile.backup", "-k", "WillEncrypt")
+	release, taskErr := app.beginConnectionTask(&devCopy)
+	if taskErr != nil {
+		writeJSON(w, http.StatusOK, map[string]interface{}{"online": online, "unknown": true})
+		return
+	}
+	defer release()
+	out, err := app.runIdeviceCmd(r.Context(), cmdKindShort, &devCopy, cmdIdeviceInfo, "-q", "com.apple.mobile.backup", "-k", "WillEncrypt")
 	if err != nil {
 		writeJSON(w, http.StatusOK, map[string]interface{}{"online": true, "unknown": true})
 		return
@@ -864,8 +870,7 @@ func (app *application) handleEncryptionStatus(w http.ResponseWriter, r *http.Re
 }
 
 // handleTestDeviceIP 探测「设备 IP」是否可达（lockdown over Wi-Fi: 62078）。
-// 可达则注入 netmuxd（add_device）让设备按 IP 立即上线。给「测试连接」按钮即时、
-// 明确的反馈，替代过去填了 IP 却静默离线、看不出通不通的体验。
+// 等待 netmuxd 注册并确认设备上线后才返回成功，同时返回状态供页面立即更新。
 func (app *application) handleTestDeviceIP(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -876,6 +881,10 @@ func (app *application) handleTestDeviceIP(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	udid := extractUDIDFromPath(r.URL.Path, "/api/test-ip/")
+	if udid == "" {
+		writeError(w, http.StatusBadRequest, "无效的设备UDID")
+		return
+	}
 	if app.rejectRemovedDeviceOperation(w, udid) {
 		return
 	}
@@ -897,11 +906,27 @@ func (app *application) handleTestDeviceIP(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	ip = addr.String()
-	ok, reason := app.probeReachable(ip)
-	if ok && udid != "" {
-		go app.callAddDevice(udid, ip) // 可达 → 注入 netmuxd，使其按 IP 上线
+	if err := app.callAddDevice(udid, ip); err != nil {
+		writeJSON(w, http.StatusOK, map[string]interface{}{"ok": false, "reason": err.Error(), "ip": ip})
+		return
 	}
-	writeJSON(w, http.StatusOK, map[string]interface{}{"ok": ok, "reason": reason, "ip": ip})
+	if app.refreshPresence() {
+		app.refreshDetails()
+	}
+	snapshot := app.buildStatusSnapshot()
+	connected := false
+	for _, device := range snapshot.Devices {
+		if device.UDID == udid {
+			connected = device.Online
+			break
+		}
+	}
+	reason := ""
+	if !connected {
+		reason = "IP 可达，但设备尚未上线，请确认设备已解锁并完成配对后重试"
+	}
+	app.broadcastStatus()
+	writeJSON(w, http.StatusOK, map[string]interface{}{"ok": connected, "reason": reason, "ip": ip, "status": snapshot})
 }
 
 // mergeBackupConfig 将 rawFields 中出现的字段合并到 dst。
@@ -952,10 +977,13 @@ func (app *application) handlePairDevice(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	release, err := app.beginConnectionTask(device)
+	if err != nil {
+		writeError(w, http.StatusConflict, err.Error())
+		return
+	}
 	app.setPairingState(udid, pairingStateChecking, "", "")
-
-	// 在后台执行配对操作
-	go app.pairDevice(device)
+	go func() { defer release(); app.pairDeviceInTask(device) }()
 
 	writeJSON(w, http.StatusAccepted, map[string]string{
 		"message":       "配对检查已开始",

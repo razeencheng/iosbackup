@@ -34,6 +34,7 @@ func (p *countedMuxProcess) Wait() error {
 func newCountedMuxApp(active, max *atomic.Int32) *application {
 	app := newApplication()
 	app.watchdogBaseDelay = time.Millisecond
+	app.cmdRunner = func(context.Context, string, []string, []string) ([]byte, error) { return nil, nil }
 	app.muxProcFactory = func(ctx context.Context, _ string, _ ...string) muxProcess {
 		return &countedMuxProcess{ctx: ctx, active: active, max: max}
 	}

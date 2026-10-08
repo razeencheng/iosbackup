@@ -30,7 +30,7 @@ func TestRuntimeConfigDefaults(t *testing.T) {
 	if cfg.MaxHeavyJobs != 1 {
 		t.Fatalf("max heavy jobs=%d", cfg.MaxHeavyJobs)
 	}
-	if cfg.PresenceInterval != 10*time.Second {
+	if cfg.PresenceInterval != 4*time.Second {
 		t.Fatalf("presence interval=%s", cfg.PresenceInterval)
 	}
 	if cfg.DeviceDisconnectGrace != 30*time.Second {

@@ -19,7 +19,7 @@ const (
 	defaultBackupsRoot       = "/backups"
 	defaultMaxHeavyJobs      = 1
 	maxHeavyJobs             = 2
-	defaultPresenceInterval  = 10 * time.Second
+	defaultPresenceInterval  = 4 * time.Second
 	defaultDisconnectGrace   = 30 * time.Second
 	defaultSchedulerInterval = 30 * time.Second
 	defaultNetmuxdLogLevel   = "warn"
@@ -41,9 +41,14 @@ type Runtime struct {
 	EnableExperimentalOperations bool
 	InsecureAllowRemote          bool
 	AdminPasswordFile            string
+	SecretKey                    string
+	SecretKeyFile                string
 	MaxHeavyJobs                 int
 	PresenceInterval             time.Duration
 	DeviceDisconnectGrace        time.Duration
+	BackupPreparationTimeout     time.Duration
+	BackupInactivityTimeout      time.Duration
+	BackupAuthorizationTimeout   time.Duration
 	SchedulerInterval            time.Duration
 	NetmuxdLogLevel              string
 	WiFiBackend                  string
@@ -64,6 +69,9 @@ func Default() Runtime {
 		MaxHeavyJobs:                 defaultMaxHeavyJobs,
 		PresenceInterval:             defaultPresenceInterval,
 		DeviceDisconnectGrace:        defaultDisconnectGrace,
+		BackupPreparationTimeout:     30 * time.Minute,
+		BackupInactivityTimeout:      10 * time.Minute,
+		BackupAuthorizationTimeout:   5 * time.Minute,
 		SchedulerInterval:            defaultSchedulerInterval,
 		NetmuxdLogLevel:              defaultNetmuxdLogLevel,
 		WiFiBackend:                  WiFiBackendNetmuxd,
@@ -123,11 +131,24 @@ func Load(getenv func(string) string) (Runtime, error) {
 		}
 	}
 
-	if value := strings.TrimSpace(getenv("IOSBK_ADMIN_PASSWORD_FILE")); value != "" {
+	if raw := getenv("IOSBK_ADMIN_PASSWORD_FILE"); raw != "" {
+		value := strings.TrimSpace(raw)
 		cfg.AdminPasswordFile, err = cleanAbsolutePath("IOSBK_ADMIN_PASSWORD_FILE", value, true)
 		if err != nil {
 			return Runtime{}, err
 		}
+	}
+
+	cfg.SecretKey = getenv("IOSBK_SECRET_KEY")
+	if raw := getenv("IOSBK_SECRET_KEY_FILE"); raw != "" {
+		value := strings.TrimSpace(raw)
+		cfg.SecretKeyFile, err = cleanAbsolutePath("IOSBK_SECRET_KEY_FILE", value, true)
+		if err != nil {
+			return Runtime{}, err
+		}
+	}
+	if cfg.SecretKey != "" && cfg.SecretKeyFile != "" {
+		return Runtime{}, errors.New("IOSBK_SECRET_KEY 与 IOSBK_SECRET_KEY_FILE 不能同时配置")
 	}
 
 	if value := strings.TrimSpace(getenv("IOSBK_MAX_HEAVY_JOBS")); value != "" {
@@ -147,6 +168,21 @@ func Load(getenv func(string) string) (Runtime, error) {
 		cfg.DeviceDisconnectGrace, err = parseDurationRange("IOSBK_DEVICE_DISCONNECT_GRACE", value, 5*time.Second, 10*time.Minute)
 		if err != nil {
 			return Runtime{}, err
+		}
+	}
+	for _, item := range []struct {
+		name   string
+		target *time.Duration
+	}{
+		{"IOSBK_BACKUP_PREPARATION_TIMEOUT", &cfg.BackupPreparationTimeout},
+		{"IOSBK_BACKUP_INACTIVITY_TIMEOUT", &cfg.BackupInactivityTimeout},
+		{"IOSBK_BACKUP_AUTHORIZATION_TIMEOUT", &cfg.BackupAuthorizationTimeout},
+	} {
+		if value := strings.TrimSpace(getenv(item.name)); value != "" {
+			*item.target, err = parseDurationRange(item.name, value, time.Second, 24*time.Hour)
+			if err != nil {
+				return Runtime{}, err
+			}
 		}
 	}
 	if value := strings.TrimSpace(getenv("IOSBK_SCHEDULER_INTERVAL")); value != "" {

@@ -9,3 +9,17 @@ configs/notification_configs.json
 coverage.out
 coverage.html
 .DS_Store
+
+# 自动初始化凭据、环境配置和部署数据
+data/
+.env*
+configs/admin_password*
+configs/secret_key*
+configs/auth_credentials.json*
+configs/csrf_secret.json*
+configs/secrets.enc*
+configs/.admin_password-*
+configs/.secret_key-*
+configs/.auth_credentials.json-*
+configs/.csrf_secret.json-*
+configs/.secrets.enc-*

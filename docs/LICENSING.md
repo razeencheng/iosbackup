@@ -39,7 +39,7 @@ The repository also records architecture-specific runtime-closure snapshots. Eve
 
 ## Privacy boundary
 
-Embedded UI assets are local, there is no telemetry, and data is not automatically uploaded to the maintainer. Administrator-configured notification channels are the only designed Internet-facing third-party integrations. Wi-Fi operation still lets netmuxd discover devices on the local network, including through mDNS, and connect to reachable iOS devices; that traffic is not telemetry. See [PRIVACY.md](PRIVACY.md).
+Embedded UI assets are local, there is no telemetry, and data is not automatically uploaded to the maintainer. Only administrator-configured notifications are designed to connect to third-party Internet services. Wi-Fi operation still lets netmuxd discover devices on the local network, including through mDNS, and connect to reachable iOS devices; that traffic is not telemetry. See [PRIVACY.md](PRIVACY.md).
 
 ## 中文摘要
 
@@ -47,4 +47,4 @@ iOS Backup 项目源码采用 GNU Affero General Public License v3.0 only，SPDX
 
 贡献采用 inbound = outbound，不要求 CLA/DCO。许可证不授予商标权。运行中的页面与 `/api/version` 会显示版本、日期、commit、源码 URL 和许可证；官方 tag、镜像与公开源码必须一一对应。Go 应用只用标准库，但容器仍包含适用各自许可证的外部组件，具体见 [THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md) 与 [third_party/components.lock.json](../third_party/components.lock.json)。
 
-内嵌界面资源保存在本地，项目没有遥测，也不会自动向维护者上传数据。管理员配置的通知渠道是唯一设计用于连接互联网第三方服务的集成。使用 Wi-Fi 时，netmuxd 仍会在局域网内发现设备（包括 mDNS）并连接可达的 iOS 设备；这类通信不是遥测。详见 [PRIVACY.md](PRIVACY.md)。
+内嵌界面资源保存在本地，项目没有遥测，也不会自动向维护者上传数据。只有管理员自行配置的通知功能会按设计连接互联网第三方服务。使用 Wi-Fi 时，netmuxd 仍会在局域网内发现设备（包括 mDNS）并连接可达的 iOS 设备；这类通信不是遥测。详见 [PRIVACY.md](PRIVACY.md)。

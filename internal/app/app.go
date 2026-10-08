@@ -29,14 +29,16 @@ var templateFS embed.FS
 
 // Device 设备信息结构
 type device struct {
-	UDID         string    `json:"udid"`
-	Name         string    `json:"name"`
-	DeviceType   string    `json:"device_type"`
-	Connection   string    `json:"connection"`
-	LastBackup   time.Time `json:"last_backup"`
-	IsOnline     bool      `json:"is_online"`
-	BatteryLevel int       `json:"battery_level"`
-	IsCharging   bool      `json:"is_charging"`
+	UDID            string    `json:"udid"`
+	Name            string    `json:"name"`
+	DeviceType      string    `json:"device_type"`
+	Connection      string    `json:"connection"`
+	LastBackup      time.Time `json:"last_backup"`
+	IsOnline        bool      `json:"is_online"`
+	PresenceUnknown bool      `json:"presence_unknown"`
+	LastSeen        time.Time `json:"last_seen"`
+	BatteryLevel    int       `json:"battery_level"`
+	IsCharging      bool      `json:"is_charging"`
 }
 
 // BackupConfig 备份配置结构
@@ -117,36 +119,53 @@ type application struct {
 	enableExperimentalOperations bool
 	paths                        appPaths
 	// usbmuxd2 / netmuxd 进程监督句柄（均由 superviseMux 管理，单 goroutine + 单 cancel）
-	usbMuxLifecycleMu       sync.Mutex
-	usbMuxState             muxLifecycleState
-	usbMuxGeneration        uint64
-	usbmuxdCancel           context.CancelFunc // usbmuxd2 supervisor 取消
-	usbmuxdDone             chan struct{}      // usbmuxd2 supervisor 退出信号
-	netMuxLifecycleMu       sync.Mutex
-	netMuxState             muxLifecycleState
-	netMuxGeneration        uint64
-	netmuxdCancel           context.CancelFunc // netmuxd supervisor 取消
-	netmuxdDone             chan struct{}      // netmuxd supervisor 退出信号
-	muxRestartMu            sync.Mutex
-	muxRestartInProgress    bool
-	mu                      sync.RWMutex
-	htmlTemplate            *template.Template
-	loginTemplate           *template.Template
-	onboardingTemplate      *template.Template
-	backupInProgress        map[string]bool // 跟踪正在备份的设备
-	checkInProgress         map[string]bool // 跟踪正在检查备份条件的设备
-	deviceOperationStates   map[string]deviceOperationState
-	backupProgress          map[string]backupProgress
-	backupProgressBroadcast map[string]time.Time
-	notificationManager     *notificationManager // 通知管理器
-	notificationConfigStore *notificationConfigStore
-	secretStore             secretStore // 备份密码加密存储（缺密钥时为降级 store；测试中可能为 nil）
+	usbMuxLifecycleMu         sync.Mutex
+	usbMuxState               muxLifecycleState
+	usbMuxGeneration          uint64
+	usbmuxdCancel             context.CancelFunc // usbmuxd2 supervisor 取消
+	usbmuxdDone               chan struct{}      // usbmuxd2 supervisor 退出信号
+	netMuxLifecycleMu         sync.Mutex
+	netMuxState               muxLifecycleState
+	netMuxGeneration          uint64
+	netmuxdCancel             context.CancelFunc // netmuxd supervisor 取消
+	netmuxdDone               chan struct{}      // netmuxd supervisor 退出信号
+	muxRestartMu              sync.Mutex
+	connectionClosed          bool
+	connectionRecoveryWorkers sync.WaitGroup
+	connectionRefreshPending  bool
+	connectionRefreshRevision uint64
+	connectionPublishMu       sync.Mutex
+	connectionServices        [2]connectionService
+	connectionFlights         [2]*connectionFlight
+	connectionRevision        uint64
+	connectionRecoveryActive  bool
+	connectionTasks           int
+	detailRefreshMu           sync.Mutex
+	mu                        sync.RWMutex
+	htmlTemplate              *template.Template
+	loginTemplate             *template.Template
+	onboardingTemplate        *template.Template
+	backupInProgress          map[string]bool // 跟踪正在备份的设备
+	checkInProgress           map[string]bool // 跟踪正在检查备份条件的设备
+	deviceOperationStates     map[string]deviceOperationState
+	backupProgress            map[string]backupProgress
+	backupProgressBroadcast   map[string]time.Time
+	notificationManager       *notificationManager // 通知管理器
+	notificationConfigStore   *notificationConfigStore
+	secretStore               secretStore // 备份密码加密存储（缺密钥时为降级 store；测试中可能为 nil）
 	// cmdRunner 可注入的 exec runner（nil 时使用 defaultCmdRunner）；测试时注入 mock
 	cmdRunner cmdRunner
 	// streamCmdRunner 用于长时间/大输出命令；nil 时使用真实流式 exec。
 	streamCmdRunner streamCmdRunner
+	// backupCommand 是外部备份工具的构造边界；nil 时执行固定路径的真实工具。
+	backupCommand func(context.Context, string, ...string) *execCmd
 	// reachProbe 可注入的 IP 可达性探测（nil 时使用真实 wifiReachable）；测试时注入避免真实拨号
 	reachProbe func(ip string) (bool, string)
+	// networkIPLookup 测试可注入 netmuxd 的地址快照；生产读取 ListDevices。
+	networkIPLookup      func(context.Context) (map[string]string, error)
+	networkRecoveryMu    sync.Mutex                      // 单次恢复循环串行，网络 I/O 不占用 app.mu
+	networkRecovery      map[string]networkRecoveryState // app.mu 保护；仅内存缓存
+	networkRegistrations map[string]bool                 // app.mu 保护；同一设备禁止重复注册
 	// muxProcFactory 可注入的进程工厂（nil 时使用真实 exec）；测试时注入 fake
 	muxProcFactory func(ctx context.Context, name string, args ...string) muxProcess
 	// powerAssertionStarter 启动 Wi-Fi WirelessSync assertion helper；测试时注入 fake。

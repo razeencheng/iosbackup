@@ -4,6 +4,7 @@ import (
 	"math"
 	"net/netip"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -34,7 +35,7 @@ func TestLoadDefaults(t *testing.T) {
 	if cfg.InsecureAllowRemote || cfg.AdminPasswordFile != "" || cfg.MinFreeBytes != 0 {
 		t.Fatalf("unexpected opt-in defaults: insecure=%v password=%q min-free=%d", cfg.InsecureAllowRemote, cfg.AdminPasswordFile, cfg.MinFreeBytes)
 	}
-	if cfg.PresenceInterval != 10*time.Second {
+	if cfg.PresenceInterval != 4*time.Second {
 		t.Fatalf("presence interval=%s", cfg.PresenceInterval)
 	}
 	if cfg.DeviceDisconnectGrace != 30*time.Second {
@@ -278,6 +279,8 @@ func TestNewPathsDerivesAllWritablePaths(t *testing.T) {
 		NotificationConfigFile: "/srv/config/notification_configs.json",
 		SecretsFile:            "/srv/config/secrets.enc",
 		AuthCredentialsFile:    "/srv/config/auth_credentials.json",
+		AdminPasswordFile:      "/srv/config/admin_password",
+		SecretKeyFile:          "/srv/config/secret_key",
 		CSRFSecretFile:         "/srv/config/csrf_secret.json",
 	}
 	if !reflect.DeepEqual(paths, want) {
@@ -291,4 +294,66 @@ func mapEnv(values map[string]string) func(string) string {
 
 func mustPrefix(value string) netip.Prefix {
 	return netip.MustParsePrefix(value)
+}
+
+func TestBackupTimeoutConfiguration(t *testing.T) {
+	values := map[string]string{"IOSBK_BACKUP_PREPARATION_TIMEOUT": "45m", "IOSBK_BACKUP_INACTIVITY_TIMEOUT": "12m", "IOSBK_BACKUP_AUTHORIZATION_TIMEOUT": "7m"}
+	cfg, err := config.Load(func(key string) string { return values[key] })
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.BackupPreparationTimeout != 45*time.Minute || cfg.BackupInactivityTimeout != 12*time.Minute || cfg.BackupAuthorizationTimeout != 7*time.Minute {
+		t.Fatalf("timeouts not loaded: %+v", cfg)
+	}
+	for key := range values {
+		for _, value := range []string{"0", "-1s", "25h", "bad"} {
+			_, err := config.Load(func(k string) string {
+				if k == key {
+					return value
+				}
+				return ""
+			})
+			if err == nil {
+				t.Errorf("%s=%s should fail startup validation", key, value)
+			}
+		}
+	}
+}
+
+func TestSecretKeyRuntimeSources(t *testing.T) {
+	for _, values := range []map[string]string{
+		{}, {"IOSBK_SECRET_KEY": "  ", "IOSBK_SECRET_KEY_FILE": ""},
+		{"IOSBK_SECRET_KEY": "encoded-key"}, {"IOSBK_SECRET_KEY_FILE": " /run/secrets/key "},
+	} {
+		cfg, err := config.Load(mapEnv(values))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if cfg.SecretKey != values["IOSBK_SECRET_KEY"] || cfg.SecretKeyFile != strings.TrimSpace(values["IOSBK_SECRET_KEY_FILE"]) {
+			t.Fatal("配置源没有正确解析")
+		}
+	}
+	for _, values := range []map[string]string{
+		{"IOSBK_SECRET_KEY": "encoded-key", "IOSBK_SECRET_KEY_FILE": "/run/secrets/key"},
+		{"IOSBK_SECRET_KEY_FILE": "relative"}, {"IOSBK_SECRET_KEY_FILE": "/"},
+	} {
+		if _, err := config.Load(mapEnv(values)); err == nil {
+			t.Fatal("冲突或非法路径应被拒绝")
+		}
+	}
+}
+
+func TestExplicitSecretFileWhitespaceIsNotUnset(t *testing.T) {
+	for _, name := range []string{"IOSBK_ADMIN_PASSWORD_FILE", "IOSBK_SECRET_KEY_FILE"} {
+		t.Run(name, func(t *testing.T) {
+			for _, value := range []string{" ", "\t\n"} {
+				if _, err := config.Load(mapEnv(map[string]string{name: value})); err == nil {
+					t.Fatalf("非空的非法显式%s不能回退默认生成", name)
+				}
+			}
+			if _, err := config.Load(mapEnv(map[string]string{name: ""})); err != nil {
+				t.Fatalf("只有空串视为未设置: %v", err)
+			}
+		})
+	}
 }

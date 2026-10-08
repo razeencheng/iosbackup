@@ -65,6 +65,18 @@
     });
   }
 
+  function connectionProblem() {
+    var service=(snapshot.connection_services||[]).find(function(item){return item.connection==='usb';});
+    if(!service) return '';
+    var zh=lang==='zh';
+    if(service.recovery==='restarting') return zh?'正在恢复 USB 连接服务，请稍候。':'Restoring the USB connection service. Please wait.';
+    if(service.recovery==='waiting_busy') return zh?'连接服务异常，等待当前设备任务结束后恢复。':'Waiting for current device tasks to finish before recovering the connection service.';
+    if(service.recovery==='manual_required') return zh?'USB 连接服务自动恢复失败，请返回控制台查看状态。':'USB connection recovery failed. Return to the console to check its status.';
+    if(service.recovery==='backoff') return zh?'USB 连接服务恢复失败，稍后自动重试。':'USB connection recovery failed. Another attempt is scheduled.';
+    if(service.health==='unknown') return zh?'正在检查 USB 连接服务…':'Checking the USB connection service…';
+    if(service.health!=='healthy') return zh?'USB 连接服务异常，设备状态暂时无法确认。':'USB connection service is unavailable. Device status is temporarily unknown.';
+    return '';
+  }
   function selectedDevice() { return snapshot.devices.find(function (device) { return device.udid === selectedUDID; }) || null; }
   function usbDevices() { return snapshot.devices.filter(function (device) { return device.online && device.conn === 'usb'; }); }
   function completedCount() {
@@ -72,7 +84,7 @@
     var count = 1;
     var device = selectedDevice();
     if (device && device.conn === 'usb' && device.online) count = Math.max(count, 2);
-    if (device && device.pairing_state === 'paired') count = Math.max(count, 3);
+    if (device && device.presence_known!==false && device.pairing_state === 'paired') count = Math.max(count, 3);
     if (device && device.backup_state === 'succeeded' && device.last_backup) count = 4;
     return count;
   }
@@ -136,9 +148,14 @@
     if (state === 'checking') { title = c.pairChecking; badge = c.checking; }
     if (state === 'paired') { title = c.pairPaired; detail = device.name || ''; badge = c.paired; }
     if (state === 'failed') { title = c.pairFailed; detail = device.pairing_error || device.pairing_error_code || ''; badge = c.failed; }
+    var problem=connectionProblem();
+    if(problem){ title=lang==='zh'?'连接服务暂时不可用':'Connection service unavailable';detail=problem;badge=c.failed; }
+    document.getElementById('checkPair').disabled=!!problem || !device || device.operations_available===false;
+    document.querySelector('.password-grid').hidden=!!problem;
+    text('s3Title',problem?title:c.s3Title);text('s3Lead',problem||c.s3Lead);
     text('pairTitle', title); text('pairDetail', detail); text('pairState', badge);
     var error = document.getElementById('pairError');
-    error.hidden = state !== 'failed';
+    error.hidden = !!problem || state !== 'failed';
     error.textContent = detail;
     text('checkPair', state === 'failed' ? c.retryPair : c.checkPair);
   }
@@ -160,7 +177,7 @@
     error.hidden = state !== 'failed' && state !== 'interrupted';
     error.textContent = detail;
     var button = document.getElementById('startBackup');
-    button.disabled = state === 'starting' || state === 'running' || !device || device.pairing_state !== 'paired';
+    button.disabled = state === 'starting' || state === 'running' || !device || device.presence_known===false || device.operations_available===false || device.pairing_state !== 'paired';
     button.textContent = state === 'succeeded' && device && device.last_backup ? c.finish : ((state === 'failed' || state === 'interrupted') ? c.retryBackup : c.start);
   }
 
@@ -198,6 +215,8 @@
     } else {
       text('usbTitle', c.usbWaiting); text('usbDetail', c.usbWaitingDetail); text('usbState', c.listening);
     }
+    var problem=connectionProblem();
+    if(problem){ text('usbTitle',lang==='zh'?'连接服务暂时不可用':'Connection service unavailable');text('usbDetail',problem);text('usbState',c.failed);text('s2Lead',problem); } else {text('s2Lead',c.s2Lead);}
     pairingMessage(device);
     text('deviceName', device ? (device.name || c.deviceFallback) : c.deviceFallback);
     text('deviceMeta', device ? ((device.device_type || 'iOS') + ' · ' + (device.battery || 0) + '%') : c.deviceWaiting);

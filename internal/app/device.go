@@ -1,7 +1,6 @@
 package app
 
 import (
-	"context"
 	"fmt"
 	"log"
 	"os"
@@ -81,155 +80,65 @@ func isNetworkConnection(connectionDesc string) bool {
 
 // RefreshDevices 刷新设备列表
 func (app *application) RefreshDevices() error {
-	// 锁内只取快照；任何设备命令都在锁外运行。
+	release, err := app.beginConnectionTask(nil)
+	if err != nil {
+		return err
+	}
+	defer release()
 	app.mu.Lock()
 	if len(app.backupInProgress) > 0 {
-		var backupDevices []string
-		for udid := range app.backupInProgress {
-			if deviceName, exists := app.devices[udid]; exists {
-				backupDevices = append(backupDevices, deviceName.Name)
-			} else {
-				// 安全的UDID截取
-				udidPrefix := udid
-				if len(udid) > 8 {
-					udidPrefix = udid[:8]
-				}
-				backupDevices = append(backupDevices, udidPrefix+"...")
-			}
-		}
-		app.addLog("SYSTEM", fmt.Sprintf("刷新被阻止：%d 台设备正在备份中 (%s)", len(app.backupInProgress), strings.Join(backupDevices, ", ")))
 		app.mu.Unlock()
-		return fmt.Errorf("有 %d 台设备正在备份中，请等待备份完成后再刷新", len(app.backupInProgress))
+		return fmt.Errorf("设备正在执行任务，请稍后刷新")
 	}
 	app.deviceRefreshGeneration++
 	generation := app.deviceRefreshGeneration
-	existing := make(map[string]*device, len(app.devices))
-	for udid, device := range app.devices {
+	for udid, d := range app.loadPairedDevices() {
 		if app.isDeviceRemovedUnsafe(udid) || app.deviceRemovalPending[udid] {
 			continue
 		}
-		existing[udid] = cloneDevice(device)
-	}
-	removed := make(map[string]struct{})
-	for udid, config := range app.configs {
-		if (config != nil && config.RemovedAt != nil) || app.deviceRemovalPending[udid] {
-			removed[udid] = struct{}{}
-		}
-	}
-	app.mu.Unlock()
-
-	app.mu.RLock()
-	pairedDevices := app.loadPairedDevices()
-	app.mu.RUnlock()
-	for udid := range removed {
-		delete(pairedDevices, udid)
-	}
-
-	nextDevices := existing
-	for _, device := range nextDevices {
-		device.IsOnline = false
-	}
-	for udid, pairedDevice := range pairedDevices {
-		if existingDevice, exists := nextDevices[udid]; exists {
-			// 保留重要的运行时数据
-			pairedDevice.LastBackup = existingDevice.LastBackup
-			pairedDevice.Name = existingDevice.Name // 保留已知的设备名称
-		}
-		nextDevices[udid] = pairedDevice
-	}
-
-	// 使用双 socket 查询：USB（usbmuxd2 默认 socket）+ 网络（netmuxd socket）
-	// USB 列表用 idevice_id -l（不加 -n），网络列表用 netmuxd env 的 idevice_id -l -n
-	// 同 UDID 同时在线时 USB 优先
-	usbList, netList := app.listDevicesFromBothSockets()
-	onlineMap := mergeDeviceLists(usbList, netList)
-	for udid := range removed {
-		delete(onlineMap, udid)
-	}
-
-	hasNewDevices := false
-
-	for udid, onlineDev := range onlineMap {
-		// 如果设备已在列表中，更新为在线状态
-		var currentDevice *device
-		if existingDevice, exists := nextDevices[udid]; exists {
-			currentDevice = existingDevice
-			currentDevice.IsOnline = true
-		} else {
-			currentDevice = &device{
-				UDID:     udid,
-				IsOnline: true,
-			}
-			nextDevices[udid] = currentDevice
-		}
-
-		currentDevice.Connection = onlineDev.Connection
-
-		// 获取设备详细信息（通过 runIdeviceCmd）
-		app.getDeviceInfo(currentDevice)
-	}
-
-	app.mu.Lock()
-	if app.deviceRefreshGeneration != generation {
-		app.mu.Unlock()
-		return nil
-	}
-	// 刷新期间可能刚完成移除；发布前以当前配置再过滤一次，避免旧快照复活设备。
-	for udid := range nextDevices {
-		if app.isDeviceRemovedUnsafe(udid) || app.deviceRemovalPending[udid] {
-			delete(nextDevices, udid)
-		}
-	}
-	app.devices = nextDevices
-	for udid := range pairedDevices {
-		if app.isDeviceRemovedUnsafe(udid) || app.deviceRemovalPending[udid] {
-			continue
+		if app.devices[udid] == nil {
+			app.devices[udid] = d
 		}
 		state := app.deviceOperationStates[udid]
 		if state.PairingState == "" || state.PairingState == pairingStateUnknown {
 			state.PairingState = pairingStatePaired
-			state.PairingErrorCode = ""
-			state.PairingError = ""
 			app.deviceOperationStates[udid] = state
 		}
 	}
-	for udid, device := range nextDevices {
-		if app.ensureConfigUnsafe(udid, device.Name) {
-			hasNewDevices = true
-		}
-		if config := app.configs[udid]; config != nil && config.RemovedAt == nil && device.DeviceType != "" && config.DeviceType != device.DeviceType {
-			config.DeviceType = device.DeviceType
-			hasNewDevices = true
-		}
-	}
-	pairQueue := make([]device, 0, len(nextDevices))
-	onlineDeviceCount := 0
-	for _, device := range nextDevices {
-		if device.IsOnline {
-			onlineDeviceCount++
-			pairQueue = append(pairQueue, *device)
-		}
-	}
-	totalDevices := len(nextDevices)
 	app.mu.Unlock()
-
-	for _, device := range pairQueue {
-		go app.pairDeviceAndUpdateInfo(device, generation)
+	app.scanConnections(app.rootCtx)
+	app.mu.RLock()
+	var queue []device
+	for _, d := range app.devices {
+		if d.IsOnline && !d.PresenceUnknown {
+			queue = append(queue, *d)
+		}
 	}
-
-	offlineDevices := totalDevices - onlineDeviceCount
-
-	app.addLog("SYSTEM", fmt.Sprintf("刷新设备列表完成，总计 %d 台设备（在线 %d 台，离线 %d 台）", totalDevices, onlineDeviceCount, offlineDevices))
-
-	if hasNewDevices {
-		go app.saveConfigs()
+	app.mu.RUnlock()
+	for _, d := range queue {
+		app.pairDeviceAndUpdateInfoInTask(d, generation)
 	}
-
+	app.mu.RLock()
+	_, _, valid := app.connectionListsUnsafe()
+	app.mu.RUnlock()
+	if !valid[0] || !valid[1] {
+		return errConnectionUnavailable
+	}
 	return nil
 }
 
 // pairDeviceAndUpdateInfo 检查并配对设备，成功后更新设备信息和配置
 func (app *application) pairDeviceAndUpdateInfo(device device, generation uint64) {
+	release, err := app.beginConnectionTask(&device)
+	if err != nil {
+		return
+	}
+	defer release()
+	app.pairDeviceAndUpdateInfoInTask(device, generation)
+}
+
+func (app *application) pairDeviceAndUpdateInfoInTask(device device, generation uint64) {
+	epoch := app.connectionEpoch(&device)
 	app.mu.RLock()
 	blocked := app.deviceRemovalBlockedUnsafe(device.UDID) != nil
 	app.mu.RUnlock()
@@ -237,15 +146,15 @@ func (app *application) pairDeviceAndUpdateInfo(device device, generation uint64
 		return
 	}
 	// 先尝试配对
-	app.pairDevice(&device)
+	app.pairDeviceInTask(&device)
 
 	// 配对完成后重新获取设备信息
-	app.getDeviceInfo(&device)
+	app.getDeviceInfoInTask(&device)
 
 	// 更新配置中的设备名称
 	var needSaveConfig bool
 	app.mu.Lock()
-	if app.deviceRefreshGeneration == generation {
+	if app.deviceRefreshGeneration == generation && app.connectionEpochUnsafe(&device) == epoch {
 		if current, exists := app.devices[device.UDID]; exists && current.Connection == device.Connection {
 			current.Name = device.Name
 			current.DeviceType = device.DeviceType
@@ -254,7 +163,7 @@ func (app *application) pairDeviceAndUpdateInfo(device device, generation uint64
 		}
 	}
 	if config, exists := app.configs[device.UDID]; exists &&
-		app.deviceRefreshGeneration == generation &&
+		app.deviceRefreshGeneration == generation && app.connectionEpochUnsafe(&device) == epoch &&
 		config.RemovedAt == nil &&
 		!app.deviceRemovalPending[device.UDID] {
 		if device.Name != "Unknown Device" && device.Name != "" {
@@ -279,8 +188,10 @@ func (app *application) setPairingState(udid, stateCode, errorCode, message stri
 	app.mu.Lock()
 	state := app.deviceOperationStates[udid]
 	state.PairingState = stateCode
-	state.PairingErrorCode = errorCode
-	state.PairingError = message
+	if stateCode != pairingStateChecking {
+		state.PairingErrorCode = errorCode
+		state.PairingError = message
+	}
 	app.deviceOperationStates[udid] = state
 	app.mu.Unlock()
 	app.broadcastStatus()
@@ -296,43 +207,56 @@ func pairingFailureMessage(output string) string {
 // pairDevice 检查并配对设备（通过 runIdeviceCmd，自动注入 socket 和 -n）。
 // 所有用户可见结果都写入结构化状态，由 /api/events 发布。
 func (app *application) pairDevice(device *device) {
+	release, err := app.beginConnectionTask(device)
+	if err != nil {
+		return
+	}
+	defer release()
+	app.pairDeviceInTask(device)
+}
+
+func (app *application) pairDeviceInTask(device *device) {
 	if device == nil || device.UDID == "" {
 		return
 	}
 	if app.deviceRemovalBlock(device.UDID) != nil {
 		return
 	}
-	app.setPairingState(device.UDID, pairingStateChecking, "", "")
+	setState := app.pairingStatePublisher(device)
+	setState(device.UDID, pairingStateChecking, "", "")
 	app.addDebugLog(device.UDID, "正在检查设备配对状态...")
 
 	// 首先检查设备配对状态（短命令）
-	_, err := app.runIdeviceCmd(context.Background(), cmdKindShort, device, cmdIdevicePair, "validate")
+	_, err := app.runIdeviceCmd(app.rootCtx, cmdKindShort, device, cmdIdevicePair, "validate")
 	if err == nil {
 		app.addDebugLog(device.UDID, "设备已配对，配对状态正常")
-		app.setPairingState(device.UDID, pairingStatePaired, "", "")
+		setState(device.UDID, pairingStatePaired, "", "")
 		return
 	}
 
 	app.addInfoLog(device.UDID, "设备未配对，开始自动配对...")
 
 	// 尝试配对设备（短命令）
-	output, err := app.runIdeviceCmd(context.Background(), cmdKindShort, device, cmdIdevicePair, "pair")
+	output, err := app.runIdeviceCmd(app.rootCtx, cmdKindShort, device, cmdIdevicePair, "pair")
 	outputStr := strings.TrimSpace(string(output))
 
 	if err != nil {
 		if strings.Contains(outputStr, "Please accept the trust dialog") {
 			app.addWarnLog(device.UDID, "配对需要用户确认：请在设备上点击'信任此电脑'")
-			app.setPairingState(device.UDID, pairingStateWaitingForTrust, "trust_required", "请在设备上点击“信任此电脑”并输入设备锁屏密码")
+			setState(device.UDID, pairingStateWaitingForTrust, "trust_required", "请在设备上点击“信任此电脑”并输入设备锁屏密码")
 			go app.retryPairAfterTrust(device.UDID)
 		} else if strings.Contains(outputStr, "already paired") {
-			app.addDebugLog(device.UDID, "设备已经配对")
-			app.setPairingState(device.UDID, pairingStatePaired, "", "")
+			if _, verifyErr := app.runIdeviceCmd(app.rootCtx, cmdKindShort, device, cmdIdevicePair, "validate"); verifyErr == nil {
+				setState(device.UDID, pairingStatePaired, "", "")
+			} else {
+				setState(device.UDID, pairingStateFailed, "pair_validation_failed", pairingFailureMessage(verifyErr.Error()))
+			}
 		} else {
 			app.addErrorLog(device.UDID, fmt.Sprintf("配对失败: %s", outputStr))
 			if outputStr == "" {
 				outputStr = err.Error()
 			}
-			app.setPairingState(device.UDID, pairingStateFailed, "pair_failed", pairingFailureMessage(outputStr))
+			setState(device.UDID, pairingStateFailed, "pair_failed", pairingFailureMessage(outputStr))
 		}
 		return
 	}
@@ -340,13 +264,13 @@ func (app *application) pairDevice(device *device) {
 	app.addInfoLog(device.UDID, "设备配对成功")
 
 	// 验证配对结果
-	_, err = app.runIdeviceCmd(context.Background(), cmdKindShort, device, cmdIdevicePair, "validate")
+	_, err = app.runIdeviceCmd(app.rootCtx, cmdKindShort, device, cmdIdevicePair, "validate")
 	if err == nil {
 		app.addLog(device.UDID, "配对验证成功，设备可以正常使用")
-		app.setPairingState(device.UDID, pairingStatePaired, "", "")
+		setState(device.UDID, pairingStatePaired, "", "")
 	} else {
 		app.addLog(device.UDID, "配对验证失败，可能需要手动重新配对")
-		app.setPairingState(device.UDID, pairingStateFailed, "pair_validation_failed", pairingFailureMessage(err.Error()))
+		setState(device.UDID, pairingStateFailed, "pair_validation_failed", pairingFailureMessage(err.Error()))
 	}
 }
 
@@ -370,6 +294,14 @@ func (app *application) retryPairAfterTrustWithSchedule(udid string, interval ti
 		return
 	}
 
+	release, err := app.beginConnectionTask(device)
+	if err != nil {
+		return
+	}
+	defer release()
+	epoch := app.connectionEpoch(device)
+	setState := app.pairingStatePublisher(device)
+
 	for i := 0; i < maxRetries; i++ {
 		timer := time.NewTimer(interval)
 		select {
@@ -379,35 +311,37 @@ func (app *application) retryPairAfterTrustWithSchedule(udid string, interval ti
 		case <-timer.C:
 		}
 
+		if app.connectionEpoch(device) != epoch {
+			return
+		}
 		// 检查配对状态
-		_, err := app.runIdeviceCmd(context.Background(), cmdKindShort, device, cmdIdevicePair, "validate")
+		_, err := app.runIdeviceCmd(app.rootCtx, cmdKindShort, device, cmdIdevicePair, "validate")
 		if err == nil {
 			app.addLog(udid, "设备信任确认成功，配对完成")
-			app.setPairingState(udid, pairingStatePaired, "", "")
+			setState(udid, pairingStatePaired, "", "")
 			return
 		}
 
 		// 重试配对
-		output, err := app.runIdeviceCmd(context.Background(), cmdKindShort, device, cmdIdevicePair, "pair")
+		output, err := app.runIdeviceCmd(app.rootCtx, cmdKindShort, device, cmdIdevicePair, "pair")
 		outputStr := strings.TrimSpace(string(output))
 
-		if err == nil {
-			app.addLog(udid, "设备配对成功")
-			app.setPairingState(udid, pairingStatePaired, "", "")
+		if err == nil || strings.Contains(outputStr, "already paired") {
+			if _, verifyErr := app.runIdeviceCmd(app.rootCtx, cmdKindShort, device, cmdIdevicePair, "validate"); verifyErr == nil {
+				app.addLog(udid, "设备配对验证成功")
+				setState(udid, pairingStatePaired, "", "")
+			} else {
+				setState(udid, pairingStateFailed, "pair_validation_failed", pairingFailureMessage(verifyErr.Error()))
+			}
 			return
 		}
 
 		if !strings.Contains(outputStr, "Please accept the trust dialog") {
-			if strings.Contains(outputStr, "already paired") {
-				app.addLog(udid, "设备已经配对")
-				app.setPairingState(udid, pairingStatePaired, "", "")
-				return
-			}
 			app.addLog(udid, fmt.Sprintf("配对失败: %s", outputStr))
 			if outputStr == "" {
 				outputStr = err.Error()
 			}
-			app.setPairingState(udid, pairingStateFailed, "pair_failed", pairingFailureMessage(outputStr))
+			setState(udid, pairingStateFailed, "pair_failed", pairingFailureMessage(outputStr))
 			return
 		}
 
@@ -415,13 +349,22 @@ func (app *application) retryPairAfterTrustWithSchedule(udid string, interval ti
 	}
 
 	app.addLog(udid, "配对超时，请手动在设备上点击'信任此电脑'后重新刷新设备列表")
-	app.setPairingState(udid, pairingStateFailed, "pair_timeout", "等待设备确认信任超时，请确认后重试")
+	setState(udid, pairingStateFailed, "pair_timeout", "等待设备确认信任超时，请确认后重试")
 }
 
 // getDeviceInfo 获取设备详细信息（通过 runIdeviceCmd，自动注入 socket 和 -n）
 func (app *application) getDeviceInfo(device *device) {
+	release, err := app.beginConnectionTask(device)
+	if err != nil {
+		return
+	}
+	defer release()
+	app.getDeviceInfoInTask(device)
+}
+
+func (app *application) getDeviceInfoInTask(device *device) {
 	// 获取设备名称（短命令）
-	if output, err := app.runIdeviceCmd(context.Background(), cmdKindShort, device, cmdIdeviceInfo, "-k", "DeviceName"); err == nil {
+	if output, err := app.runIdeviceCmd(app.rootCtx, cmdKindShort, device, cmdIdeviceInfo, "-k", "DeviceName"); err == nil {
 		deviceName := strings.TrimSpace(string(output))
 		if deviceName != "" && deviceName != device.Name {
 			device.Name = deviceName
@@ -434,19 +377,19 @@ func (app *application) getDeviceInfo(device *device) {
 	}
 
 	// 获取设备类型
-	if output, err := app.runIdeviceCmd(context.Background(), cmdKindShort, device, cmdIdeviceInfo, "-k", "ProductType"); err == nil {
+	if output, err := app.runIdeviceCmd(app.rootCtx, cmdKindShort, device, cmdIdeviceInfo, "-k", "ProductType"); err == nil {
 		device.DeviceType = strings.TrimSpace(string(output))
 	}
 
 	// 获取电池信息（使用正确的 domain，不变）
-	if output, err := app.runIdeviceCmd(context.Background(), cmdKindShort, device, cmdIdeviceInfo, "-q", "com.apple.mobile.battery", "-k", "BatteryCurrentCapacity"); err == nil {
+	if output, err := app.runIdeviceCmd(app.rootCtx, cmdKindShort, device, cmdIdeviceInfo, "-q", "com.apple.mobile.battery", "-k", "BatteryCurrentCapacity"); err == nil {
 		if level, err := strconv.Atoi(strings.TrimSpace(string(output))); err == nil {
 			device.BatteryLevel = level
 		}
 	}
 
 	// 获取充电状态（使用正确的 domain，不变）
-	if output, err := app.runIdeviceCmd(context.Background(), cmdKindShort, device, cmdIdeviceInfo, "-q", "com.apple.mobile.battery", "-k", "ExternalConnected"); err == nil {
+	if output, err := app.runIdeviceCmd(app.rootCtx, cmdKindShort, device, cmdIdeviceInfo, "-q", "com.apple.mobile.battery", "-k", "ExternalConnected"); err == nil {
 		device.IsCharging = strings.TrimSpace(string(output)) == "true"
 	}
 

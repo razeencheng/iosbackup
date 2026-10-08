@@ -40,6 +40,6 @@ body:
     id: safety
     attributes:
       label: Compatibility and safety considerations
-      description: Note effects on existing HTTP/configuration contracts, stored backups, privileges, and Core/Preview/Experimental status.
+      description: Note effects on existing HTTP/configuration contracts, stored backups, privileges, and feature support boundaries.
     validations:
       required: true

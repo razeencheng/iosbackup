@@ -8,11 +8,11 @@ func TestDevelopmentDefaults(t *testing.T) {
 		got  string
 		want string
 	}{
-		{name: "version", got: Version, want: "v1.5.0-beta.1"},
+		{name: "version", got: Version, want: "v1.5.4"},
 		{name: "build date", got: BuildDate, want: "unknown"},
 		{name: "commit", got: Commit, want: "unknown"},
 		{name: "source URL", got: SourceURL, want: "https://github.com/razeencheng/iosbackup"},
-		{name: "description", got: Description, want: "Balanced package layout for the public Docker Beta"},
+		{name: "description", got: Description, want: "Verified multi-architecture releases to GHCR and Docker Hub"},
 		{name: "license", got: LicenseID, want: "AGPL-3.0-only"},
 	}
 

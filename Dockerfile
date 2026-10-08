@@ -99,13 +99,23 @@ RUN git clone https://github.com/libimobiledevice/libtatsu.git && \
 
 # Clone and build libimobiledevice (master 以支持 iPadOS 26)
 COPY third_party/patches/libimobiledevice/afc-return-after-receive-error.patch /build/patches/libimobiledevice-afc-return-after-receive-error.patch
+COPY third_party/patches/libimobiledevice/backup-activity-records.patch /build/patches/libimobiledevice-backup-activity-records.patch
 ARG LIBIMD_REF
 RUN git clone https://github.com/libimobiledevice/libimobiledevice.git && \
     cd libimobiledevice && { [ -z "$LIBIMD_REF" ] || git checkout "$LIBIMD_REF"; } && \
     patch -p1 < /build/patches/libimobiledevice-afc-return-after-receive-error.patch && \
+    patch -p1 < /build/patches/libimobiledevice-backup-activity-records.patch && \
     ./autogen.sh --without-cython && \
     make && \
     make install
+
+# 验证活动报告的真实 C 调用顺序：模拟协议 I/O，无需设备或网络。
+COPY tools/backup_activity_test.c /build/iosbk-tools/backup_activity_test.c
+RUN cc -DHAVE_CONFIG_H -I/build/libimobiledevice -I/build/libimobiledevice/tools \
+        -I/build/libimobiledevice/include -I/build/libimobiledevice/common \
+        /build/iosbk-tools/backup_activity_test.c -o /build/iosbk-tools/backup_activity_test \
+        $(pkg-config --cflags --libs libimobiledevice-1.0 libimobiledevice-glue-1.0 libplist-2.0) && \
+    LD_LIBRARY_PATH=/usr/local/lib /build/iosbk-tools/backup_activity_test
 
 # 独立 Wireless Sync Power Assertion 诊断工具。协议/TLS/长度帧复用锁定版
 # libimobiledevice 的 public property_list_service API；先运行纯请求构造测试再安装工具。

@@ -1,26 +1,27 @@
 services:
   iosbackup:
-    image: ${IOSBK_IMAGE:-ghcr.io/razeencheng/iosbackup:v1.5.0-beta.1}
+    image: ghcr.io/razeencheng/iosbackup:latest
     container_name: iosbackup
     network_mode: host
     privileged: true
     restart: unless-stopped
     stop_grace_period: 20s
-    read_only: true
     tmpfs:
       - /tmp:size=64m,mode=1777
       - /var/run:size=16m,mode=0755
     environment:
-      PORT: "${IOSBK_PORT:-9000}"
-      LOG_LEVEL: "${IOSBK_LOG_LEVEL:-INFO}"
+      PORT: "9000"
+      LOG_LEVEL: "INFO"
       IOSBK_LISTEN_ADDR: "0.0.0.0"
       IOSBK_AUTH_ENABLED: "true"
-      IOSBK_ADMIN_PASSWORD_FILE: "/configs/admin_password"
-      IOSBK_SECRET_KEY: "${IOSBK_SECRET_KEY:?set IOSBK_SECRET_KEY to base64-encoded 32 bytes}"
+      # 默认自动生成密码和主密钥；仅在需要自定义凭据时设置以下选项。
+      IOSBK_ADMIN_PASSWORD_FILE: "${IOSBK_ADMIN_PASSWORD_FILE:-}"
+      IOSBK_SECRET_KEY: "${IOSBK_SECRET_KEY:-}"
+      IOSBK_SECRET_KEY_FILE: "${IOSBK_SECRET_KEY_FILE:-}"
       IOSBK_CONFIGS_DIR: "/configs"
       IOSBK_BACKUPS_DIR: "/backups"
-      IOSBK_DEVICE_DISCONNECT_GRACE: "${IOSBK_DEVICE_DISCONNECT_GRACE:-30s}"
-      IOSBK_ENABLE_EXPERIMENTAL_OPERATIONS: "${IOSBK_ENABLE_EXPERIMENTAL_OPERATIONS:-false}"
+      IOSBK_DEVICE_DISCONNECT_GRACE: "30s"
+      IOSBK_ENABLE_EXPERIMENTAL_OPERATIONS: "false"
     volumes:
       - ./data/backups:/backups
       - ./data/configs:/configs

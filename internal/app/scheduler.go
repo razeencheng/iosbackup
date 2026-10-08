@@ -88,6 +88,9 @@ func (app *application) tryBeginAutoBackupCheck(udid string) bool {
 	if config == nil || !config.AutoBackupEnabled {
 		return false
 	}
+	if app.connectionAdmissionUnsafe(app.devices[udid]) != nil {
+		return false
+	}
 	app.checkInProgress[udid] = true
 	return true
 }
@@ -149,6 +152,9 @@ func (app *application) checkAndBackup(udid string, config backupConfig, deviceS
 
 	// 获取设备详细信息（电量、充电状态等）
 	updatedDevice := app.updateDeviceStatusForBackup(device, deviceStatus)
+	if updatedDevice == nil {
+		return
+	}
 
 	// 检查电量条件
 	if updatedDevice.BatteryLevel > 0 && updatedDevice.BatteryLevel < config.MinBatteryLevel {
@@ -180,9 +186,14 @@ func (app *application) updateDeviceStatusForBackup(device *device, deviceStatus
 	// 只修改当前 goroutine 拥有的副本；慢命令完成后再短锁提交。
 	device.Connection = deviceStatus.Connection
 	device.IsOnline = deviceStatus.IsOnline
+	epoch := app.connectionEpoch(device)
 	app.getDeviceInfo(device)
 	app.mu.Lock()
-	if current, ok := app.devices[device.UDID]; ok && current.Connection == deviceStatus.Connection {
+	if app.connectionEpochUnsafe(device) != epoch || app.connectionAdmissionUnsafe(device) != nil {
+		app.mu.Unlock()
+		return nil
+	}
+	if current, ok := app.devices[device.UDID]; ok && !current.PresenceUnknown && current.Connection == deviceStatus.Connection {
 		current.Name = device.Name
 		current.DeviceType = device.DeviceType
 		current.BatteryLevel = device.BatteryLevel

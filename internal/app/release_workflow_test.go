@@ -40,12 +40,15 @@ var releaseWorkflowStepNames = []string{
 	"Checkout validated release source",
 	"Confirm validated release source",
 	"Check GHCR visibility before push",
+	"Check Docker Hub publication settings",
 	"Log in to GHCR",
+	"Log in to Docker Hub",
 	"Set up QEMU",
 	"Set up Docker Buildx",
 	"Build and push multi-architecture image",
 	"Confirm GHCR visibility after push",
 	"Record image index digest",
+	"Confirm Docker Hub image digest",
 	"Export platform manifests and BuildKit SLSA provenance",
 	"Generate linux/amd64 SPDX JSON SBOM",
 	"Generate linux/arm64 SPDX JSON SBOM",
@@ -55,11 +58,16 @@ var releaseWorkflowStepNames = []string{
 	"Attest linux/amd64 SPDX SBOM with Cosign keyless",
 	"Attest linux/arm64 SPDX SBOM with Cosign keyless",
 	"Verify Cosign signature and platform SBOM attestations",
+	"Verify Docker Hub signature and SBOM attestations",
 	"Generate deterministic release notes",
 	"Upload verified release assets",
 	"Download verified release assets",
 	"Validate downloaded release assets",
-	"Create GitHub prerelease",
+	"Create GitHub release",
+	"Set up Docker Buildx for promotion",
+	"Log in to GHCR for promotion",
+	"Log in to Docker Hub for promotion",
+	"Promote newest stable image to latest",
 }
 
 var releaseWorkflowJobSpecs = []workflowJobSpec{
@@ -92,7 +100,7 @@ var releaseWorkflowJobSpecs = []workflowJobSpec{
 			"arm64_digest": "${{ steps.platforms.outputs.arm64_digest }}",
 			"artifact_id":  "${{ steps.assets.outputs.artifact-id }}",
 		},
-		steps: releaseWorkflowStepNames[4:24],
+		steps: releaseWorkflowStepNames[4:28],
 	},
 	{
 		name:    "release",
@@ -100,8 +108,9 @@ var releaseWorkflowJobSpecs = []workflowJobSpec{
 		timeout: "15",
 		permissions: map[string]string{
 			"contents": "write",
+			"packages": "write",
 		},
-		steps: releaseWorkflowStepNames[24:],
+		steps: releaseWorkflowStepNames[28:],
 	},
 }
 
@@ -140,7 +149,7 @@ func TestReleaseWorkflowTriggerAndPermissions(t *testing.T) {
 	}
 	for _, forbidden := range []string{"artifact-metadata:", "attestations:"} {
 		if strings.Contains(workflow, forbidden) {
-			t.Fatalf("personal private repositories must not request unavailable GitHub-native attestation permission %q", forbidden)
+			t.Fatalf("release uses Cosign and must not request GitHub-native attestation permission %q", forbidden)
 		}
 	}
 }
@@ -178,7 +187,7 @@ func TestReleaseWorkflowJobGraphAndLeastPrivilege(t *testing.T) {
 	}
 }
 
-func TestReleaseWorkflowPinsActionsAndAvoidsDockerHub(t *testing.T) {
+func TestReleaseWorkflowPinsActionsAndRegistryDependencies(t *testing.T) {
 	workflow := loadReleaseWorkflow(t)
 	wantUses := map[string]string{
 		"actions/checkout":            "d23441a48e516b6c34aea4fa41551a30e30af803",
@@ -195,7 +204,7 @@ func TestReleaseWorkflowPinsActionsAndAvoidsDockerHub(t *testing.T) {
 	}
 	assertPinnedUses(t, workflow, wantUses)
 	if strings.Contains(workflow, "actions/attest@") {
-		t.Fatal("private personal repositories cannot run GitHub-native artifact attestations without Enterprise Cloud")
+		t.Fatal("release uses the verified Cosign evidence chain instead of GitHub-native artifact attestations")
 	}
 
 	ciPath := filepath.Join(findModuleRoot(t), ".github", "workflows", "ci.yml")
@@ -212,17 +221,9 @@ func TestReleaseWorkflowPinsActionsAndAvoidsDockerHub(t *testing.T) {
 		"docker.io/tonistiigi/binfmt@sha256:400a4873b838d1b89194d982c45e5fb3cda4593fbfd7e08a02e76b03b21166f0",
 		"docker.io/moby/buildkit@sha256:28a898719c18a33f4e8000685287fa36fd0dd9560c6440227d3a732d79bb41d8",
 	}
-	withoutPinnedDependencies := workflow
 	for _, image := range allowedDependencyImages {
 		if strings.Count(workflow, image) != 1 {
 			t.Errorf("release workflow must reference pinned dependency image exactly once: %s", image)
-		}
-		withoutPinnedDependencies = strings.ReplaceAll(withoutPinnedDependencies, image, "")
-	}
-	lower := strings.ToLower(withoutPinnedDependencies)
-	for _, forbidden := range []string{"docker.io", "hub.docker", "dockerhub"} {
-		if strings.Contains(lower, forbidden) {
-			t.Fatalf("release workflow must be GHCR-only; found %q", forbidden)
 		}
 	}
 	if strings.Count(workflow, "ghcr.io/razeencheng/iosbackup") == 0 {
@@ -313,7 +314,9 @@ func TestReleaseWorkflowValidatesFrozenInputsBeforePush(t *testing.T) {
 		"context: .",
 		"platforms: linux/amd64,linux/arm64",
 		"push: true",
-		"tags: ghcr.io/razeencheng/iosbackup:${{ needs.validate.outputs.version }}",
+		"tags: |",
+		"ghcr.io/razeencheng/iosbackup:${{ needs.validate.outputs.version }}",
+		"docker.io/razeencheng/iosbackup:${{ needs.validate.outputs.version }}",
 		"IOSBK_VERSION=${{ needs.validate.outputs.version }}",
 		"IOSBK_BUILD_DATE=${{ needs.validate.outputs.build_date }}",
 		"IOSBK_COMMIT=${{ needs.validate.outputs.commit }}",
@@ -337,7 +340,7 @@ func TestReleaseWorkflowValidatesFrozenInputsBeforePush(t *testing.T) {
 	}
 }
 
-func TestReleaseWorkflowPublishesPerPlatformEvidenceAfterPrivateGate(t *testing.T) {
+func TestReleaseWorkflowPublishesPerPlatformEvidenceAfterPublicGate(t *testing.T) {
 	workflow := loadReleaseWorkflow(t)
 	if err := validateReleaseWorkflowSafety(workflow); err != nil {
 		t.Fatal(err)
@@ -364,24 +367,24 @@ func TestReleaseWorkflowPublishesPerPlatformEvidenceAfterPrivateGate(t *testing.
 		"Upload verified release assets",
 		"Download verified release assets",
 		"Validate downloaded release assets",
-		"Create GitHub prerelease",
+		"Create GitHub release",
 	}
 	assertStepOrder(t, steps, ordered)
 
 	preflight := namedStep(t, steps, "Check GHCR visibility before push")
 	for _, required := range []string{
-		`jq -e '.repository.private == true' "$GITHUB_EVENT_PATH" >/dev/null`,
+		`jq -e '.repository.private == false' "$GITHUB_EVENT_PATH" >/dev/null`,
 		`api="https://api.github.com/users/razeencheng/packages/container/iosbackup"`,
 		`case "$status" in`,
 		"200)",
 		"404)",
-		`if [ "$visibility" != "private" ]; then`,
+		`if [ "$visibility" != "public" ]; then`,
 	} {
 		if !hasActiveLine(preflight, required) {
 			t.Errorf("pre-push visibility gate is missing %q", required)
 		}
 	}
-	if strings.Contains(preflight.body, "PATCH") || strings.Contains(preflight.body, "visibility=private") {
+	if strings.Contains(preflight.body, "PATCH") || strings.Contains(preflight.body, "visibility=public") {
 		t.Fatal("pre-push gate must never modify package visibility")
 	}
 
@@ -389,14 +392,14 @@ func TestReleaseWorkflowPublishesPerPlatformEvidenceAfterPrivateGate(t *testing.
 	for _, required := range []string{
 		`api="https://api.github.com/users/razeencheng/packages/container/iosbackup"`,
 		`test "$status" = "200"`,
-		`test "$visibility" = "private"`,
+		`test "$visibility" = "public"`,
 	} {
 		if !hasActiveLine(postflight, required) {
 			t.Errorf("post-push visibility gate is missing %q", required)
 		}
 	}
 	if strings.Contains(postflight.body, "404)") || strings.Contains(postflight.body, "PATCH") {
-		t.Fatal("post-push gate must require an existing private package without mutating it")
+		t.Fatal("post-push gate must require an existing public package without mutating it")
 	}
 
 	build := namedStep(t, steps, "Build and push multi-architecture image")
@@ -532,6 +535,7 @@ func TestReleaseWorkflowPublishesPerPlatformEvidenceAfterPrivateGate(t *testing.
 			`--certificate-identity "$identity" \`,
 			`--certificate-oidc-issuer "$issuer" \`,
 			`"ghcr.io/razeencheng/iosbackup@${{ steps.platforms.outputs.amd64_digest }}" \`,
+			`| jq -s 'if all(.[]; type == "object") then . else error("expected Cosign attestation objects") end' \`,
 			"> dist/iosbackup-linux-amd64-cosign-sbom-attestation-verification.json",
 		},
 		{
@@ -539,6 +543,7 @@ func TestReleaseWorkflowPublishesPerPlatformEvidenceAfterPrivateGate(t *testing.
 			`--certificate-identity "$identity" \`,
 			`--certificate-oidc-issuer "$issuer" \`,
 			`"ghcr.io/razeencheng/iosbackup@${{ steps.platforms.outputs.arm64_digest }}" \`,
+			`| jq -s 'if all(.[]; type == "object") then . else error("expected Cosign attestation objects") end' \`,
 			"> dist/iosbackup-linux-arm64-cosign-sbom-attestation-verification.json",
 		},
 	} {
@@ -624,9 +629,10 @@ func TestReleaseWorkflowPublishesPerPlatformEvidenceAfterPrivateGate(t *testing.
 		t.Errorf("downloaded release transfer list mismatch: got %v, want %v", got, wantTransferredBasenames)
 	}
 
-	release := namedStep(t, steps, "Create GitHub prerelease")
+	release := namedStep(t, steps, "Create GitHub release")
 	for _, required := range []string{
-		"prerelease: true",
+		"prerelease: ${{ contains(needs.validate.outputs.version, '-') }}",
+		"make_latest: false",
 		"tag_name: ${{ needs.validate.outputs.version }}",
 		"target_commitish: ${{ needs.validate.outputs.commit }}",
 		"body_path: dist/iosbackup-release-notes.md",
@@ -634,11 +640,11 @@ func TestReleaseWorkflowPublishesPerPlatformEvidenceAfterPrivateGate(t *testing.
 		"append_body: false",
 	} {
 		if !hasActiveLine(release, required) {
-			t.Errorf("GitHub prerelease is missing %q", required)
+			t.Errorf("GitHub release is missing %q", required)
 		}
 	}
 	if got := multilineFieldValues(t, release, "files"); strings.Join(got, "\n") != strings.Join(releaseSupplyChainAssetPaths, "\n") {
-		t.Errorf("GitHub prerelease attachment list mismatch: got %v, want %v", got, releaseSupplyChainAssetPaths)
+		t.Errorf("GitHub release attachment list mismatch: got %v, want %v", got, releaseSupplyChainAssetPaths)
 	}
 }
 
@@ -658,8 +664,8 @@ func TestReleaseWorkflowRejectsBypassMutations(t *testing.T) {
 		},
 		{
 			name:     "inline comment impersonates repository gate",
-			old:      `          jq -e '.repository.private == true' "$GITHUB_EVENT_PATH" >/dev/null` + "\n",
-			replace:  `          true # jq -e '.repository.private == true' "$GITHUB_EVENT_PATH" >/dev/null` + "\n",
+			old:      `          jq -e '.repository.private == false' "$GITHUB_EVENT_PATH" >/dev/null` + "\n",
+			replace:  `          true # jq -e '.repository.private == false' "$GITHUB_EVENT_PATH" >/dev/null` + "\n",
 			wantPart: "active pre-push gate",
 		},
 		{
@@ -836,7 +842,7 @@ func TestReleaseWorkflowRejectsBypassMutations(t *testing.T) {
 			name:     "release notes accidentally attached",
 			old:      "          files: |\n            dist/iosbackup-linux-amd64.spdx.json\n",
 			replace:  "          files: |\n            dist/iosbackup-release-notes.md\n            dist/iosbackup-linux-amd64.spdx.json\n",
-			wantPart: "GitHub prerelease attachment list",
+			wantPart: "GitHub release attachment list",
 		},
 		{
 			name:     "qemu registers every platform",
@@ -1476,6 +1482,12 @@ func validateReleaseWorkflowSafety(workflow string) error {
 		if !equalStringMap(outputs, spec.outputs) {
 			return fmt.Errorf("job %q outputs are %v, want %v", job.name, outputs, spec.outputs)
 		}
+		if job.name == "release" {
+			concurrency, err := jobScalarMapText(job, "concurrency")
+			if err != nil || !equalStringMap(concurrency, map[string]string{"group": "iosbackup-release-promotion", "cancel-in-progress": "false"}) {
+				return fmt.Errorf("release promotion must be serialized without cancelling an active promotion")
+			}
+		}
 		if len(job.steps) != len(spec.steps) {
 			return fmt.Errorf("job %q step count is %d, want %d", job.name, len(job.steps), len(spec.steps))
 		}
@@ -1545,11 +1557,11 @@ func validateReleaseWorkflowSafety(workflow string) error {
 		}
 	}
 	preflightStep := steps[preflight]
-	if !hasActiveLine(preflightStep, `jq -e '.repository.private == true' "$GITHUB_EVENT_PATH" >/dev/null`) {
-		return fmt.Errorf("required active pre-push gate for the private repository is missing")
+	if !hasActiveLine(preflightStep, `jq -e '.repository.private == false' "$GITHUB_EVENT_PATH" >/dev/null`) {
+		return fmt.Errorf("required active pre-push gate for the public repository is missing")
 	}
 	postflightStep := steps[postflight]
-	for _, command := range []string{`test "$status" = "200"`, `test "$visibility" = "private"`} {
+	for _, command := range []string{`test "$status" = "200"`, `test "$visibility" = "public"`} {
 		if !hasActiveLine(postflightStep, command) {
 			return fmt.Errorf("required active post-push gate %q is missing", command)
 		}
@@ -1610,7 +1622,9 @@ func validateReleaseWorkflowSafety(workflow string) error {
 			`diff -u "$expected" "$actual"`,
 			"test -s dist/iosbackup-release-notes.md",
 		},
-		"Create GitHub prerelease": {
+		"Create GitHub release": {
+			"prerelease: ${{ contains(needs.validate.outputs.version, '-') }}",
+			"make_latest: false",
 			"body_path: dist/iosbackup-release-notes.md",
 			"generate_release_notes: false",
 			"append_body: false",
@@ -1646,19 +1660,21 @@ func validateReleaseWorkflowSafety(workflow string) error {
 	if strings.Join(expectedAssets, "\n") != strings.Join(wantTransferredBasenames, "\n") {
 		return fmt.Errorf("downloaded release transfer list is %v, want %v", expectedAssets, wantTransferredBasenames)
 	}
-	releaseFiles, err := multilineFieldValuesText(steps[positions["Create GitHub prerelease"]], "files")
+	releaseFiles, err := multilineFieldValuesText(steps[positions["Create GitHub release"]], "files")
 	if err != nil {
 		return err
 	}
 	if strings.Join(releaseFiles, "\n") != strings.Join(releaseSupplyChainAssetPaths, "\n") {
-		return fmt.Errorf("GitHub prerelease attachment list is %v, want %v", releaseFiles, releaseSupplyChainAssetPaths)
+		return fmt.Errorf("GitHub release attachment list is %v, want %v", releaseFiles, releaseSupplyChainAssetPaths)
 	}
 
 	for index, step := range steps {
 		for _, line := range activeWorkflowLines(step) {
 			switch {
 			case activeUsesAction(line, "docker/login-action"):
-				if step.name != "Log in to GHCR" || index <= preflight || index >= postflight {
+				initialLogin := (step.name == "Log in to GHCR" || step.name == "Log in to Docker Hub") && index > positions["Check Docker Hub publication settings"] && index < postflight
+				promotionLogin := (step.name == "Log in to GHCR for promotion" || step.name == "Log in to Docker Hub for promotion") && index > positions["Create GitHub release"]
+				if !initialLogin && !promotionLogin {
 					return fmt.Errorf("unexpected publishing side effect %q in step %q", line, step.name)
 				}
 			case activeUsesAction(line, "docker/build-push-action"), pushTrueWorkflowLineRE.MatchString(line):
@@ -1678,7 +1694,7 @@ func validateReleaseWorkflowSafety(workflow string) error {
 					return fmt.Errorf("unexpected publishing side effect %q in step %q", line, step.name)
 				}
 			case strings.HasPrefix(line, "cosign verify "), strings.HasPrefix(line, "cosign verify-attestation "):
-				if step.name != "Verify Cosign signature and platform SBOM attestations" || index <= postflight {
+				if (step.name != "Verify Cosign signature and platform SBOM attestations" && step.name != "Verify Docker Hub signature and SBOM attestations") || index <= postflight {
 					return fmt.Errorf("unexpected publishing side effect %q in step %q", line, step.name)
 				}
 			case strings.HasPrefix(line, "cosign "):
@@ -1692,7 +1708,11 @@ func validateReleaseWorkflowSafety(workflow string) error {
 					return fmt.Errorf("unexpected publishing side effect %q in step %q", line, step.name)
 				}
 			case activeUsesAction(line, "softprops/action-gh-release"):
-				if step.name != "Create GitHub prerelease" || index <= positions["Validate downloaded release assets"] {
+				if step.name != "Create GitHub release" || index <= positions["Validate downloaded release assets"] {
+					return fmt.Errorf("unexpected publishing side effect %q in step %q", line, step.name)
+				}
+			case strings.HasPrefix(line, "docker buildx imagetools create "), strings.HasPrefix(line, "gh release edit "):
+				if step.name != "Promote newest stable image to latest" || index <= positions["Create GitHub release"] {
 					return fmt.Errorf("unexpected publishing side effect %q in step %q", line, step.name)
 				}
 			case strings.HasPrefix(line, "docker login "), strings.HasPrefix(line, "docker push "), strings.HasPrefix(line, "docker image push "), strings.HasPrefix(line, "gh release create "):
