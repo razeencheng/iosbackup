@@ -5,7 +5,7 @@
     {"name":"debian:bookworm","digest":"sha256:813017f3d62be4b5891a7acca6a01bdcd4b8513daa81b1ab99d3a50385b26931","platforms":["linux/amd64","linux/arm64/v8"],"source":"https://hub.docker.com/_/debian"},
     {"name":"debian:bookworm-slim","digest":"sha256:abd67ffcfa541b485a3dff59865ab629aa048a6c613e639d36e7456b0b229241","platforms":["linux/amd64","linux/arm64/v8"],"source":"https://hub.docker.com/_/debian"},
     {"name":"rust:bookworm","digest":"sha256:14bc9c5966e7b3a385794b3d5389a8765668342025fbcc7b2e3d2866ac4bd8c3","platforms":["linux/amd64","linux/arm64/v8"],"source":"https://hub.docker.com/_/rust"},
-    {"name":"golang:1.26.7-alpine","digest":"sha256:28d89ee9cc0ff9fec75c82ca201e6bf7fdf9a679d4b7b24dfa04f2bb766bb468","platforms":["linux/amd64","linux/arm64/v8"],"source":"https://hub.docker.com/_/golang"},
+    {"name":"golang:1.27.1-alpine","digest":"sha256:cf6fca6641884b8433441b2b0652976f975e1d0fdd26d177eaaf8596087f3125","platforms":["linux/amd64","linux/arm64/v8"],"source":"https://hub.docker.com/_/golang"},
     {"name":"libplist","ref":"32428abacb909988e8e960a8845a6430b17b6a60","source":"https://github.com/libimobiledevice/libplist","license":"LGPL-2.1","license_file":"third_party/licenses/LGPL-2.1.txt"},
     {"name":"libimobiledevice-glue","ref":"da770a7687f35fbb981db4d7b47b1b032cd5c2c7","source":"https://github.com/libimobiledevice/libimobiledevice-glue","license":"LGPL-2.1","license_file":"third_party/licenses/LGPL-2.1.txt"},
     {"name":"libusbmuxd","ref":"93eb168bf6b07472d17781328c21df0c60300524","source":"https://github.com/libimobiledevice/libusbmuxd","license":"LGPL-2.1","license_file":"third_party/licenses/LGPL-2.1.txt"},
