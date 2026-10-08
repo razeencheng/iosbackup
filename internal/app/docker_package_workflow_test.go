@@ -17,10 +17,10 @@ func TestDockerPackageTestWorkflowIsManualAndNonPublishing(t *testing.T) {
 	}
 
 	assertPinnedUses(t, workflow, map[string]string{
-		"actions/checkout":           "d23441a48e516b6c34aea4fa41551a30e30af803",
-		"docker/build-push-action":   "53b7df96c91f9c12dcc8a07bcb9ccacbed38856a",
-		"docker/setup-buildx-action": "37fe631027851001ddb9b187196cc803df7f5f0e",
-		"docker/setup-qemu-action":   "96fe6ef7f33517b61c61be40b68a1882f3264fb8",
+		"actions/checkout":           "3d3c42e5aac5ba805825da76410c181273ba90b1",
+		"docker/build-push-action":   "c3c9e263c25d99ce0380d002d59b67737d91b0dc",
+		"docker/setup-buildx-action": "f87e5991a6d7451dcb8d9637bfbc97413f497069",
+		"docker/setup-qemu-action":   "99012661954931238ded8c8b007157a8430204e1",
 	})
 
 	for _, forbidden := range []string{
