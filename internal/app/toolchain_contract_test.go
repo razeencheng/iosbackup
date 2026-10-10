@@ -25,8 +25,8 @@ func TestGoToolchainSecurityBaselineIsCentralized(t *testing.T) {
 		t.Fatal("go.mod must declare an exact Go toolchain patch version")
 	}
 	version := strings.Join(toolchainMatch[1:], ".")
-	if versionBefore(t, toolchainMatch[1:], []int{1, 27, 1}) {
-		t.Fatalf("Go %s is below the security baseline 1.27.1", version)
+	if versionBefore(t, toolchainMatch[1:], []int{1, 27, 2}) {
+		t.Fatalf("Go %s is below the security baseline 1.27.2", version)
 	}
 
 	goVersionFileRE := regexp.MustCompile(`(?m)^[ \t]+go-version-file:[ \t]+go\.mod[ \t]*$`)

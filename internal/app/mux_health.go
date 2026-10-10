@@ -44,6 +44,7 @@ type connectionService struct {
 	attempts                                           []time.Time
 	backoff                                            int
 	configRestart                                      bool
+	notified                                           bool
 }
 
 type connectionServiceDTO struct {
@@ -244,6 +245,7 @@ func (app *application) publishConnectionScan(backend int, result connectionScan
 		}
 		if result.completed.Sub(s.healthySince) >= time.Minute {
 			s.backoff = 0
+			s.notified = false
 		}
 		s.lastSuccess = result.completed
 		if s.phase != "restarting" && !s.configRestart {
@@ -261,10 +263,24 @@ func (app *application) publishConnectionScan(backend int, result connectionScan
 			s.phase = "manual_required"
 		}
 	}
+	notifyFailure := result.err != nil && !errors.Is(result.err, context.Canceled) && app.rootCtx.Err() == nil &&
+		s.failures >= 3 && !result.completed.Before(s.graceUntil) && !s.notified
+	if notifyFailure {
+		s.notified = true
+	}
 	app.connectionRevision++
 	revision := app.connectionRevision
 	usb, network, valid := app.connectionListsUnsafe()
 	app.mu.Unlock()
+	if notifyFailure {
+		name := "USB 连接服务"
+		if backend == connectionWiFi {
+			name = "Wi-Fi 连接服务"
+		} else if app.usesUSBMuxd2WiFi() {
+			name = "USB / Wi-Fi 连接服务"
+		}
+		app.notifySystemError(name+"持续不可用", "设备列表已连续多次查询失败，暂时无法确认设备状态或开始新备份。请查看页面中的连接服务状态及日志；如自动恢复未成功，请检查容器和设备连接。")
+	}
 	_, created := app.applyPresenceSnapshotValid(mergeDeviceLists(usb, network), network, result.completed, valid, revision)
 	if created {
 		_ = app.saveConfigs()

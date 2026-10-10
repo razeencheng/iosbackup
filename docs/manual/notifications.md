@@ -63,7 +63,11 @@ To pause all delivery, turn off the master switch and save. To disable a channel
 | `backup_failed` | An already-started backup command failed; failures during earlier condition checks or command startup do not always trigger this event. |
 | `device_online` | The app detected that a device went from offline to online. |
 | `device_offline` | The device has not been detected for longer than the applicable waiting period. |
-| `system_error` | The app recorded a system error through its common error-log entry point. |
+| `system_error` | Persistent connection-service failures, pairing issues requiring action, and explicit failures in restore, unpack, encryption or password storage operations. Error logs alone do not send notifications. |
+
+A device temporarily missing, a pairing-check timeout, a locked device or pairing unsupported on the current connection updates the UI and logs without sending a push. Wi-Fi connections only validate existing pairing. To establish trust again, connect using USB, unlock the device and confirm “Trust This Computer”. Manual pairing results appear in the device's backup settings.
+
+With automatic backups enabled, due checks must explicitly report invalid pairing at least three consecutive times over at least five minutes before sending one “Device needs pairing” warning. Successful validation resets this warning; a temporary disconnect does not rearm it. Connection services notify after three consecutive failed queries outside the startup grace period, and rearm only after successful queries spanning one minute. Deduplication is held in memory and starts afresh after application restart. The master switch, channel rules and asynchronous delivery behavior still apply.
 
 ## Body templates
 

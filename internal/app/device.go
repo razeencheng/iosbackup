@@ -187,7 +187,12 @@ func (app *application) pairDeviceAndUpdateInfoInTask(device device, generation 
 func (app *application) setPairingState(udid, stateCode, errorCode, message string) {
 	app.mu.Lock()
 	state := app.deviceOperationStates[udid]
+	app.pairingCheckSequence++
+	state.pairingCheck = app.pairingCheckSequence
 	state.PairingState = stateCode
+	if stateCode == pairingStatePaired {
+		state.pairingAlert = pairingAlertState{}
+	}
 	if stateCode != pairingStateChecking {
 		state.PairingErrorCode = errorCode
 		state.PairingError = message
@@ -195,161 +200,6 @@ func (app *application) setPairingState(udid, stateCode, errorCode, message stri
 	app.deviceOperationStates[udid] = state
 	app.mu.Unlock()
 	app.broadcastStatus()
-}
-
-func pairingFailureMessage(output string) string {
-	if strings.Contains(strings.ToLower(output), "passcode is set") {
-		return "设备已锁定。请解锁设备并输入锁屏密码，然后重试。"
-	}
-	return "配对失败。请确认设备已解锁并保持 USB 连接，然后重试。"
-}
-
-// pairDevice 检查并配对设备（通过 runIdeviceCmd，自动注入 socket 和 -n）。
-// 所有用户可见结果都写入结构化状态，由 /api/events 发布。
-func (app *application) pairDevice(device *device) {
-	release, err := app.beginConnectionTask(device)
-	if err != nil {
-		return
-	}
-	defer release()
-	app.pairDeviceInTask(device)
-}
-
-func (app *application) pairDeviceInTask(device *device) {
-	if device == nil || device.UDID == "" {
-		return
-	}
-	if app.deviceRemovalBlock(device.UDID) != nil {
-		return
-	}
-	setState := app.pairingStatePublisher(device)
-	setState(device.UDID, pairingStateChecking, "", "")
-	app.addDebugLog(device.UDID, "正在检查设备配对状态...")
-
-	// 首先检查设备配对状态（短命令）
-	_, err := app.runIdeviceCmd(app.rootCtx, cmdKindShort, device, cmdIdevicePair, "validate")
-	if err == nil {
-		app.addDebugLog(device.UDID, "设备已配对，配对状态正常")
-		setState(device.UDID, pairingStatePaired, "", "")
-		return
-	}
-
-	app.addInfoLog(device.UDID, "设备未配对，开始自动配对...")
-
-	// 尝试配对设备（短命令）
-	output, err := app.runIdeviceCmd(app.rootCtx, cmdKindShort, device, cmdIdevicePair, "pair")
-	outputStr := strings.TrimSpace(string(output))
-
-	if err != nil {
-		if strings.Contains(outputStr, "Please accept the trust dialog") {
-			app.addWarnLog(device.UDID, "配对需要用户确认：请在设备上点击'信任此电脑'")
-			setState(device.UDID, pairingStateWaitingForTrust, "trust_required", "请在设备上点击“信任此电脑”并输入设备锁屏密码")
-			go app.retryPairAfterTrust(device.UDID)
-		} else if strings.Contains(outputStr, "already paired") {
-			if _, verifyErr := app.runIdeviceCmd(app.rootCtx, cmdKindShort, device, cmdIdevicePair, "validate"); verifyErr == nil {
-				setState(device.UDID, pairingStatePaired, "", "")
-			} else {
-				setState(device.UDID, pairingStateFailed, "pair_validation_failed", pairingFailureMessage(verifyErr.Error()))
-			}
-		} else {
-			app.addErrorLog(device.UDID, fmt.Sprintf("配对失败: %s", outputStr))
-			if outputStr == "" {
-				outputStr = err.Error()
-			}
-			setState(device.UDID, pairingStateFailed, "pair_failed", pairingFailureMessage(outputStr))
-		}
-		return
-	}
-
-	app.addInfoLog(device.UDID, "设备配对成功")
-
-	// 验证配对结果
-	_, err = app.runIdeviceCmd(app.rootCtx, cmdKindShort, device, cmdIdevicePair, "validate")
-	if err == nil {
-		app.addLog(device.UDID, "配对验证成功，设备可以正常使用")
-		setState(device.UDID, pairingStatePaired, "", "")
-	} else {
-		app.addLog(device.UDID, "配对验证失败，可能需要手动重新配对")
-		setState(device.UDID, pairingStateFailed, "pair_validation_failed", pairingFailureMessage(err.Error()))
-	}
-}
-
-// retryPairAfterTrust 等待用户信任后重试配对（通过 runIdeviceCmd）
-func (app *application) retryPairAfterTrust(udid string) {
-	app.retryPairAfterTrustWithSchedule(udid, 10*time.Second, 6)
-}
-
-func (app *application) retryPairAfterTrustWithSchedule(udid string, interval time.Duration, maxRetries int) {
-	app.addLog(udid, "等待用户在设备上确认信任...")
-
-	// 获取设备信息以确定连接类型
-	app.mu.RLock()
-	device, exists := app.devices[udid]
-	device = cloneDevice(device)
-	app.mu.RUnlock()
-
-	if !exists {
-		app.addLog(udid, "设备信息不存在，无法重试配对")
-		app.setPairingState(udid, pairingStateFailed, "pair_failed", "设备信息不存在")
-		return
-	}
-
-	release, err := app.beginConnectionTask(device)
-	if err != nil {
-		return
-	}
-	defer release()
-	epoch := app.connectionEpoch(device)
-	setState := app.pairingStatePublisher(device)
-
-	for i := 0; i < maxRetries; i++ {
-		timer := time.NewTimer(interval)
-		select {
-		case <-app.rootCtx.Done():
-			timer.Stop()
-			return
-		case <-timer.C:
-		}
-
-		if app.connectionEpoch(device) != epoch {
-			return
-		}
-		// 检查配对状态
-		_, err := app.runIdeviceCmd(app.rootCtx, cmdKindShort, device, cmdIdevicePair, "validate")
-		if err == nil {
-			app.addLog(udid, "设备信任确认成功，配对完成")
-			setState(udid, pairingStatePaired, "", "")
-			return
-		}
-
-		// 重试配对
-		output, err := app.runIdeviceCmd(app.rootCtx, cmdKindShort, device, cmdIdevicePair, "pair")
-		outputStr := strings.TrimSpace(string(output))
-
-		if err == nil || strings.Contains(outputStr, "already paired") {
-			if _, verifyErr := app.runIdeviceCmd(app.rootCtx, cmdKindShort, device, cmdIdevicePair, "validate"); verifyErr == nil {
-				app.addLog(udid, "设备配对验证成功")
-				setState(udid, pairingStatePaired, "", "")
-			} else {
-				setState(udid, pairingStateFailed, "pair_validation_failed", pairingFailureMessage(verifyErr.Error()))
-			}
-			return
-		}
-
-		if !strings.Contains(outputStr, "Please accept the trust dialog") {
-			app.addLog(udid, fmt.Sprintf("配对失败: %s", outputStr))
-			if outputStr == "" {
-				outputStr = err.Error()
-			}
-			setState(udid, pairingStateFailed, "pair_failed", pairingFailureMessage(outputStr))
-			return
-		}
-
-		app.addLog(udid, fmt.Sprintf("等待用户确认中... (%d/%d)", i+1, maxRetries))
-	}
-
-	app.addLog(udid, "配对超时，请手动在设备上点击'信任此电脑'后重新刷新设备列表")
-	setState(udid, pairingStateFailed, "pair_timeout", "等待设备确认信任超时，请确认后重试")
 }
 
 // getDeviceInfo 获取设备详细信息（通过 runIdeviceCmd，自动注入 socket 和 -n）

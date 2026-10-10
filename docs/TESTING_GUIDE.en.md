@@ -12,7 +12,7 @@ go list -m all
 git status --short
 ```
 
-Follow [go.mod](../go.mod), currently specifying `go1.27.1`. The module list should contain only `iosbackup`. Do not use production configuration, mount real backups, or provide real notification credentials to default tests.
+Follow [go.mod](../go.mod), currently specifying `go1.27.2`. The module list should contain only `iosbackup`. Do not use production configuration, mount real backups, or provide real notification credentials to default tests.
 
 ## 2. Run default tests
 

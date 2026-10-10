@@ -329,9 +329,10 @@
               <div style="display:flex;gap:9px;align-items:flex-start;font-size:12px;color:#6F7E8C;background:#fff;border:1px dashed #D8E2EA;border-radius:var(--iosbk-radius);padding:11px 13px;line-height:1.5"><svg class="ui-icon" style="color:#2C62C6;margin-top:2px" aria-hidden="true"><use href="/static/ui-icons.svg#icon-pair"></use></svg><span data-i18n="bset.pairHint"></span></div>
               <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:flex-end;padding-top:2px">
                 <span id="dirty-{{$d.UDID}}" class="dirty-hint hidden" style="margin-right:auto"><span class="ddot"></span><span data-i18n="bset.unsaved"></span></span>
-                <button onclick="pairDevice('{{$d.UDID}}')" style="display:inline-flex;align-items:center;gap:8px;padding:10px 16px;background:#fff;color:#27384A;border:1px solid #D8E2EA;border-radius:var(--iosbk-radius);font-size:13.5px;font-weight:500;cursor:pointer;font-family:inherit"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-pair"></use></svg><span data-i18n="{{if $d.IsOnline}}bset.repair{{else}}bset.pair{{end}}"></span></button>
+                <button id="pairBtn-{{$d.UDID}}" onclick="pairDevice('{{$d.UDID}}')" style="display:inline-flex;align-items:center;gap:8px;padding:10px 16px;background:#fff;color:#27384A;border:1px solid #D8E2EA;border-radius:var(--iosbk-radius);font-size:13.5px;font-weight:500;cursor:pointer;font-family:inherit"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-pair"></use></svg><span data-i18n="{{if $d.IsOnline}}bset.repair{{else}}bset.pair{{end}}"></span></button>
                 <button id="saveBtn-{{$d.UDID}}" onclick="saveConfig('{{$d.UDID}}')" style="display:inline-flex;align-items:center;gap:8px;padding:10px 18px;background:#2C62C6;color:#fff;border:none;border-radius:var(--iosbk-radius);font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-save"></use></svg><span data-i18n="bset.save"></span></button>
               </div>
+              <div id="pairingResult-{{$d.UDID}}" class="hidden" role="status" aria-live="polite" style="font-size:12.5px;line-height:1.6"></div>
             </div>
           </div>
 
@@ -615,6 +616,7 @@ function applyI18n(){
   updateAutoText();
   rerenderBackupProgress();
   renderConnectionHealth();
+  Object.keys(latestPairingStatuses).forEach(function(udid){ renderPairingResult(latestPairingStatuses[udid]); });
   if(removedDevicesCache!==null) renderRemovedDevices(removedDevicesCache,'ready');
   else if(removedDevicesViewState) renderRemovedDevices(null,removedDevicesViewState);
 }
@@ -838,6 +840,7 @@ function clearDirty(udid){
 /* ============== live updates via SSE (no full reload) ============== */
 let autoRefreshEnabled=true, backingCount=0, es=null, pendingReload=false;
 const latestDeviceStatuses={};
+const latestPairingStatuses={};
 function connectSSE(){
   if(!autoRefreshEnabled) return;
   if(!window.EventSource){ fallbackPoll(); return; }
@@ -1022,6 +1025,7 @@ function renderBackupProgress(d){
 }
 function rerenderBackupProgress(){ Object.keys(latestDeviceStatuses).forEach(function(udid){ renderBackupProgress(latestDeviceStatuses[udid]); }); }
 function patchDevice(d){
+  renderPairingResult(d);
   var u=d.udid;
   latestDeviceStatuses[u]=d;
   document.querySelectorAll('[data-connection-action]').forEach(function(button){if(button.getAttribute('data-connection-action')===u) button.disabled=d.operations_available===false||d.backing_up;});
@@ -1100,7 +1104,66 @@ function testDeviceIP(udid){
     else { showInlineResult(box,false,d.reason||d.error||L('连不上','Unreachable')); }
   }).catch(function(e){ showInlineResult(box,false,String(e)); }).finally(function(){ btn.disabled=false; btn.style.opacity=''; });
 }
-function pairDevice(udid){ csrfFetch('/api/pair/'+udid,{method:'POST'}).then(function(r){return r.json();}).then(function(data){ toast(data.error?(L('配对失败：','Pair failed: ')+data.error):L('请在设备上点「信任此电脑」','Tap “Trust this computer” on the device'), !!data.error); }).catch(function(e){ toast(L('配对失败：','Pair failed: ')+e,true); }); }
+function pairingStatusText(d){
+  if(d.pairing_state==='checking') return L('正在检查设备配对状态…','Checking device pairing…');
+  if(d.pairing_state==='paired') return L('设备配对正常。','Device pairing is valid.');
+  if(d.pairing_state==='waiting_for_trust') return L('请在设备上点击“信任此电脑”并输入锁屏密码。','Tap “Trust This Computer” and enter the device passcode.');
+  if(d.pairing_state!=='failed') return '';
+  var messages={
+    device_unavailable:'Device not found on this connection. Reconnect it and retry.',
+    connection_timeout:'The device connection timed out. Please retry later.',
+    connection_unavailable:'Cannot connect to the device. Check the connection and retry.',
+    device_locked:'Unlock the device and enter its passcode, then retry.',
+    pairing_required:'Connect the device using USB, unlock it and confirm “Trust This Computer”.',
+    pairing_not_supported:'Pairing is unavailable on this connection. Use USB if pairing is needed.',
+    trust_denied:'The trust request was declined. Reconnect using USB and confirm trust.',
+    pair_timeout:'Timed out waiting for trust. Confirm on the device and retry.'
+  };
+  return L(d.pairing_error||'配对检查未完成，请稍后重试。',messages[d.pairing_error_code]||'Pairing could not be verified. Please retry or check the logs.');
+}
+function renderPairingResult(d){
+  latestPairingStatuses[d.udid]=d;
+  var box=document.getElementById('pairingResult-'+d.udid);
+  if(box){
+    var text=pairingStatusText(d);
+    box.textContent=text;
+    box.classList.toggle('hidden',!text);
+    box.style.color=d.pairing_state==='failed'?'#9A6B66':(d.pairing_state==='paired'?'#0B7565':'#718090');
+  }
+  var button=document.getElementById('pairBtn-'+d.udid);
+  if(button) button.disabled=d.pairing_state==='checking'||d.operations_available===false||!!d.backing_up;
+}
+async function trackPairingResult(udid){
+  // 手动操作独立跟踪终态，不受“暂停实时更新”或 SSE 断线影响。
+  var deadline=Date.now()+240000;
+  while(Date.now()<deadline){
+    var controller=new AbortController();
+    var timeout=setTimeout(function(){controller.abort();},5000);
+    try{
+      var response=await fetch('/api/status',{signal:controller.signal,cache:'no-store'});
+      if(!response.ok) throw new Error(L('无法读取配对结果，请刷新页面查看。','Cannot read the pairing result. Refresh the page to check.'));
+      var status=await response.json();
+      var device=(status.devices||[]).find(function(d){return d.udid===udid;});
+      if(!device) throw new Error(L('设备已不在列表中，请刷新页面查看。','The device is no longer listed. Refresh the page to check.'));
+      renderPairingResult(device);
+      if(device.pairing_state==='paired'||device.pairing_state==='failed') return;
+    }finally{ clearTimeout(timeout); }
+    await new Promise(function(resolve){setTimeout(resolve,1000);});
+  }
+  throw new Error(L('配对检查尚未完成，请稍后刷新查看结果。','Pairing has not finished. Refresh later to check the result.'));
+}
+function pairDevice(udid){
+  renderPairingResult({udid:udid,pairing_state:'checking'});
+  function failed(message){
+    renderPairingResult({udid:udid,pairing_state:'failed',pairing_error:message});
+    toast(L('配对检查失败：','Pairing check failed: ')+message,true);
+  }
+  return csrfFetch('/api/pair/'+udid,{method:'POST'}).then(function(r){return r.json();}).then(function(data){
+    if(data.error){ failed(data.error); return; }
+    toast(L('配对检查已开始，结果会显示在下方。','Pairing check started. The result will appear below.'));
+    return trackPairingResult(udid);
+  }).catch(function(e){ failed(String(e)); });
+}
 function gateMsg(d){
   if(d.error_code==='connection_unavailable') return L('连接服务暂时不可用，请等待服务恢复。','The connection service is unavailable. Please wait for recovery.');
   var key={offline:'gate.offline',busy:'gate.busy',not_charging:'gate.notCharging',low_battery:'gate.lowBattery',missing:'gate.missing',backup_busy:'gate.backupBusy'}[d.error_code];

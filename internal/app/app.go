@@ -92,6 +92,8 @@ type deviceOperationState struct {
 	BackupState      string
 	BackupErrorCode  string
 	LastBackupError  string
+	pairingAlert     pairingAlertState
+	pairingCheck     uint64
 }
 
 type muxLifecycleState uint8
@@ -148,6 +150,7 @@ type application struct {
 	backupInProgress          map[string]bool // 跟踪正在备份的设备
 	checkInProgress           map[string]bool // 跟踪正在检查备份条件的设备
 	deviceOperationStates     map[string]deviceOperationState
+	pairingCheckSequence      uint64
 	backupProgress            map[string]backupProgress
 	backupProgressBroadcast   map[string]time.Time
 	notificationManager       *notificationManager // 通知管理器
