@@ -6,7 +6,7 @@ Set up a development environment for offline tests. Use the operations manual fo
 
 ## Prepare the environment
 
-Install Git and Go on a trusted development machine. The current [go.mod](../go.mod) declares language version `go 1.21` and toolchain `go1.27.1`; use the toolchain matching the project/CI. Automatic toolchain selection may download it. “Offline default tests” means the tests themselves do not access external services, not an offline first-time Go installation. Prepare the toolchain and caches before disconnecting if necessary.
+Install Git and Go on a trusted development machine. The current [go.mod](../go.mod) declares language version `go 1.21` and toolchain `go1.27.2`; use the toolchain matching the project/CI. Automatic toolchain selection may download it. “Offline default tests” means the tests themselves do not access external services, not an offline first-time Go installation. Prepare the toolchain and caches before disconnecting if necessary.
 
 The Go module remains standard-library-only. Do not add third-party Go packages. Image components such as libimobiledevice and netmuxd are separate dependencies recorded in [third_party](../third_party/components.lock.json). Pure Go builds and default unit tests do not require a real phone.
 

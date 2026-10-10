@@ -6,7 +6,7 @@ Thank you for contributing. Before a large change, discuss in an Issue which use
 
 Start with the [development guide](docs/DEVELOPMENT.md) ([中文](docs/DEVELOPMENT.zh-CN.md)) for the source layout, safe local setup and testing paths.
 
-Use Go 1.21 or newer. Automatic toolchain selection is pinned to Go 1.27.1 as the security baseline for project builds. The Go module must remain standard-library-only; the container's device toolchain is tracked separately.
+Use Go 1.21 or newer. Automatic toolchain selection is pinned to Go 1.27.2 as the security baseline for project builds. The Go module must remain standard-library-only; the container's device toolchain is tracked separately.
 
 Run `gofmt -w` on the Go files you changed, then validate from the repository root:
 
