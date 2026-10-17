@@ -15,9 +15,9 @@ import (
 
 var (
 	// ErrEncryptionUnavailable 表示应用未提供有效的秘密存储密钥。
-	ErrEncryptionUnavailable = errors.New("加密功能不可用：未加载有效的秘密存储主密钥")
+	ErrEncryptionUnavailable = errors.New("encryption unavailable: no valid secret-store master key is loaded")
 	// ErrSecretNotFound 表示指定秘密条目不存在；通用方法复用此历史错误以保持兼容。
-	ErrSecretNotFound = errors.New("未找到该设备的备份密码")
+	ErrSecretNotFound = errors.New("backup password not found for this device")
 )
 
 const maxSecretsFileSize = 8 << 20
@@ -46,7 +46,7 @@ type AESSecretStore struct {
 // NewAESSecretStore 用 32 字节密钥构造可用的秘密存储。
 func NewAESSecretStore(key []byte, path string) (*AESSecretStore, error) {
 	if len(key) != 32 {
-		return nil, fmt.Errorf("AES 密钥须为 32 字节（AES-256），实际 %d 字节", len(key))
+		return nil, fmt.Errorf("AES key must be 32 bytes (AES-256); got %d bytes", len(key))
 	}
 	block, err := aes.NewCipher(key)
 	if err != nil {
@@ -111,7 +111,7 @@ func (s *AESSecretStore) SetSecret(key, value string) error {
 	}
 	nonce := make([]byte, s.gcm.NonceSize())
 	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
-		return fmt.Errorf("生成 nonce 失败: %w", err)
+		return fmt.Errorf("generate nonce: %w", err)
 	}
 	sealed := s.gcm.Seal(nonce, nonce, []byte(value), []byte(key))
 	entries[key] = base64.StdEncoding.EncodeToString(sealed)
@@ -143,15 +143,15 @@ func (s *AESSecretStore) GetSecret(key string) (string, error) {
 func (s *AESSecretStore) decrypt(key, encoded string) (string, error) {
 	raw, err := base64.StdEncoding.DecodeString(encoded)
 	if err != nil {
-		return "", fmt.Errorf("密文 base64 解码失败: %w", err)
+		return "", fmt.Errorf("decode ciphertext as base64: %w", err)
 	}
 	nonceSize := s.gcm.NonceSize()
 	if len(raw) < nonceSize {
-		return "", errors.New("密文损坏：长度不足")
+		return "", errors.New("ciphertext is corrupt: insufficient length")
 	}
 	plain, err := s.gcm.Open(nil, raw[:nonceSize], raw[nonceSize:], []byte(key))
 	if err != nil {
-		return "", fmt.Errorf("解密失败（密钥不匹配或数据损坏）: %w", err)
+		return "", fmt.Errorf("decrypt ciphertext (key mismatch or corrupt data): %w", err)
 	}
 	return string(plain), nil
 }
@@ -185,13 +185,13 @@ func (s *AESSecretStore) loadLocked() (map[string]string, error) {
 		return nil, err
 	}
 	if len(data) == 0 {
-		return nil, errors.New("秘密存储文件为空，无法确认数据完整性")
+		return nil, errors.New("secret-store file is empty; data integrity cannot be verified")
 	}
 	if err := json.Unmarshal(data, &entries); err != nil {
-		return nil, fmt.Errorf("解析 %s 失败: %w", s.path, err)
+		return nil, fmt.Errorf("parse %s: %w", s.path, err)
 	}
 	if entries == nil {
-		return nil, fmt.Errorf("解析 %s 失败：内容必须为 JSON 对象", s.path)
+		return nil, fmt.Errorf("parse %s: content must be a JSON object", s.path)
 	}
 	return entries, nil
 }
@@ -202,7 +202,7 @@ func (s *AESSecretStore) saveLocked(entries map[string]string) error {
 		return err
 	}
 	if len(data) > maxSecretsFileSize {
-		return fmt.Errorf("秘密存储内容超过大小上限 %d 字节", maxSecretsFileSize)
+		return fmt.Errorf("secret-store content exceeds the size limit of %d bytes", maxSecretsFileSize)
 	}
 	return s.writeFile(s.path, data, 0o600)
 }

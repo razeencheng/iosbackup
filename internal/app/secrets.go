@@ -32,7 +32,7 @@ func newUnavailableSecretStore(path string) *aesSecretStore {
 // 显式配置失败不得回退；没有密钥但已有密文时不得生成替代密钥。
 func initSecretStore(cfg runtimeConfig, paths appPaths) (secretStore, error) {
 	if cfg.SecretKey != "" && cfg.SecretKeyFile != "" {
-		return nil, errors.New("IOSBK_SECRET_KEY 与 IOSBK_SECRET_KEY_FILE 不能同时配置")
+		return nil, errors.New("IOSBK_SECRET_KEY and IOSBK_SECRET_KEY_FILE cannot both be configured")
 	}
 	if err := persistence.EnsurePrivateDirectory(paths.ConfigsRoot); err != nil {
 		return nil, err
@@ -50,7 +50,7 @@ func initSecretStore(cfg runtimeConfig, paths appPaths) (secretStore, error) {
 		data, err := persistence.ReadSecretFile(keyPath, 4<<10, private)
 		if err != nil {
 			if !errors.Is(err, os.ErrNotExist) || !private {
-				return nil, fmt.Errorf("读取加密主密钥文件 %s: %w", keyPath, err)
+				return nil, fmt.Errorf("read encryption master key file %s: %w", keyPath, err)
 			}
 			data, err = initializeDefaultSecretKey(paths)
 			if err != nil {
@@ -61,14 +61,14 @@ func initSecretStore(cfg runtimeConfig, paths appPaths) (secretStore, error) {
 	}
 	key, err := base64.StdEncoding.Strict().DecodeString(encoded)
 	if err != nil || len(key) != 32 {
-		return nil, fmt.Errorf("%s 必须是标准 Base64 编码的恰 32 字节加密主密钥", source)
+		return nil, fmt.Errorf("%s must contain a standard Base64-encoded encryption master key of exactly 32 bytes", source)
 	}
 	store, err := newAESSecretStore(key, paths.SecretsFile)
 	if err != nil {
 		return nil, err
 	}
 	if err := store.Validate(); err != nil {
-		return nil, fmt.Errorf("校验已有秘密存储失败，请检查原密钥与数据完整性: %w", err)
+		return nil, fmt.Errorf("validate existing secret store; check the original key and data integrity: %w", err)
 	}
 	return store, nil
 }
@@ -82,22 +82,22 @@ func initializeDefaultSecretKey(paths appPaths) ([]byte, error) {
 			return data, nil
 		}
 		if !errors.Is(readErr, os.ErrNotExist) {
-			return nil, fmt.Errorf("读取并发初始化的加密主密钥: %w", readErr)
+			return nil, fmt.Errorf("read concurrently initialized encryption master key: %w", readErr)
 		}
-		return nil, errors.New("已有 secrets.enc 但缺少原加密主密钥；请恢复 secret_key 或原 IOSBK_SECRET_KEY，不能生成替代密钥")
+		return nil, errors.New("secrets.enc exists but the original encryption master key is missing; restore secret_key or the original IOSBK_SECRET_KEY; a replacement key must not be generated")
 	} else if !errors.Is(err, os.ErrNotExist) {
-		return nil, fmt.Errorf("检查秘密存储: %w", err)
+		return nil, fmt.Errorf("inspect secret store: %w", err)
 	}
 	raw := make([]byte, 32)
 	if _, err := rand.Read(raw); err != nil {
-		return nil, fmt.Errorf("生成加密主密钥: %w", err)
+		return nil, fmt.Errorf("generate encryption master key: %w", err)
 	}
 	if _, err := persistence.CreatePrivateFile(paths.SecretKeyFile, []byte(base64.StdEncoding.EncodeToString(raw)+"\n")); err != nil {
-		return nil, fmt.Errorf("保存加密主密钥: %w", err)
+		return nil, fmt.Errorf("save encryption master key: %w", err)
 	}
 	data, err := persistence.ReadSecretFile(paths.SecretKeyFile, 4<<10, true)
 	if err != nil {
-		return nil, fmt.Errorf("读取加密主密钥文件: %w", err)
+		return nil, fmt.Errorf("read encryption master key file: %w", err)
 	}
 	return data, nil
 }

@@ -14,14 +14,14 @@ import (
 func EnsurePrivateDirectory(path string) error {
 	path = filepath.Clean(path)
 	if !filepath.IsAbs(path) || filepath.Clean(path) == string(filepath.Separator) {
-		return errors.New("配置目录必须是专用的绝对路径，不能使用文件系统根目录")
+		return errors.New("configuration directory must be a dedicated absolute path, not the filesystem root")
 	}
 	if err := os.MkdirAll(path, 0700); err != nil {
-		return fmt.Errorf("创建配置目录: %w", err)
+		return fmt.Errorf("create configuration directory: %w", err)
 	}
 	f, err := os.OpenFile(path, os.O_RDONLY|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0)
 	if err != nil {
-		return fmt.Errorf("打开配置目录（不允许符号链接）: %w", err)
+		return fmt.Errorf("open configuration directory (symlinks are not allowed): %w", err)
 	}
 	defer f.Close()
 	info, err := f.Stat()
@@ -29,10 +29,10 @@ func EnsurePrivateDirectory(path string) error {
 		return err
 	}
 	if !info.IsDir() {
-		return errors.New("配置路径必须是目录")
+		return errors.New("configuration path must be a directory")
 	}
 	if err := f.Chmod(0700); err != nil {
-		return fmt.Errorf("设置配置目录权限: %w", err)
+		return fmt.Errorf("set configuration directory permissions: %w", err)
 	}
 	return nil
 }
@@ -50,22 +50,22 @@ func ReadSecretFile(path string, limit int64, private bool) ([]byte, error) {
 		return nil, err
 	}
 	if !info.Mode().IsRegular() {
-		return nil, errors.New("秘密文件必须是普通文件，不能是符号链接或特殊文件")
+		return nil, errors.New("secret file must be a regular file, not a symlink or special file")
 	}
 	if private {
 		if err := f.Chmod(0600); err != nil {
-			return nil, fmt.Errorf("设置秘密文件权限: %w", err)
+			return nil, fmt.Errorf("set secret file permissions: %w", err)
 		}
 	}
 	if info.Size() > limit {
-		return nil, fmt.Errorf("秘密文件超过大小上限 %d 字节", limit)
+		return nil, fmt.Errorf("secret file exceeds the size limit of %d bytes", limit)
 	}
 	data, err := io.ReadAll(io.LimitReader(f, limit+1))
 	if err != nil {
 		return nil, err
 	}
 	if int64(len(data)) > limit {
-		return nil, fmt.Errorf("秘密文件超过大小上限 %d 字节", limit)
+		return nil, fmt.Errorf("secret file exceeds the size limit of %d bytes", limit)
 	}
 	return data, nil
 }
@@ -99,7 +99,7 @@ func CreatePrivateFile(path string, data []byte) (bool, error) {
 		if errors.Is(err, os.ErrExist) {
 			return false, nil
 		}
-		return false, fmt.Errorf("发布秘密文件（文件系统须支持硬链接）: %w", err)
+		return false, fmt.Errorf("publish secret file (the filesystem must support hard links): %w", err)
 	}
 	directory, err := os.Open(dir)
 	if err != nil {

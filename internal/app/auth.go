@@ -75,7 +75,7 @@ func newAuthManager(cfg runtimeConfig, paths appPaths) (*authManager, string, er
 	}
 	if hasDigest {
 		if err == nil && sha256.Sum256([]byte(password)) != digest {
-			return nil, "", errors.New("默认管理员密码文件与已有认证摘要不一致；请恢复原文件或显式配置 IOSBK_ADMIN_PASSWORD_FILE")
+			return nil, "", errors.New("default administrator password file does not match the existing authentication digest; restore the original file or explicitly configure IOSBK_ADMIN_PASSWORD_FILE")
 		}
 		manager.passwordHash = digest
 		return manager, "", nil
@@ -84,12 +84,12 @@ func newAuthManager(cfg runtimeConfig, paths appPaths) (*authManager, string, er
 	if errors.Is(err, os.ErrNotExist) {
 		raw := make([]byte, 32)
 		if _, err := rand.Read(raw); err != nil {
-			return nil, "", fmt.Errorf("生成管理员密码: %w", err)
+			return nil, "", fmt.Errorf("generate administrator password: %w", err)
 		}
 		candidate := base64.RawURLEncoding.EncodeToString(raw)
 		created, err := persistence.CreatePrivateFile(paths.AdminPasswordFile, []byte(candidate+"\n"))
 		if err != nil {
-			return nil, "", fmt.Errorf("保存管理员密码: %w", err)
+			return nil, "", fmt.Errorf("save administrator password: %w", err)
 		}
 		if created {
 			generated = candidate
@@ -107,14 +107,14 @@ func newAuthManager(cfg runtimeConfig, paths appPaths) (*authManager, string, er
 		return nil, "", err
 	}
 	if _, err := persistence.CreatePrivateFile(paths.AuthCredentialsFile, encoded); err != nil {
-		return nil, "", fmt.Errorf("保存认证凭据: %w", err)
+		return nil, "", fmt.Errorf("save authentication credentials: %w", err)
 	}
 	digest, err = readAuthDigest(paths.AuthCredentialsFile)
 	if err != nil {
 		return nil, "", err
 	}
 	if digest != manager.passwordHash {
-		return nil, "", errors.New("默认管理员密码文件与已有认证摘要不一致")
+		return nil, "", errors.New("default administrator password file does not match the existing authentication digest")
 	}
 	return manager, generated, nil
 }
@@ -122,11 +122,11 @@ func newAuthManager(cfg runtimeConfig, paths appPaths) (*authManager, string, er
 func readAdminPassword(path string, private bool) (string, error) {
 	data, err := persistence.ReadSecretFile(path, 64<<10, private)
 	if err != nil {
-		return "", fmt.Errorf("读取管理员密码文件: %w", err)
+		return "", fmt.Errorf("read administrator password file: %w", err)
 	}
 	password := strings.TrimSuffix(strings.TrimSuffix(string(data), "\n"), "\r")
 	if len(password) < 24 {
-		return "", errors.New("管理员密码文件必须提供至少 24 个字符的高熵密码")
+		return "", errors.New("administrator password file must provide a high-entropy password of at least 24 characters")
 	}
 	return password, nil
 }
@@ -135,18 +135,18 @@ func readAuthDigest(path string) ([32]byte, error) {
 	var result [32]byte
 	data, err := persistence.ReadSecretFile(path, 4<<10, true)
 	if err != nil {
-		return result, fmt.Errorf("读取认证凭据: %w", err)
+		return result, fmt.Errorf("read authentication credentials: %w", err)
 	}
 	var stored authCredentialsFile
 	if err := decodeStrictJSON(data, &stored); err != nil {
-		return result, fmt.Errorf("解析认证凭据: %w", err)
+		return result, fmt.Errorf("parse authentication credentials: %w", err)
 	}
 	if stored.SchemaVersion != authCredentialsSchemaVersion {
-		return result, fmt.Errorf("不支持的认证凭据 schema_version: %d", stored.SchemaVersion)
+		return result, fmt.Errorf("unsupported authentication credentials schema_version: %d", stored.SchemaVersion)
 	}
 	digest, err := hex.DecodeString(stored.PasswordSHA256)
 	if err != nil || len(digest) != sha256.Size {
-		return result, errors.New("认证凭据摘要无效")
+		return result, errors.New("invalid authentication credentials digest")
 	}
 	copy(result[:], digest)
 	return result, nil
@@ -175,11 +175,11 @@ func (a *authManager) AuthenticatePassword(password string) bool {
 
 func (a *authManager) createSession(now time.Time) (string, error) {
 	if !a.Enabled() {
-		return "", errors.New("认证未启用")
+		return "", errors.New("authentication is disabled")
 	}
 	raw := make([]byte, 32)
 	if _, err := rand.Read(raw); err != nil {
-		return "", fmt.Errorf("生成登录会话: %w", err)
+		return "", fmt.Errorf("generate login session: %w", err)
 	}
 	key := sha256.Sum256(raw)
 	a.sessionMu.Lock()
@@ -276,14 +276,14 @@ func newCSRFManager(path string) (*csrfManager, error) {
 	}
 	var stored csrfSecretFile
 	if err := decodeStrictJSON(data, &stored); err != nil {
-		return nil, fmt.Errorf("解析 CSRF secret: %w", err)
+		return nil, fmt.Errorf("parse CSRF secret: %w", err)
 	}
 	if stored.SchemaVersion != 1 {
-		return nil, fmt.Errorf("不支持的 CSRF schema_version: %d", stored.SchemaVersion)
+		return nil, fmt.Errorf("unsupported CSRF schema_version: %d", stored.SchemaVersion)
 	}
 	secret, err := base64.RawURLEncoding.DecodeString(stored.Secret)
 	if err != nil || len(secret) != 32 {
-		return nil, errors.New("CSRF secret 无效")
+		return nil, errors.New("invalid CSRF secret")
 	}
 	return csrfManagerFromSecret(secret), nil
 }
@@ -291,7 +291,7 @@ func newCSRFManager(path string) (*csrfManager, error) {
 func newEphemeralCSRFManager() *csrfManager {
 	secret := make([]byte, 32)
 	if _, err := rand.Read(secret); err != nil {
-		panic(fmt.Sprintf("生成 CSRF secret 失败: %v", err))
+		panic(fmt.Sprintf("event=auth.csrf_secret_failed Generate CSRF secret: %v", err))
 	}
 	return csrfManagerFromSecret(secret)
 }

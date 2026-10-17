@@ -387,7 +387,7 @@ func (app *application) currentNetmuxdDevicesContext(parent context.Context) (ma
 // wifiLockdownPort 设备在 Wi-Fi 上 lockdownd 的监听端口；端口可达不代表已注册到 netmuxd。
 const wifiLockdownPort = "62078"
 
-// reachableTCP 探测 addr 能否建立 TCP 连接，返回 (是否可达, 中文原因)。
+// reachableTCP 探测 addr 能否建立 TCP 连接，返回 (是否可达, 英文诊断)。
 func reachableTCP(addr string, timeout time.Duration) (bool, string) {
 	return reachableTCPContext(context.Background(), addr, timeout)
 }
@@ -402,13 +402,13 @@ func reachableTCPContext(ctx context.Context, addr string, timeout time.Duration
 	msg := strings.ToLower(err.Error())
 	switch {
 	case strings.Contains(msg, "no route to host"):
-		return false, "无法连接（无路由）——设备多半不在同一 Wi-Fi/网段，或 IP 已变"
+		return false, "No route to host; the device may be on a different Wi-Fi network/subnet or its IP address may have changed"
 	case strings.Contains(msg, "timeout"):
-		return false, "连接超时——设备可能离线/休眠，或被网络隔离"
+		return false, "Connection timed out; the device may be offline, asleep, or isolated by the network"
 	case strings.Contains(msg, "refused"):
-		return false, "连接被拒——IP 在网但该端口未监听（可能未开 Wi-Fi 同步）"
+		return false, "Connection refused; no service is listening on this port (Wi-Fi sync may be disabled)"
 	default:
-		return false, "连不上：" + err.Error()
+		return false, "Connection failed: " + err.Error()
 	}
 }
 

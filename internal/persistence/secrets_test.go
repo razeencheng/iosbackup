@@ -162,7 +162,7 @@ func TestAESSecretStoreRejectsJSONNullWithoutPanicking(t *testing.T) {
 	if err == nil {
 		t.Fatal("JSON null 不是秘密条目对象，应返回错误")
 	}
-	if !strings.Contains(err.Error(), "JSON 对象") {
+	if !strings.Contains(err.Error(), "JSON object") {
 		t.Fatalf("应返回明确的 JSON 对象错误，得到 %v", err)
 	}
 	if strings.Contains(err.Error(), "must-not-appear-in-error") {
@@ -334,7 +334,7 @@ func TestAESSecretStoreRejectsMaxPlusOneOnReadWithoutLeakingContent(t *testing.T
 	if err == nil {
 		t.Fatal("超过大小上限 1 字节的秘密文件应拒绝读取")
 	}
-	if !strings.Contains(err.Error(), "大小上限") {
+	if !strings.Contains(err.Error(), "size limit") {
 		t.Fatalf("应返回明确的大小上限错误，得到 %v", err)
 	}
 	if strings.Contains(err.Error(), marker) {
@@ -356,7 +356,7 @@ func TestAESSecretStoreRejectsMaxPlusOneOnWriteAndPreservesOldFile(t *testing.T)
 	if err == nil {
 		t.Fatal("超过大小上限 1 字节的秘密内容应拒绝写入")
 	}
-	if !strings.Contains(err.Error(), "大小上限") {
+	if !strings.Contains(err.Error(), "size limit") {
 		t.Fatalf("应返回明确的大小上限错误，得到 %v", err)
 	}
 	if strings.Contains(err.Error(), marker) {
@@ -384,7 +384,7 @@ func TestAESSecretStoreSetSecretCannotCreateFutureUnreadableFile(t *testing.T) {
 	if err == nil {
 		t.Fatal("SetSecret 不得写出超过读取上限的文件")
 	}
-	if !strings.Contains(err.Error(), "大小上限") || strings.Contains(err.Error(), marker) {
+	if !strings.Contains(err.Error(), "size limit") || strings.Contains(err.Error(), marker) {
 		t.Fatalf("SetSecret 应返回不泄密的大小错误，得到 %v", err)
 	}
 	reopened := mustStore(t, testKey(17), path)

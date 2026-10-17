@@ -364,7 +364,7 @@ func TestAutomaticSecretKeyExplicitSourcesAndConflict(t *testing.T) {
 	cfg := automaticSetupConfig(t)
 	cfg.SecretKey = "configured"
 	cfg.SecretKeyFile = "/missing"
-	if _, err := initSecretStore(cfg, newAppPaths(cfg)); err == nil || !strings.Contains(err.Error(), "不能同时配置") {
+	if _, err := initSecretStore(cfg, newAppPaths(cfg)); err == nil || !strings.Contains(err.Error(), "cannot both be configured") {
 		t.Fatal("双重显式源必须清楚报错")
 	}
 }

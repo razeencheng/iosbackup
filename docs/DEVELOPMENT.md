@@ -102,7 +102,9 @@ go test -count=1 ./internal/i18n ./internal/notification
 go test -count=1 -run 'TestSharedI18n|TestI18n|TestDeviceConnectionsAreLanguageIndependent' ./internal/app
 ```
 
-For new text, update both resources and test the relevant success/error path. For a new language, add complete catalogs, update the supported-language resolver and selector, document fallback and review terminology. Test live switching, unsaved forms, storage failure, unknown error fallback, narrow layouts and longer translations. Review the actual browser output as well as key/parameter parity. Application logs use English event markers such as `event=backup.scheduled`; raw tool diagnostics and user-provided data retain their original text.
+For new user-facing text, update both resources and test the relevant success/error path. For a new language, add complete catalogs, update the supported-language resolver and selector, document fallback and review terminology. Test live switching, unsaved forms, storage failure, unknown error fallback, narrow layouts and longer translations. Review the actual browser output as well as key/parameter parity.
+
+Application-generated operational diagnostics use fixed English and stable event markers such as `event=backup.scheduled`. This includes startup failures and underlying errors embedded in logs, not only the outer log format. Do not add log translation catalogs or a log-language setting; browser/notification language changes do not affect logs. Shared message errors may reuse the English catalog for their diagnostic text. Keep UI/API user messages and generated notifications localized at their presentation boundary. Raw tool/OS diagnostics, device names, paths and other user-provided data retain their original text, including non-English content. Test complete error chains and original-text preservation; checking event markers alone does not establish this contract.
 
 ## Build an image when needed
 

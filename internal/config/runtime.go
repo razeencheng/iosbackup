@@ -148,7 +148,7 @@ func Load(getenv func(string) string) (Runtime, error) {
 		}
 	}
 	if cfg.SecretKey != "" && cfg.SecretKeyFile != "" {
-		return Runtime{}, errors.New("IOSBK_SECRET_KEY 与 IOSBK_SECRET_KEY_FILE 不能同时配置")
+		return Runtime{}, errors.New("IOSBK_SECRET_KEY and IOSBK_SECRET_KEY_FILE cannot both be configured")
 	}
 
 	if value := strings.TrimSpace(getenv("IOSBK_MAX_HEAVY_JOBS")); value != "" {
@@ -196,7 +196,7 @@ func Load(getenv func(string) string) (Runtime, error) {
 		case "error", "warn", "info", "debug", "trace":
 			cfg.NetmuxdLogLevel = value
 		default:
-			return Runtime{}, fmt.Errorf("IOSBK_NETMUXD_LOG_LEVEL 只接受 error/warn/info/debug/trace: %q", value)
+			return Runtime{}, fmt.Errorf("IOSBK_NETMUXD_LOG_LEVEL must be error/warn/info/debug/trace: %q", value)
 		}
 	}
 	if value := strings.ToLower(strings.TrimSpace(getenv("IOSBK_WIFI_BACKEND"))); value != "" {
@@ -204,7 +204,7 @@ func Load(getenv func(string) string) (Runtime, error) {
 		case WiFiBackendNetmuxd, WiFiBackendUSBMuxD2:
 			cfg.WiFiBackend = value
 		default:
-			return Runtime{}, fmt.Errorf("IOSBK_WIFI_BACKEND 只接受 netmuxd/usbmuxd2: %q", value)
+			return Runtime{}, fmt.Errorf("IOSBK_WIFI_BACKEND must be netmuxd/usbmuxd2: %q", value)
 		}
 	}
 	if value := strings.TrimSpace(getenv("IOSBK_WIFI_POWER_ASSERTION")); value != "" {
@@ -224,7 +224,7 @@ func Load(getenv func(string) string) (Runtime, error) {
 		for _, item := range strings.Split(value, ",") {
 			prefix, parseErr := netip.ParsePrefix(strings.TrimSpace(item))
 			if parseErr != nil || !prefix.Addr().IsPrivate() {
-				return Runtime{}, fmt.Errorf("IOSBK_WEBHOOK_ALLOW_CIDRS 只接受私网 CIDR: %q", item)
+				return Runtime{}, fmt.Errorf("IOSBK_WEBHOOK_ALLOW_CIDRS must contain only private CIDRs: %q", item)
 			}
 			cfg.WebhookAllowCIDRs = append(cfg.WebhookAllowCIDRs, prefix.Masked())
 		}
@@ -232,7 +232,7 @@ func Load(getenv func(string) string) (Runtime, error) {
 
 	listenAddr, _ := netip.ParseAddr(cfg.ListenAddr)
 	if !cfg.AuthEnabled && !listenAddr.IsLoopback() && !cfg.InsecureAllowRemote {
-		return Runtime{}, errors.New("认证关闭时监听非 loopback 地址需要 IOSBK_INSECURE_ALLOW_REMOTE=true 显式确认")
+		return Runtime{}, errors.New("Listening on a non-loopback address with authentication disabled requires IOSBK_INSECURE_ALLOW_REMOTE=true")
 	}
 	return cfg, nil
 }

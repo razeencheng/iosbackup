@@ -78,11 +78,11 @@ func (e *exitError) Error() string { return e.prefix + e.err.Error() }
 func (e *exitError) Unwrap() error { return e.err }
 
 func newRuntimeConfigExitError(err error) error {
-	return &exitError{prefix: "运行配置无效: ", err: err}
+	return &exitError{prefix: "event=config.invalid Invalid runtime configuration: ", err: err}
 }
 
 func newApplicationExitError(err error) error {
-	return &exitError{prefix: "应用退出: ", err: err}
+	return &exitError{prefix: "event=application.failed Application failed: ", err: err}
 }
 
 func run(ctx context.Context, cfg runtimeConfig) error {
