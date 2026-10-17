@@ -59,18 +59,16 @@ func TestBackupProgressRendererCoversApprovedStateMatrix(t *testing.T) {
 }
 
 func TestBackupProgressCopyIsBilingualAndActionable(t *testing.T) {
-	markup := readEmbeddedPage(t, "index.html")
-	for _, copy := range []string{
-		`currentFile:{zh:"当前文件",en:"Current file"}`,
-		`currentFileHint:{zh:"当前正在传输的文件进度",en:"Progress of the file currently being transferred"}`,
-		`separator:{zh:"。 ",en:". "}`,
-		`reconnectingTitle:{zh:"等待设备重新连接",en:"Waiting for the device to reconnect"}`,
-		`interruptedHint:{zh:"设备持续离线，本次备份已安全停止。重新连接后可再次开始备份。",en:"The device stayed offline, so this backup stopped safely. Reconnect it to start a new backup."}`,
-		`storageHint:{zh:"请检查保存位置的剩余空间和写入权限。",en:"Check free space and write access for the backup location."}`,
-	} {
-		if !strings.Contains(markup, copy) {
-			t.Errorf("进度组件缺少双语文案 %q", copy)
+	catalog := uiMessageCatalog(t)
+	for _, key := range []string{"progress.currentFile", "progress.currentFileHint", "progress.separator", "progress.reconnectingTitle", "progress.interruptedHint", "progress.storageHint"} {
+		for _, locale := range []string{"en", "zh-CN"} {
+			if catalog[locale][key] == "" {
+				t.Errorf("missing progress translation %s: %s", locale, key)
+			}
 		}
+	}
+	if !strings.Contains(catalog["en"]["progress.storageHint"], "free space") || !strings.Contains(catalog["zh-CN"]["progress.storageHint"], "写入权限") {
+		t.Fatal("storage failure needs actionable guidance")
 	}
 }
 

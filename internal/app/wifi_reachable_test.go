@@ -32,6 +32,9 @@ func TestReachableTCP(t *testing.T) {
 	if strings.TrimSpace(reason) == "" {
 		t.Error("不可达应附带原因说明")
 	}
+	if !strings.Contains(reason, "Connection refused") {
+		t.Errorf("探测失败应返回英文诊断，得到 %q", reason)
+	}
 }
 
 // wifiReachable 探测设备的 lockdown-over-Wi-Fi 端口（62078）。

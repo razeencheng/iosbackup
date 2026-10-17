@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-var errBackupStalled = errors.New("备份长时间没有活动，已停止；请检查手机授权和网络后重试")
+var errBackupStalled = errors.New("backup stalled and was stopped; check device authorization and network before retrying")
 
 // backupActivity 只属于一次命令。设备发现、防休眠续租、普通日志都不能续期。
 // 配套工具报告实际协议字节/消息计数；旧工具仅以可确认的输出进度变化为后备。
@@ -135,7 +135,7 @@ func (a *backupActivity) timeout(cfg runtimeConfig, at time.Time) error {
 	if at.Sub(since) < limit {
 		return nil
 	}
-	return fmt.Errorf("%w（阶段 %s，无活动 %s）", errBackupStalled, a.phase, limit)
+	return fmt.Errorf("%w (phase %s, inactive for %s)", errBackupStalled, a.phase, limit)
 }
 
 func (app *application) runBackupCommand(ctx context.Context, cancel context.CancelCauseFunc, udid, sessionID, directory string, network bool) error {
@@ -226,7 +226,7 @@ func (app *application) runBackupCommand(ctx context.Context, cancel context.Can
 		return err
 	}
 	if !activity.success {
-		return errors.New("备份工具已退出，但未确认本次备份成功")
+		return errors.New("backup tool exited without confirming backup completion")
 	}
 	return nil
 }

@@ -8,6 +8,8 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"iosbackup/internal/i18n"
 )
 
 // ---- 常量 ----
@@ -364,10 +366,10 @@ func (app *application) replayAddDevice() {
 			continue
 		}
 		if _, alreadyIn := currentNetDevices[udid]; alreadyIn {
-			app.addDebugLog(udid, fmt.Sprintf("设备已在 netmuxd 列表，跳过 add_device（IP: %s）", cfg.NetworkAddress))
+			app.addDebugLog(udid, fmt.Sprintf("event=network.already_registered Skipping add_device ip=%s", cfg.NetworkAddress))
 			continue
 		}
-		app.addInfoLog(udid, fmt.Sprintf("调用 add_device: udid=%s ip=%s", udid, cfg.NetworkAddress))
+		app.addInfoLog(udid, fmt.Sprintf("event=network.registering udid=%s ip=%s", udid, cfg.NetworkAddress))
 		app.callAddDevice(udid, cfg.NetworkAddress)
 	}
 }
@@ -385,7 +387,7 @@ func (app *application) currentNetmuxdDevicesContext(parent context.Context) (ma
 // wifiLockdownPort 设备在 Wi-Fi 上 lockdownd 的监听端口；端口可达不代表已注册到 netmuxd。
 const wifiLockdownPort = "62078"
 
-// reachableTCP 探测 addr 能否建立 TCP 连接，返回 (是否可达, 中文原因)。
+// reachableTCP 探测 addr 能否建立 TCP 连接，返回 (是否可达, 英文诊断)。
 func reachableTCP(addr string, timeout time.Duration) (bool, string) {
 	return reachableTCPContext(context.Background(), addr, timeout)
 }
@@ -400,13 +402,13 @@ func reachableTCPContext(ctx context.Context, addr string, timeout time.Duration
 	msg := strings.ToLower(err.Error())
 	switch {
 	case strings.Contains(msg, "no route to host"):
-		return false, "无法连接（无路由）——设备多半不在同一 Wi-Fi/网段，或 IP 已变"
+		return false, "No route to host; the device may be on a different Wi-Fi network/subnet or its IP address may have changed"
 	case strings.Contains(msg, "timeout"):
-		return false, "连接超时——设备可能离线/休眠，或被网络隔离"
+		return false, "Connection timed out; the device may be offline, asleep, or isolated by the network"
 	case strings.Contains(msg, "refused"):
-		return false, "连接被拒——IP 在网但该端口未监听（可能未开 Wi-Fi 同步）"
+		return false, "Connection refused; no service is listening on this port (Wi-Fi sync may be disabled)"
 	default:
-		return false, "连不上：" + err.Error()
+		return false, "Connection failed: " + err.Error()
 	}
 }
 
@@ -446,8 +448,8 @@ func (app *application) callAddDeviceContext(parent context.Context, udid, ip st
 		return err
 	}
 	if app.usesUSBMuxd2WiFi() {
-		app.addWarnLog(udid, fmt.Sprintf("usbmuxd2 Wi-Fi 模式仅支持同网段 mDNS 自动发现，忽略手工 IP %s", ip))
-		return fmt.Errorf("当前 Wi-Fi 连接模式不支持手动 IP，请使用同网段自动发现或切换到 netmuxd")
+		app.addWarnLog(udid, fmt.Sprintf("event=network.manual_ip_unsupported usbmuxd2 Wi-Fi uses local mDNS discovery; ignoring ip=%s", ip))
+		return i18n.NewError(i18n.ManualIPUnsupported, nil)
 	}
 	app.mu.Lock()
 	if err := app.deviceRemovalBlockedUnsafe(udid); err != nil {
@@ -482,8 +484,8 @@ func (app *application) callAddDeviceContext(parent context.Context, udid, ip st
 		}
 	}
 	if ok, reason := probe(ip); !ok {
-		app.addWarnLog(udid, fmt.Sprintf("add_device 跳过：IP %s 不可达（%s）", ip, reason))
-		return fmt.Errorf("%s", reason)
+		app.addWarnLog(udid, fmt.Sprintf("event=network.ip_unreachable Skipping add_device ip=%s detail=%s", ip, reason))
+		return operationError(i18n.IPConnectionFailed, nil, reason)
 	}
 	// 已注册设备重复添加可能触发 helper panic。
 	result := app.scanConnection(ctx, connectionWiFi, false)
@@ -517,28 +519,28 @@ func (app *application) callAddDeviceContext(parent context.Context, udid, ip st
 		_, registered := devices[udid]
 		verifyCancel()
 		if queryErr == nil && registered {
-			app.addInfoLog(udid, fmt.Sprintf("add_device 响应未确认，但注册表已确认设备上线: ip=%s", ip))
+			app.addInfoLog(udid, fmt.Sprintf("event=network.registration_confirmed Device registry confirms registration ip=%s", ip))
 			app.requestConnectionRefresh()
 			return nil
 		}
 	}
 
 	if err != nil {
-		app.addWarnLog(udid, fmt.Sprintf("add_device 执行失败且未查询到设备注册: ip=%s err=%v output=%q", ip, err, output))
-		return fmt.Errorf("IP 可达，但连接服务注册失败，请检查 Wi-Fi 连接服务和设备配对状态")
+		app.addWarnLog(udid, fmt.Sprintf("event=network.registration_failed ip=%s error=%v output=%q", ip, err, output))
+		return i18n.NewError(i18n.IPDeviceOffline, nil)
 	}
 
 	switch {
 	case strings.Contains(output, "Success"):
-		app.addInfoLog(udid, fmt.Sprintf("add_device 成功: ip=%s", ip))
+		app.addInfoLog(udid, fmt.Sprintf("event=network.registered ip=%s", ip))
 		app.requestConnectionRefresh()
 		return nil
 	case strings.Contains(output, "Failure"):
-		app.addWarnLog(udid, fmt.Sprintf("add_device 返回 Failure，设备未注册: ip=%s", ip))
-		return fmt.Errorf("IP 可达，但设备未能注册到 Wi-Fi 连接服务，请确认 IP 属于此设备且已完成配对")
+		app.addWarnLog(udid, fmt.Sprintf("event=network.registration_rejected Device remains unregistered ip=%s", ip))
+		return i18n.NewError(i18n.IPDeviceOffline, nil)
 	default:
-		app.addWarnLog(udid, fmt.Sprintf("add_device 输出未知且未查询到设备注册: ip=%s output=%q", ip, output))
-		return fmt.Errorf("IP 可达，但 Wi-Fi 连接服务未确认注册成功，请重试并检查服务日志")
+		app.addWarnLog(udid, fmt.Sprintf("event=network.registration_unconfirmed ip=%s output=%q", ip, output))
+		return i18n.NewError(i18n.IPDeviceOffline, nil)
 	}
 }
 
@@ -612,7 +614,7 @@ func (app *application) superviseMux(ctx context.Context, label, name string, ar
 		}
 		proc := app.launchMux(ctx, name, args...)
 		if err := proc.Start(); err != nil {
-			app.addErrorLog("SYSTEM", fmt.Sprintf("%s 启动失败: %v", label, err))
+			app.addErrorLog("SYSTEM", fmt.Sprintf("event=service.start_failed service=%s error=%v", label, err))
 			if !sleepOrDone(ctx, delay) {
 				return
 			}
@@ -627,10 +629,10 @@ func (app *application) superviseMux(ctx context.Context, label, name string, ar
 			app.connectionProcessStarted(connectionWiFi)
 		}
 		if first {
-			app.addInfoLog("SYSTEM", label+" 守护进程已启动")
+			app.addInfoLog("SYSTEM", label+" event=service.started")
 			first = false
 		} else {
-			app.addInfoLog("SYSTEM", label+" 已重启")
+			app.addInfoLog("SYSTEM", label+" event=service.restarted")
 			if onRestart != nil {
 				go onRestart()
 			}
@@ -642,7 +644,7 @@ func (app *application) superviseMux(ctx context.Context, label, name string, ar
 		// 区分主动停止与意外退出
 		select {
 		case <-ctx.Done():
-			app.addInfoLog("SYSTEM", label+" 守护进程已停止")
+			app.addInfoLog("SYSTEM", label+" event=service.stopped")
 			return
 		default:
 		}
@@ -652,7 +654,7 @@ func (app *application) superviseMux(ctx context.Context, label, name string, ar
 			delay = app.backoffStart()
 		}
 
-		app.addWarnLog("SYSTEM", fmt.Sprintf("%s 意外退出，%v 后重启", label, delay))
+		app.addWarnLog("SYSTEM", fmt.Sprintf("event=service.exited service=%s restart_after=%v", label, delay))
 		if !sleepOrDone(ctx, delay) {
 			return
 		}
@@ -665,7 +667,7 @@ func (app *application) superviseMux(ctx context.Context, label, name string, ar
 // StartNetmuxd 启动 netmuxd 守护进程（单 goroutine 监督，重启后重放 add_device）。
 func (app *application) StartNetmuxd() error {
 	if app.usesUSBMuxd2WiFi() {
-		app.addInfoLog("SYSTEM", "Wi-Fi 诊断后端为 usbmuxd2，跳过 netmuxd 启动")
+		app.addInfoLog("SYSTEM", "event=network.netmuxd_start_skipped Wi-Fi backend is usbmuxd2")
 		return nil
 	}
 	app.netMuxLifecycleMu.Lock()
@@ -681,7 +683,7 @@ func (app *application) startNetmuxdLocked() error {
 		return nil
 	}
 	if app.netMuxState == muxStopping {
-		return fmt.Errorf("netmuxd 正在停止")
+		return fmt.Errorf("netmuxd is stopping")
 	}
 	app.netMuxState = muxStarting
 	ctx, cancel := context.WithCancel(app.rootCtx)
@@ -710,7 +712,7 @@ func (app *application) startNetmuxdLocked() error {
 	// 生产环境等待端口就绪（不持锁）；测试注入工厂时跳过
 	if app.muxProcFactory == nil {
 		if !waitForDialReadyContext(ctx, "tcp", netmuxdAddr, 10*time.Second) {
-			app.addWarnLog("SYSTEM", "netmuxd 端口未在 10s 内就绪，看门狗将持续重试")
+			app.addWarnLog("SYSTEM", "event=network.netmuxd_not_ready Port was not ready within 10s; watchdog will retry")
 		}
 	}
 	return nil
@@ -739,7 +741,7 @@ func (app *application) stopNetmuxdLocked() {
 		select {
 		case <-done:
 		case <-time.After(6 * time.Second):
-			app.addWarnLog("SYSTEM", "等待 netmuxd 退出超时")
+			app.addWarnLog("SYSTEM", "event=network.netmuxd_stop_timeout Timed out waiting for exit")
 			return
 		}
 	}
@@ -753,18 +755,18 @@ func (app *application) stopNetmuxdLocked() {
 // RestartNetmuxd 重启 netmuxd 守护进程并重放 add_device（无固定 sleep）。
 func (app *application) restartNetmuxdProcess() error {
 	if app.usesUSBMuxd2WiFi() {
-		app.addInfoLog("SYSTEM", "Wi-Fi 诊断后端为 usbmuxd2，跳过 netmuxd 重启")
+		app.addInfoLog("SYSTEM", "event=network.netmuxd_restart_skipped Wi-Fi backend is usbmuxd2")
 		return nil
 	}
 	app.netMuxLifecycleMu.Lock()
 	defer app.netMuxLifecycleMu.Unlock()
-	app.addInfoLog("SYSTEM", "开始重启 netmuxd 守护进程...")
+	app.addInfoLog("SYSTEM", "event=network.netmuxd_restarting")
 	app.stopNetmuxdLocked()
 	if err := app.startNetmuxdLocked(); err != nil {
-		app.addErrorLog("SYSTEM", fmt.Sprintf("重启 netmuxd 失败: %v", err))
+		app.addErrorLog("SYSTEM", fmt.Sprintf("event=network.netmuxd_restart_failed error=%v", err))
 		return err
 	}
-	app.addInfoLog("SYSTEM", "netmuxd 守护进程重启完成")
+	app.addInfoLog("SYSTEM", "event=network.netmuxd_restarted")
 	return nil
 }
 
@@ -817,7 +819,7 @@ func (app *application) startUSBMuxDLocked() error {
 		return nil
 	}
 	if app.usbMuxState == muxStopping {
-		return fmt.Errorf("usbmuxd 正在停止")
+		return fmt.Errorf("usbmuxd is stopping")
 	}
 	app.usbMuxState = muxStarting
 
@@ -851,7 +853,7 @@ func (app *application) startUSBMuxDLocked() error {
 	// 生产环境等待 unix socket 就绪（不持锁）；测试注入工厂时跳过
 	if app.muxProcFactory == nil {
 		if !waitForDialReadyContext(ctx, "unix", "/var/run/usbmuxd", 10*time.Second) {
-			app.addWarnLog("SYSTEM", "usbmuxd socket 未在 10s 内就绪，看门狗将持续重试")
+			app.addWarnLog("SYSTEM", "event=usb.socket_not_ready Socket was not ready within 10s; watchdog will retry")
 		}
 	}
 	return nil
@@ -869,7 +871,7 @@ func (app *application) prepareUSBMuxD() {
 		"/tmp/usbmuxd.sock",
 	} {
 		if err := os.Remove(f); err == nil {
-			app.addDebugLog("SYSTEM", fmt.Sprintf("已清理陈旧文件: %s", f))
+			app.addDebugLog("SYSTEM", fmt.Sprintf("event=service.stale_file_removed path=%s", f))
 		}
 	}
 }
@@ -891,14 +893,14 @@ func (app *application) stopUSBMuxDLocked() {
 	generation := app.usbMuxGeneration
 
 	if cancel != nil {
-		app.addInfoLog("SYSTEM", "正在停止 usbmuxd 守护进程...")
+		app.addInfoLog("SYSTEM", "event=usb.stopping")
 		cancel() // SetGracefulCancel：先 SIGINT，WaitDelay 后强制 kill
 	}
 	if done != nil {
 		select {
 		case <-done:
 		case <-time.After(6 * time.Second): // 略大于优雅退出 grace(3s)
-			app.addWarnLog("SYSTEM", "等待 usbmuxd 退出超时")
+			app.addWarnLog("SYSTEM", "event=usb.stop_timeout Timed out waiting for exit")
 			return
 		}
 	}
@@ -907,18 +909,18 @@ func (app *application) stopUSBMuxDLocked() {
 		app.usbmuxdDone = nil
 		app.usbMuxState = muxStopped
 	}
-	app.addInfoLog("SYSTEM", "usbmuxd 守护进程已停止")
+	app.addInfoLog("SYSTEM", "event=usb.stopped")
 }
 
 // RestartUSBMuxD 重启 usbmuxd 守护进程（无固定 sleep；停止与就绪均为事件驱动）。
 func (app *application) restartUSBMuxDProcess() error {
 	app.usbMuxLifecycleMu.Lock()
 	defer app.usbMuxLifecycleMu.Unlock()
-	app.addInfoLog("SYSTEM", "开始重启 usbmuxd 守护进程...")
+	app.addInfoLog("SYSTEM", "event=usb.restarting")
 	app.stopUSBMuxDLocked()
 	if err := app.startUSBMuxDLocked(); err != nil {
-		return fmt.Errorf("重启 usbmuxd 失败: %v", err)
+		return fmt.Errorf("restart usbmuxd: %v", err)
 	}
-	app.addInfoLog("SYSTEM", "usbmuxd 守护进程重启完成")
+	app.addInfoLog("SYSTEM", "event=usb.restarted")
 	return nil
 }

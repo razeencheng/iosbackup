@@ -100,7 +100,7 @@ func (app *application) recoverNetworkDevices(ctx context.Context, now time.Time
 		if !eligible {
 			continue
 		}
-		app.addDebugLog(udid, "Wi-Fi 设备已不在注册表，尝试恢复连接")
+		app.addDebugLog(udid, "event=network.device_missing Attempting connection recovery")
 		err := app.callAddDeviceContext(ctx, udid, ip)
 		app.mu.Lock()
 		if state.delay == 0 || err == nil {

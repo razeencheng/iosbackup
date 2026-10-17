@@ -43,7 +43,7 @@ func TestDeviceRemovalUIAddsConfirmedFifthTabAndImpactPanel(t *testing.T) {
 		"不会删除已有备份、配置和配对信息",
 		"Existing backups, settings, and pairing information are not deleted",
 	} {
-		if !strings.Contains(markup, phrase) {
+		if !strings.Contains(uiMessageCatalog(t)["zh-CN"]["remove.keepBody"]+uiMessageCatalog(t)["en"]["remove.keepBody"], phrase) {
 			t.Errorf("移除页必须明确保留数据：缺少 %q", phrase)
 		}
 	}
@@ -151,15 +151,16 @@ func TestRemovedDevicesDrawerIsLazyAccessibleAndRestorable(t *testing.T) {
 }
 
 func TestRemovedDevicesDrawerHasCompleteStatesAndI18n(t *testing.T) {
+	catalog := uiMessageCatalog(t)
+	for _, key := range []string{"removed.loading", "removed.empty", "removed.loadFailed", "removed.backupKept", "removed.restoreAction", "removed.restoreFailed"} {
+		for _, locale := range []string{"en", "zh-CN"} {
+			if catalog[locale][key] == "" {
+				t.Errorf("missing drawer translation %s: %s", locale, key)
+			}
+		}
+	}
 	markup := readEmbeddedPage(t, "index.html")
 	for _, want := range []string{
-		`removed: {`,
-		`loading:{zh:"正在加载已移除设备…",en:"Loading removed devices…"}`,
-		`empty:{zh:"还没有已移除设备。",en:"No devices have been removed yet."}`,
-		`loadFailed:{zh:"无法加载已移除设备，请稍后重试。",en:"Removed devices could not be loaded. Please try again."}`,
-		`backupKept:{zh:"备份已保留",en:"Backup preserved"}`,
-		`restoreAction:{zh:"恢复到设备列表",en:"Restore to device list"}`,
-		`restoreFailed:{zh:"恢复失败，请稍后重试。",en:"Restore failed. Please try again."}`,
 		`function renderRemovedDevices(devices, state)`,
 		`document.createElement('article')`,
 		`.textContent=`,

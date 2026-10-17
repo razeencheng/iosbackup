@@ -186,16 +186,17 @@ func TestLoadPreservesValidationErrors(t *testing.T) {
 		env  map[string]string
 		want string
 	}{
+		{name: "conflicting key sources", env: map[string]string{"IOSBK_SECRET_KEY": "not-a-real-key", "IOSBK_SECRET_KEY_FILE": "/run/secrets/key"}, want: "IOSBK_SECRET_KEY and IOSBK_SECRET_KEY_FILE cannot both be configured"},
 		{name: "bool", env: map[string]string{"IOSBK_AUTH_ENABLED": "maybe"}, want: "IOSBK_AUTH_ENABLED must be true or false"},
 		{name: "port range", env: map[string]string{"PORT": "0"}, want: "PORT must be between 1 and 65535"},
 		{name: "directory root", env: map[string]string{"IOSBK_CONFIGS_DIR": "/"}, want: "IOSBK_CONFIGS_DIR must not use the filesystem root as a directory"},
 		{name: "file root", env: map[string]string{"IOSBK_ADMIN_PASSWORD_FILE": "/"}, want: "IOSBK_ADMIN_PASSWORD_FILE must not use the filesystem root as a file"},
 		{name: "heavy jobs", env: map[string]string{"IOSBK_MAX_HEAVY_JOBS": "3"}, want: "IOSBK_MAX_HEAVY_JOBS must be between 1 and 2"},
 		{name: "presence duration", env: map[string]string{"IOSBK_PRESENCE_INTERVAL": "500ms"}, want: "IOSBK_PRESENCE_INTERVAL must be between 1s and 10m0s"},
-		{name: "log level", env: map[string]string{"IOSBK_NETMUXD_LOG_LEVEL": "verbose"}, want: "IOSBK_NETMUXD_LOG_LEVEL 只接受 error/warn/info/debug/trace: \"verbose\""},
-		{name: "Wi-Fi backend", env: map[string]string{"IOSBK_WIFI_BACKEND": "other"}, want: "IOSBK_WIFI_BACKEND 只接受 netmuxd/usbmuxd2: \"other\""},
-		{name: "public CIDR", env: map[string]string{"IOSBK_WEBHOOK_ALLOW_CIDRS": "0.0.0.0/0"}, want: "IOSBK_WEBHOOK_ALLOW_CIDRS 只接受私网 CIDR: \"0.0.0.0/0\""},
-		{name: "remote acknowledgement", env: map[string]string{"IOSBK_LISTEN_ADDR": "0.0.0.0"}, want: "认证关闭时监听非 loopback 地址需要 IOSBK_INSECURE_ALLOW_REMOTE=true 显式确认"},
+		{name: "log level", env: map[string]string{"IOSBK_NETMUXD_LOG_LEVEL": "verbose"}, want: "IOSBK_NETMUXD_LOG_LEVEL must be error/warn/info/debug/trace: \"verbose\""},
+		{name: "Wi-Fi backend", env: map[string]string{"IOSBK_WIFI_BACKEND": "other"}, want: "IOSBK_WIFI_BACKEND must be netmuxd/usbmuxd2: \"other\""},
+		{name: "public CIDR", env: map[string]string{"IOSBK_WEBHOOK_ALLOW_CIDRS": "0.0.0.0/0"}, want: "IOSBK_WEBHOOK_ALLOW_CIDRS must contain only private CIDRs: \"0.0.0.0/0\""},
+		{name: "remote acknowledgement", env: map[string]string{"IOSBK_LISTEN_ADDR": "0.0.0.0"}, want: "Listening on a non-loopback address with authentication disabled requires IOSBK_INSECURE_ALLOW_REMOTE=true"},
 	}
 
 	for _, tt := range tests {

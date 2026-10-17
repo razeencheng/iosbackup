@@ -152,11 +152,11 @@ func TestNotificationConfigDefaultsTemplates(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if config.NotificationTemplates[string(notificationBackupSuccess)] != "设备 ${device_name} 备份成功完成" {
+	if config.NotificationTemplates[string(notificationBackupSuccess)] != "" {
 		t.Fatalf("成功模板默认值不正确: %+v", config.NotificationTemplates)
 	}
-	if config.NotificationTemplates[string(notificationBackupFailed)] == "" {
-		t.Fatal("失败模板默认值不应为空")
+	if config.NotificationTemplates[string(notificationBackupFailed)] != "" {
+		t.Fatal("未定制失败模板必须保持空值，由发送时选择语言")
 	}
 }
 

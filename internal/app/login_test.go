@@ -87,7 +87,7 @@ func TestBasicAuthRemainsCompatibleForAPIClients(t *testing.T) {
 
 func TestLoginPageIsPublicAndUsesSelectedBrandCopy(t *testing.T) {
 	handler := newLoginTestApp(t).setupRoutes()
-	rr := performRequest(handler, http.MethodGet, "/login?next=%2F", nil, map[string]string{"Accept": "text/html"})
+	rr := performRequest(handler, http.MethodGet, "/login?next=%2F", nil, map[string]string{"Accept": "text/html", "Accept-Language": "zh-CN"})
 	if rr.Code != http.StatusOK {
 		t.Fatalf("登录页应公开访问，得到 %d", rr.Code)
 	}

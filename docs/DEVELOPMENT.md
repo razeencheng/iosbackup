@@ -27,6 +27,7 @@ go list -m all
 | `cmd/iosbackup` | Executable entry point, process signals, application startup |
 | `internal/app` | Orchestration, HTTP/API, device state, backups, scheduling, templates, and static assets |
 | `internal/config` | Startup parameter and path parsing/validation |
+| `internal/i18n` | Shared language negotiation and API message resources |
 | `internal/notification` | Notification manager, message types, channel adapters |
 | `internal/persistence` | Atomic file writes and secret-storage support |
 | `internal/boundedio` | Bounded output and line-reading utilities |
@@ -70,6 +71,40 @@ go test -count=1 ./internal/config ./internal/persistence
 ```
 
 See the [testing guide](TESTING_GUIDE.en.md) for the full default suite, coverage, benchmarks, and requirements for enabling real-notification tests. Real notifications require the `integration` tag, an explicit sending-confirmation variable, and a separate configuration path. Leave them disabled during ordinary development.
+
+## Internationalization
+
+The supported application languages are `en` and `zh-CN`. Interface language is a browser preference shared by sign-in, console, onboarding and notification settings. Explicit choices override browser language preferences; unsupported choices fall back to a supported browser preference or English. Legacy `zh` and the onboarding preference are migrated. A language cookie allows server-rendered pages and errors to use the same preference before sign-in. Initial HTML and live language changes consume the same catalog, so the first page does not rely on JavaScript to replace Chinese fallback text.
+
+Resources are local and embedded in the binary:
+
+- `internal/app/static/ui-messages.json`: shared UI source for Go templates and the browser, including titles, placeholders, accessibility labels and image alternatives. `/static/ui-messages.js` serves this catalog as a registration script.
+- `internal/app/static/i18n.js`: language resolution, named interpolation, attributes, dates and request headers.
+- `internal/i18n/messages.json`: API messages used by Go and served to the browser at `/static/api-messages.js`.
+- `internal/notification/messages.json`: generated notification titles, default bodies and channel labels.
+
+API keys in `internal/i18n/messages.json` also generate the Go constants in `internal/i18n/codes.go`. Use `i18n.EncryptionPasswordRequired` in Go call sites instead of a literal such as `"api.encryption_password_required"`. After adding or removing a key, run `go generate ./internal/i18n` and commit the generated file with the catalog change. Do not edit `codes.go` manually or rename existing wire values during a symbol refactor. CI checks generated output without modifying it; a Go source check rejects inline API message keys in production code. Protocol tests may retain literal values to detect accidental compatibility changes.
+
+```bash
+go generate ./internal/i18n
+go run ./internal/i18n/cmd/gencodes -dir internal/i18n -check
+```
+
+Use semantic keys and complete messages with named parameters (`{name}` for UI/API, `${name}` for notification templates). Parameter names must match in every language. Do not concatenate sentence fragments, derive keys from translated text, or branch on a translated label. Preserve device names, paths and custom templates. Known failures return a stable `message_code` and `params`; `code` retains any existing endpoint-specific classification (new endpoints default to the message key). Compatibility `error`/`message` fields remain readable, while raw tool output belongs in diagnostic `detail`. UI actions translate `message_code`, with `code` as a compatibility fallback, including when the language changes after an operation. SSE broadcasts machine states and standard timestamps, never one browser's translated state.
+
+Keep interface language, notification language and scheduling separate. Notification `language` is persisted per deployment; omitted language remains `zh-CN` for compatibility. An empty body override selects the built-in template at send time. Existing nonempty templates are user content, even when they match an older Chinese default: preserve them until the administrator clears them. Switching interface language does not change notification delivery or backup times. Scheduling and displayed times continue to use `Asia/Shanghai`; new `last_backup_at` timestamps include an offset while `last_backup` remains for older clients.
+
+Install Node.js (20 or newer) to run the offline JavaScript behavior tests; no npm packages are needed. CI runs the Node test explicitly, so missing Node cannot silently skip internationalization checks:
+
+```bash
+node internal/app/testdata/i18n.test.js
+go test -count=1 ./internal/i18n ./internal/notification
+go test -count=1 -run 'TestSharedI18n|TestI18n|TestDeviceConnectionsAreLanguageIndependent' ./internal/app
+```
+
+For new user-facing text, update both resources and test the relevant success/error path. For a new language, add complete catalogs, update the supported-language resolver and selector, document fallback and review terminology. Test live switching, unsaved forms, storage failure, unknown error fallback, narrow layouts and longer translations. Review the actual browser output as well as key/parameter parity.
+
+Application-generated operational diagnostics use fixed English and stable event markers such as `event=backup.scheduled`. This includes startup failures and underlying errors embedded in logs, not only the outer log format. Do not add log translation catalogs or a log-language setting; browser/notification language changes do not affect logs. Shared message errors may reuse the English catalog for their diagnostic text. Keep UI/API user messages and generated notifications localized at their presentation boundary. Raw tool/OS diagnostics, device names, paths and other user-provided data retain their original text, including non-English content. Test complete error chains and original-text preservation; checking event markers alone does not establish this contract.
 
 ## Build an image when needed
 

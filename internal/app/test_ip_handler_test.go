@@ -112,13 +112,14 @@ func TestHandleTestDeviceIPUnsupportedBackend(t *testing.T) {
 	rr := httptest.NewRecorder()
 	app.handleTestDeviceIP(rr, withCSRF(httptest.NewRequest(http.MethodPost, "/api/test-ip/IP-DEVICE", strings.NewReader(`{"ip":"192.0.2.1"}`))))
 	var resp struct {
+		Code   string `json:"code"`
 		OK     bool   `json:"ok"`
 		Reason string `json:"reason"`
 	}
 	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
 		t.Fatal(err)
 	}
-	if resp.OK || !strings.Contains(resp.Reason, "不支持手动 IP") {
+	if resp.OK || resp.Code != "api.manual_ip_unsupported" {
 		t.Fatalf("不支持手动 IP 的后端不应误报成功：%s", rr.Body.String())
 	}
 	if len(runner.allCalls()) != 0 {
@@ -150,6 +151,7 @@ func TestHandleTestDeviceIPAlreadyRegistered(t *testing.T) {
 			rr := httptest.NewRecorder()
 			app.handleTestDeviceIP(rr, withCSRF(httptest.NewRequest(http.MethodPost, "/api/test-ip/"+udid, strings.NewReader(`{"ip":"192.0.2.1"}`))))
 			var resp struct {
+				Code   string         `json:"code"`
 				OK     bool           `json:"ok"`
 				Status statusSnapshot `json:"status"`
 			}

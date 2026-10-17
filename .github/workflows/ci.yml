@@ -49,6 +49,10 @@ jobs:
         run: go vet ./...
       - name: Package dependency direction
         run: go test -count=1 -run '^TestPackageDependencyDirection$' ./internal/app
+      - name: Generated API message constants
+        run: go run ./internal/i18n/cmd/gencodes -dir internal/i18n -check
+      - name: Internationalization behavior and catalog checks
+        run: node internal/app/testdata/i18n.test.js
       - name: Test
         run: go test -count=1 ./...
       - name: Race test

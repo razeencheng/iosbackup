@@ -39,7 +39,7 @@ func (app *application) autoBackupScheduler(ctx context.Context) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
-	app.addLog("SYSTEM", fmt.Sprintf("自动备份调度器已启动，每%s检查一次设备状态", interval))
+	app.addLog("SYSTEM", fmt.Sprintf("event=scheduler.started interval=%s", interval))
 
 	for {
 		select {
@@ -176,14 +176,14 @@ func (app *application) checkAndBackup(udid string, config backupConfig, deviceS
 
 	// 全局并发上限：满了就跳过，下个 tick 再试（天然排队，避免多台并发成倍占用资源）。
 	if !app.backupSem.tryAcquire() {
-		app.addLog(udid, "已达备份并发上限，稍后重试")
+		app.addLog(udid, "event=backup.capacity_reached All backup slots are in use; retry later")
 		return
 	}
 	defer app.backupSem.release()
 
 	// 执行备份，传递连接方式信息
 	sessionID := newBackupSessionID()
-	app.addLog(udid, backupSessionLog(sessionID, fmt.Sprintf("自动备份触发 - 连接方式: %s, 电量: %d%%, 充电: %v",
+	app.addLog(udid, backupSessionLog(sessionID, fmt.Sprintf("event=backup.scheduled connection=%s battery=%d%% charging=%v",
 		deviceStatus.Connection, updatedDevice.BatteryLevel, updatedDevice.IsCharging)))
 
 	app.performBackupWithConnection(udid, deviceStatus.Connection, sessionID)
@@ -203,6 +203,7 @@ func (app *application) updateDeviceStatusForBackup(device *device, deviceStatus
 	}
 	if current, ok := app.devices[device.UDID]; ok && !current.PresenceUnknown && current.Connection == deviceStatus.Connection {
 		current.Name = device.Name
+		current.nameIsFallback = device.nameIsFallback
 		current.DeviceType = device.DeviceType
 		current.BatteryLevel = device.BatteryLevel
 		current.IsCharging = device.IsCharging

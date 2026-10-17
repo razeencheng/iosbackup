@@ -18,8 +18,8 @@ const (
 	connectionStartupGrace = 15 * time.Second
 )
 
-var errConnectionRestarting = errors.New("连接服务正在恢复，请稍后重试")
-var errConnectionUnavailable = errors.New("连接服务异常，设备状态暂时无法确认")
+var errConnectionRestarting = errors.New("connection service is recovering; retry later")
+var errConnectionUnavailable = errors.New("connection service is unavailable; device presence cannot be confirmed")
 
 type connectionScan struct {
 	devices              map[string]*device
@@ -104,7 +104,7 @@ func parseConnectionLists(output []byte) (map[string]*device, map[string]*device
 			continue
 		}
 		if len(fields) > 2 || !udidPattern.MatchString(fields[0]) {
-			return nil, nil, fmt.Errorf("无效设备列表格式")
+			return nil, nil, fmt.Errorf("invalid device list format")
 		}
 		conn := connectTypeUSB
 		if len(fields) == 2 {
@@ -113,7 +113,7 @@ func parseConnectionLists(output []byte) (map[string]*device, map[string]*device
 			case "(network)":
 				conn = connectTypeNetwork
 			default:
-				return nil, nil, fmt.Errorf("无效连接类型")
+				return nil, nil, fmt.Errorf("invalid connection type")
 			}
 		}
 		d := &device{UDID: fields[0], Connection: connectionTypeDesc(conn), IsOnline: true}
@@ -273,20 +273,20 @@ func (app *application) publishConnectionScan(backend int, result connectionScan
 	usb, network, valid := app.connectionListsUnsafe()
 	app.mu.Unlock()
 	if notifyFailure {
-		name := "USB 连接服务"
+		name := "USB"
 		if backend == connectionWiFi {
-			name = "Wi-Fi 连接服务"
+			name = "Wi-Fi"
 		} else if app.usesUSBMuxd2WiFi() {
-			name = "USB / Wi-Fi 连接服务"
+			name = "USB / Wi-Fi"
 		}
-		app.notifySystemError(name+"持续不可用", "设备列表已连续多次查询失败，暂时无法确认设备状态或开始新备份。请查看页面中的连接服务状态及日志；如自动恢复未成功，请检查容器和设备连接。")
+		app.notifySystemEvent("connection_service_unavailable", map[string]string{"backend": name})
 	}
 	_, created := app.applyPresenceSnapshotValid(mergeDeviceLists(usb, network), network, result.completed, valid, revision)
 	if created {
 		_ = app.saveConfigs()
 	}
 	if result.err != nil && previous != "suspect" && previous != "unhealthy" {
-		app.addWarnLog("SYSTEM", fmt.Sprintf("连接服务查询异常：backend=%d generation=%d scan=%d code=%s", backend, result.generation, result.sequence, result.code))
+		app.addWarnLog("SYSTEM", fmt.Sprintf("event=connection.query_failed backend=%d generation=%d scan=%d code=%s", backend, result.generation, result.sequence, result.code))
 	}
 	app.broadcastStatus()
 }

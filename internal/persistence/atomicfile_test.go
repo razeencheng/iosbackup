@@ -87,7 +87,7 @@ func TestWriteFileAtomicRenameFailurePreservesOldFile(t *testing.T) {
 	}
 
 	err := writeFileAtomic(path, []byte("new"), 0o600, ops)
-	if !errors.Is(err, wantErr) || !strings.Contains(err.Error(), "替换配置文件") {
+	if !errors.Is(err, wantErr) || !strings.Contains(err.Error(), "replace configuration file") {
 		t.Fatalf("应包装 rename 原始错误，得到 %v", err)
 	}
 	assertFileState(t, path, "old", 0o640)
@@ -100,10 +100,10 @@ func TestWriteFileAtomicPreRenameFailuresPreserveOldFile(t *testing.T) {
 		stage  string
 		mutate func(*faultFile, error)
 	}{
-		{name: "write", stage: "写入临时文件", mutate: func(f *faultFile, err error) { f.writeErr = err }},
-		{name: "chmod", stage: "设置临时文件权限", mutate: func(f *faultFile, err error) { f.chmodErr = err }},
-		{name: "sync", stage: "同步临时文件", mutate: func(f *faultFile, err error) { f.syncErr = err }},
-		{name: "close", stage: "关闭临时文件", mutate: func(f *faultFile, err error) { f.closeErr = err }},
+		{name: "write", stage: "write temporary file", mutate: func(f *faultFile, err error) { f.writeErr = err }},
+		{name: "chmod", stage: "set temporary file permissions", mutate: func(f *faultFile, err error) { f.chmodErr = err }},
+		{name: "sync", stage: "sync temporary file", mutate: func(f *faultFile, err error) { f.syncErr = err }},
+		{name: "close", stage: "close temporary file", mutate: func(f *faultFile, err error) { f.closeErr = err }},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -191,13 +191,13 @@ func TestWriteFileAtomicWritesPrivatelyBeforeApplyingFinalMode(t *testing.T) {
 }
 
 func TestWriteFileAtomicDirectoryOpenFailureLeavesCompleteReplacement(t *testing.T) {
-	testPostRenameFailure(t, "打开配置目录", func(ops *atomicOps, wantErr error) {
+	testPostRenameFailure(t, "open configuration directory", func(ops *atomicOps, wantErr error) {
 		ops.openDir = func(string) (atomicDir, error) { return nil, wantErr }
 	})
 }
 
 func TestWriteFileAtomicDirectorySyncFailureLeavesCompleteReplacement(t *testing.T) {
-	testPostRenameFailure(t, "同步配置目录", func(ops *atomicOps, wantErr error) {
+	testPostRenameFailure(t, "sync configuration directory", func(ops *atomicOps, wantErr error) {
 		ops.openDir = func(string) (atomicDir, error) {
 			return &faultDir{syncErr: wantErr}, nil
 		}

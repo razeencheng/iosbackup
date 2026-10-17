@@ -103,7 +103,7 @@ func TestManagerFiltersRulesAndContinuesAfterNotifierFailure(t *testing.T) {
 	logsMu.Lock()
 	joined := strings.Join(logs, "\n")
 	logsMu.Unlock()
-	if !strings.Contains(joined, "通知器 fail 发送失败") || !strings.Contains(joined, "通知器 ok 发送成功") {
+	if !strings.Contains(joined, "event=notification.delivery_failed notifier=fail") || !strings.Contains(joined, "event=notification.delivery_succeeded notifier=ok") {
 		t.Fatalf("delivery logs missing: %q", joined)
 	}
 }
@@ -182,7 +182,7 @@ func TestAddNotifierRejectsTypedNil(t *testing.T) {
 	manager := NewManager(Options{Logf: func(string, ...any) {}})
 	defer manager.Close()
 	var notifier *nilCapableNotifier
-	if err := manager.AddNotifier(notifier); err == nil || !strings.Contains(err.Error(), "不能为空") {
+	if err := manager.AddNotifier(notifier); err == nil || !strings.Contains(err.Error(), "must not be nil") {
 		t.Fatalf("typed-nil notifier error = %v", err)
 	}
 	if got := len(manager.GetNotifiers()); got != 0 {
@@ -240,7 +240,7 @@ func TestSendRestoresBaseNoAvailableNotifierLogging(t *testing.T) {
 	withRule := strings.Join(logs, "\n")
 	logs = nil
 	logsMu.Unlock()
-	if !strings.Contains(withRule, "消息类型 backup_success 没有可用通知器，跳过发送") {
+	if !strings.Contains(withRule, "event=notification.no_targets type=backup_success action=skip") {
 		t.Fatalf("missing no-eligible-target log: %q", withRule)
 	}
 
@@ -249,7 +249,7 @@ func TestSendRestoresBaseNoAvailableNotifierLogging(t *testing.T) {
 	logsMu.Lock()
 	withoutRule := strings.Join(logs, "\n")
 	logsMu.Unlock()
-	if strings.Count(withoutRule, "跳过发送") != 2 || !strings.Contains(withoutRule, "没有配置通知规则或规则为空") || !strings.Contains(withoutRule, "没有可用通知器") {
+	if strings.Count(withoutRule, "action=skip") != 2 || !strings.Contains(withoutRule, "event=notification.no_rule") || !strings.Contains(withoutRule, "event=notification.no_targets") {
 		t.Fatalf("no-rule send did not preserve both base log entries: %q", withoutRule)
 	}
 
@@ -262,7 +262,7 @@ func TestSendRestoresBaseNoAvailableNotifierLogging(t *testing.T) {
 	logsMu.Lock()
 	disabledManager := strings.Join(logs, "\n")
 	logsMu.Unlock()
-	if !strings.Contains(disabledManager, "消息类型 backup_success 没有可用通知器，跳过发送") {
+	if !strings.Contains(disabledManager, "event=notification.no_targets type=backup_success action=skip") {
 		t.Fatalf("disabled manager lost the base no-available-notifier log: %q", disabledManager)
 	}
 
@@ -274,7 +274,7 @@ func TestSendRestoresBaseNoAvailableNotifierLogging(t *testing.T) {
 	logsMu.Lock()
 	afterClose := strings.Join(logs, "\n")
 	logsMu.Unlock()
-	if strings.Count(afterClose, "消息类型 backup_success 没有可用通知器，跳过发送") != 1 {
+	if strings.Count(afterClose, "event=notification.no_targets type=backup_success action=skip") != 1 {
 		t.Fatalf("Send after Close lost the base no-available-notifier log: %q", afterClose)
 	}
 }

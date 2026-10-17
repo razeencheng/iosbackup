@@ -137,7 +137,7 @@ func TestPrimaryPagesUseSemanticSVGIconSprite(t *testing.T) {
 		"index.html": {
 			`#icon-guide`, `#icon-bell`, `#icon-settings`, `#icon-backup-settings`,
 			`#icon-backup-library`, `#icon-lock`, `#icon-restore`, `#icon-folder-check`,
-			`#icon-network-check`, `#icon-pair`, `#icon-unpack`, `set('lock-open'`,
+			`#icon-network-check`, `#icon-pair`, `#icon-unpack`, `['lock-open','enc.stateOff'`,
 			`#icon-shield-unlock`,
 		},
 		"notifications.html": {

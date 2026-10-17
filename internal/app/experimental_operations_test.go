@@ -75,13 +75,14 @@ func assertExperimentalDisabledResponse(t *testing.T, rr *httptest.ResponseRecor
 		t.Fatalf("Content-Type=%q, want application/json", got)
 	}
 	var response struct {
+		Code  string `json:"code"`
 		Error string `json:"error"`
 	}
 	if err := json.Unmarshal(rr.Body.Bytes(), &response); err != nil {
 		t.Fatalf("response is not stable JSON: %v; body=%q", err, rr.Body.String())
 	}
-	if response.Error != experimentalOperationsDisabledMessage {
-		t.Fatalf("error=%q, want %q", response.Error, experimentalOperationsDisabledMessage)
+	if response.Code != "api.experimental_disabled" || response.Error == "" {
+		t.Fatalf("unexpected disabled-operation response: %+v", response)
 	}
 }
 
@@ -169,10 +170,10 @@ func TestExperimentalOperationsPreserveMethodAndCSRFPrecedence(t *testing.T) {
 		wantStatus int
 		wantBody   string
 	}{
-		{name: "unpack method", handler: app.handleBackupUnback, path: "/api/backup-unback/x", method: http.MethodGet, csrf: true, wantStatus: http.StatusMethodNotAllowed, wantBody: "Method not allowed"},
-		{name: "delete method", handler: app.handleDeleteBackup, path: "/api/delete-backup/x", method: http.MethodGet, csrf: true, wantStatus: http.StatusMethodNotAllowed, wantBody: "Method not allowed"},
-		{name: "unpack csrf", handler: app.handleBackupUnback, path: "/api/backup-unback/x", method: http.MethodPost, wantStatus: http.StatusForbidden, wantBody: "缺少 CSRF 头"},
-		{name: "delete csrf", handler: app.handleDeleteBackup, path: "/api/delete-backup/x", method: http.MethodPost, wantStatus: http.StatusForbidden, wantBody: "缺少 CSRF 头"},
+		{name: "unpack method", handler: app.handleBackupUnback, path: "/api/backup-unback/x", method: http.MethodGet, csrf: true, wantStatus: http.StatusMethodNotAllowed, wantBody: `"code":"api.method_not_allowed"`},
+		{name: "delete method", handler: app.handleDeleteBackup, path: "/api/delete-backup/x", method: http.MethodGet, csrf: true, wantStatus: http.StatusMethodNotAllowed, wantBody: `"code":"api.method_not_allowed"`},
+		{name: "unpack csrf", handler: app.handleBackupUnback, path: "/api/backup-unback/x", method: http.MethodPost, wantStatus: http.StatusForbidden, wantBody: `"code":"api.csrf_required"`},
+		{name: "delete csrf", handler: app.handleDeleteBackup, path: "/api/delete-backup/x", method: http.MethodPost, wantStatus: http.StatusForbidden, wantBody: `"code":"api.csrf_required"`},
 	}
 
 	for _, tt := range tests {
@@ -196,7 +197,7 @@ func TestExperimentalOperationsEnabledPreservesExistingEndpointBehavior(t *testi
 		app, backupPath := newExperimentalOperationsTestApp(t, true)
 		app.manifestRows = func(context.Context, string, func(backupManifestRow) error) error { return nil }
 		rr := experimentalOperationRequest(app, app.handleBackupUnback, "/api/backup-unback/"+experimentalTestUDID, "")
-		if rr.Code != http.StatusOK || !strings.Contains(rr.Body.String(), "解包已开始") {
+		if rr.Code != http.StatusOK || !strings.Contains(rr.Body.String(), `"code":"api.unpack_started"`) {
 			t.Fatalf("enabled unpack changed response: status=%d body=%s", rr.Code, rr.Body.String())
 		}
 		marker := filepath.Join(backupPath, "_unback_", ".iosbackup-unback.json")
@@ -220,7 +221,7 @@ func TestExperimentalOperationsEnabledPreservesExistingEndpointBehavior(t *testi
 			"/api/delete-backup/"+experimentalTestUDID,
 			`{"confirm_name":"实验设备"}`,
 		)
-		if rr.Code != http.StatusOK || !strings.Contains(rr.Body.String(), "备份已删除") {
+		if rr.Code != http.StatusOK || !strings.Contains(rr.Body.String(), `"code":"api.backup_deleted"`) {
 			t.Fatalf("enabled delete changed response: status=%d body=%s", rr.Code, rr.Body.String())
 		}
 		if _, err := os.Stat(backupPath); !os.IsNotExist(err) {

@@ -19,6 +19,7 @@ func TestHandleHomeRendersFromCache(t *testing.T) {
 	}
 	app.htmlTemplate = template.Must(template.New("index.html").Funcs(template.FuncMap{
 		"contains": strings.Contains,
+		"t":        uiText,
 	}).Parse(string(tmplData)))
 
 	// 仅写入内存缓存，不依赖任何 libimobiledevice 探测

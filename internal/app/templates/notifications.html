@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="{{.Locale}}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="iosbk-csrf" content="{{.CSRFToken}}">
-<title>Notifications · iOS Device Backup</title>
+<title data-i18n="page.notifications">{{t $.Locale "page.notifications"}}</title>
 <link rel="icon" href="/static/favicon.ico?v={{.Version}}" type="image/x-icon">
 <style>
   :root{--iosbk-radius:9px}
@@ -27,6 +27,9 @@
   .dirty-hint .ddot{width:7px;height:7px;border-radius:50%;background:#E0922F;animation:iosbkpulse 1.4s ease-in-out infinite}
   .save-dirty{animation:iosbkdirty 1.5s ease-in-out infinite}
 </style>
+<script src="/static/i18n.js?v={{.Version}}"></script>
+<script src="/static/ui-messages.js?v={{.Version}}"></script>
+<script src="/static/api-messages.js?v={{.Version}}"></script>
 </head>
 <body>
 <div style="min-height:100vh;padding:22px 16px 64px">
@@ -35,67 +38,72 @@
   <!-- header -->
   <div style="background:#fff;border:1px solid #D8E2EA;border-radius:var(--iosbk-radius);box-shadow:0 1px 2px rgba(35,52,68,.04);padding:16px 18px;margin-bottom:14px;display:flex;flex-wrap:wrap;gap:13px;align-items:center;justify-content:space-between">
     <div style="display:flex;align-items:center;gap:12px">
-      <a class="iosbk-brand-logo" href="/" aria-label="返回备份控制台"><img src="/static/logo-mark.png" alt=""></a>
+      <a class="iosbk-brand-logo" href="/" data-i18n-aria="common.console" aria-label="{{t $.Locale "common.console"}}"><img src="/static/logo-mark.png" alt=""></a>
       <div>
-        <div style="font-size:18px;font-weight:700;letter-spacing:-.01em" data-i18n="notif.title"></div>
-        <div style="font-size:12.5px;color:#6F7E8C;margin-top:2px" data-i18n="notif.subtitle"></div>
+        <div style="font-size:18px;font-weight:700;letter-spacing:-.01em" data-i18n="notif.title">{{t $.Locale "notif.title"}}</div>
+        <div style="font-size:12.5px;color:#6F7E8C;margin-top:2px" data-i18n="notif.subtitle">{{t $.Locale "notif.subtitle"}}</div>
       </div>
     </div>
     <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
       <div style="display:inline-flex;background:#F3F7FA;border:1px solid #D8E2EA;border-radius:var(--iosbk-radius);padding:3px">
-        <button class="lang-btn" data-lang="en" onclick="setLang('en')">EN</button>
-        <button class="lang-btn" data-lang="zh" onclick="setLang('zh')">中文</button>
+        <button class="lang-btn {{if ne $.Locale "zh-CN"}}active{{end}}" data-lang="en" onclick="setLang('en')" aria-pressed="{{if ne $.Locale "zh-CN"}}true{{else}}false{{end}}">EN</button>
+        <button class="lang-btn {{if eq $.Locale "zh-CN"}}active{{end}}" data-lang="zh-CN" onclick="setLang('zh-CN')" aria-pressed="{{if eq $.Locale "zh-CN"}}true{{else}}false{{end}}">中文</button>
       </div>
-      <a data-back-control href="/" style="display:inline-flex;align-items:center;gap:7px;padding:9px 14px;background:#fff;color:#27384A;border:1px solid #D8E2EA;border-radius:var(--iosbk-radius);font-size:13.5px;font-weight:600;text-decoration:none;font-family:inherit"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-arrow-left"></use></svg><span data-i18n="notif.back"></span></a>
-      <span id="notifDirty" class="dirty-hint hidden"><span class="ddot"></span><span data-i18n="notif.unsaved"></span></span>
-      <button onclick="reloadConfig()" style="display:inline-flex;align-items:center;gap:7px;padding:9px 14px;background:#fff;color:#27384A;border:1px solid #D8E2EA;border-radius:var(--iosbk-radius);font-size:13.5px;font-weight:500;cursor:pointer;font-family:inherit"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-refresh"></use></svg><span data-i18n="notif.reload"></span></button>
-      <button id="notifSaveBtn" onclick="saveConfig()" style="display:inline-flex;align-items:center;gap:7px;padding:9px 16px;background:#2C62C6;color:#fff;border:none;border-radius:var(--iosbk-radius);font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-save"></use></svg><span data-i18n="notif.save"></span></button>
+      <a data-back-control href="/" style="display:inline-flex;align-items:center;gap:7px;padding:9px 14px;background:#fff;color:#27384A;border:1px solid #D8E2EA;border-radius:var(--iosbk-radius);font-size:13.5px;font-weight:600;text-decoration:none;font-family:inherit"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-arrow-left"></use></svg><span data-i18n="notif.back">{{t $.Locale "notif.back"}}</span></a>
+      <span id="notifDirty" class="dirty-hint hidden"><span class="ddot"></span><span data-i18n="notif.unsaved">{{t $.Locale "notif.unsaved"}}</span></span>
+      <button onclick="reloadConfig()" style="display:inline-flex;align-items:center;gap:7px;padding:9px 14px;background:#fff;color:#27384A;border:1px solid #D8E2EA;border-radius:var(--iosbk-radius);font-size:13.5px;font-weight:500;cursor:pointer;font-family:inherit"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-refresh"></use></svg><span data-i18n="notif.reload">{{t $.Locale "notif.reload"}}</span></button>
+      <button id="notifSaveBtn" onclick="saveConfig()" style="display:inline-flex;align-items:center;gap:7px;padding:9px 16px;background:#2C62C6;color:#fff;border:none;border-radius:var(--iosbk-radius);font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-save"></use></svg><span data-i18n="notif.save">{{t $.Locale "notif.save"}}</span></button>
     </div>
   </div>
 
   <!-- master switch -->
   <div style="background:#fff;border:1px solid #D8E2EA;border-radius:var(--iosbk-radius);padding:16px 18px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;gap:14px">
-    <div><div style="font-size:15px;font-weight:600" data-i18n="notif.masterTitle"></div><div style="font-size:12.5px;color:#6F7E8C;margin-top:3px" data-i18n="notif.masterBody"></div></div>
+    <div><div style="font-size:15px;font-weight:600" data-i18n="notif.masterTitle">{{t $.Locale "notif.masterTitle"}}</div><div style="font-size:12.5px;color:#6F7E8C;margin-top:3px" data-i18n="notif.masterBody">{{t $.Locale "notif.masterBody"}}</div></div>
     <button id="masterToggle" onclick="toggleMaster()"></button>
   </div>
 
+  <div style="margin-bottom:18px;padding:14px 18px;border:1px solid #D8E2EA;border-radius:var(--iosbk-radius);background:#fff">
+    <label for="notificationLanguage" data-i18n="notif.language" style="display:block;font-weight:600;margin-bottom:8px">{{t $.Locale "notif.language"}}</label>
+    <select id="notificationLanguage" class="iosbk-in" onchange="cfg.language=this.value;markNotifDirty()"><option value="en" lang="en">English</option><option value="zh-CN" lang="zh-CN">简体中文</option></select>
+    <p data-i18n="notif.languageHint" style="font-size:12.5px;color:#6F7E8C;margin:8px 0 0">{{t $.Locale "notif.languageHint"}}</p>
+  </div>
   <div id="channelsArea">
     <div id="channels"></div>
 
     <!-- rules -->
     <div style="background:#fff;border:1px solid #D8E2EA;border-radius:var(--iosbk-radius);padding:18px;margin-bottom:14px">
-      <div style="font-size:15px;font-weight:600" data-i18n="notif.rulesTitle"></div>
-      <div style="font-size:12.5px;color:#6F7E8C;margin-top:3px;margin-bottom:14px" data-i18n="notif.rulesBody"></div>
+      <div style="font-size:15px;font-weight:600" data-i18n="notif.rulesTitle">{{t $.Locale "notif.rulesTitle"}}</div>
+      <div style="font-size:12.5px;color:#6F7E8C;margin-top:3px;margin-bottom:14px" data-i18n="notif.rulesBody">{{t $.Locale "notif.rulesBody"}}</div>
       <div id="rules" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px"></div>
     </div>
 
     <div style="background:#fff;border:1px solid #D8E2EA;border-radius:var(--iosbk-radius);padding:18px;margin-bottom:14px">
-      <div style="font-size:15px;font-weight:600" data-i18n="notif.templatesTitle"></div>
-      <div style="font-size:12.5px;color:#6F7E8C;margin-top:3px;margin-bottom:5px" data-i18n="notif.templatesBody"></div>
-      <div style="font-size:12px;color:#718090;margin-bottom:14px"><code>${title}</code> · <code>${content}</code> · <code>${device_name}</code> · <code>${device_udid}</code> · <code>${timestamp}</code> · <code>${type}</code> · <code>${level}</code> · <code>${reason}</code></div>
+      <div style="font-size:15px;font-weight:600" data-i18n="notif.templatesTitle">{{t $.Locale "notif.templatesTitle"}}</div>
+      <div style="font-size:12.5px;color:#6F7E8C;margin-top:3px;margin-bottom:5px" data-i18n="notif.templatesBody">{{t $.Locale "notif.templatesBody"}}</div>
+      <div style="font-size:12px;color:#718090;margin-bottom:14px"><code>${title}</code> · <code>${content}</code> · <code>${device_name}</code> · <code>${device_udid}</code> · <code>${timestamp}</code> · <code>${type}</code> · <code>${level}</code> · <code>${reason}</code> · <code>${diagnostics}</code></div>
       <div id="templates" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px"></div>
     </div>
 
     <!-- test -->
     <div style="background:#fff;border:1px solid #D8E2EA;border-radius:var(--iosbk-radius);padding:18px;display:flex;flex-wrap:wrap;gap:14px;align-items:center;justify-content:space-between">
-      <div style="flex:1;min-width:200px"><div style="font-size:15px;font-weight:600" data-i18n="notif.testTitle"></div><div style="font-size:12.5px;color:#6F7E8C;margin-top:3px" data-i18n="notif.testBody"></div></div>
+      <div style="flex:1;min-width:200px"><div style="font-size:15px;font-weight:600" data-i18n="notif.testTitle">{{t $.Locale "notif.testTitle"}}</div><div style="font-size:12.5px;color:#6F7E8C;margin-top:3px" data-i18n="notif.testBody">{{t $.Locale "notif.testBody"}}</div></div>
       <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-        <select id="testType" class="iosbk-in" style="width:auto;min-width:150px"><option value="backup_start" data-i18n="notif.evtStart"></option><option value="backup_success" data-i18n="notif.evtSuccess"></option><option value="backup_failed" data-i18n="notif.evtFailed"></option><option value="device_online" data-i18n="notif.evtOnline"></option><option value="device_offline" data-i18n="notif.evtOffline"></option><option value="system_error" data-i18n="notif.evtError"></option></select>
-        <button onclick="testNotification()" style="display:inline-flex;align-items:center;gap:8px;padding:9px 16px;background:#2E7D5B;color:#fff;border:none;border-radius:var(--iosbk-radius);font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-send"></use></svg><span data-i18n="notif.test"></span></button>
+        <select id="testType" class="iosbk-in" style="width:auto;min-width:150px"><option value="backup_start" data-i18n="notif.evtStart">{{t $.Locale "notif.evtStart"}}</option><option value="backup_success" data-i18n="notif.evtSuccess">{{t $.Locale "notif.evtSuccess"}}</option><option value="backup_failed" data-i18n="notif.evtFailed">{{t $.Locale "notif.evtFailed"}}</option><option value="device_online" data-i18n="notif.evtOnline">{{t $.Locale "notif.evtOnline"}}</option><option value="device_offline" data-i18n="notif.evtOffline">{{t $.Locale "notif.evtOffline"}}</option><option value="system_error" data-i18n="notif.evtError">{{t $.Locale "notif.evtError"}}</option></select>
+        <button onclick="testNotification()" style="display:inline-flex;align-items:center;gap:8px;padding:9px 16px;background:#2E7D5B;color:#fff;border:none;border-radius:var(--iosbk-radius);font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-send"></use></svg><span data-i18n="notif.test">{{t $.Locale "notif.test"}}</span></button>
       </div>
     </div>
 
     <div style="display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:12px;padding:14px 2px 0">
-      <span id="notifBottomDirty" class="dirty-hint hidden"><span class="ddot"></span><span data-i18n="notif.unsaved"></span></span>
-      <button id="notifBottomSaveBtn" onclick="saveConfig()" style="display:inline-flex;align-items:center;gap:7px;padding:9px 16px;background:#2C62C6;color:#fff;border:none;border-radius:var(--iosbk-radius);font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-save"></use></svg><span data-i18n="notif.save"></span></button>
+      <span id="notifBottomDirty" class="dirty-hint hidden"><span class="ddot"></span><span data-i18n="notif.unsaved">{{t $.Locale "notif.unsaved"}}</span></span>
+      <button id="notifBottomSaveBtn" onclick="saveConfig()" style="display:inline-flex;align-items:center;gap:7px;padding:9px 16px;background:#2C62C6;color:#fff;border:none;border-radius:var(--iosbk-radius);font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-save"></use></svg><span data-i18n="notif.save">{{t $.Locale "notif.save"}}</span></button>
     </div>
   </div>
 
-  <div style="text-align:center;margin-top:24px"><a href="/" style="display:inline-flex;align-items:center;gap:5px;color:#6F7E8C;text-decoration:none;font-size:12.5px"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-arrow-left"></use></svg><span data-i18n="common.console"></span></a></div>
+  <div style="text-align:center;margin-top:24px"><a href="/" style="display:inline-flex;align-items:center;gap:5px;color:#6F7E8C;text-decoration:none;font-size:12.5px"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-arrow-left"></use></svg><span data-i18n="common.console">{{t $.Locale "common.console"}}</span></a></div>
 
 </div>
 <footer style="max-width:860px;margin:22px auto 0;text-align:center;color:#718090;font-size:12px">
-  iOS Backup {{.Version}} · <a href="{{.SourceURL}}/tree/{{.Commit}}" rel="noreferrer" style="color:#5B6F91">Source {{.Commit}}</a> · AGPL-3.0-only
+  iOS Backup {{.Version}} · <a href="{{.SourceURL}}/tree/{{.Commit}}" rel="noreferrer" style="color:#5B6F91"><span data-i18n="common.source">{{t $.Locale "common.source"}}</span> {{.Commit}}</a> · AGPL-3.0-only
 </footer>
 </div>
 
@@ -104,34 +112,22 @@
 </div>
 
 <script>
-/* ============== bilingual dictionary (notif subtree, verbatim from i18n.js) ============== */
-const IOSBK_DICT = {
-  notif: { unsaved:{zh:"有未保存的修改",en:"Unsaved changes"}, title:{zh:"通知设置",en:"Notifications"}, subtitle:{zh:"备份成功、失败等事件发生时，把消息发到你常用的地方。",en:"Get a message where you want it when backups succeed, fail, and more."}, back:{zh:"返回",en:"Back"}, reload:{zh:"重新加载",en:"Reload"}, save:{zh:"保存",en:"Save"}, saved:{zh:"已保存",en:"Saved"}, masterTitle:{zh:"启用通知",en:"Enable notifications"}, masterBody:{zh:"关闭后，下面所有渠道都不会发送。",en:"When off, none of the channels below will send."}, add:{zh:"添加",en:"Add"}, remove:{zh:"删除",en:"Remove"}, removeConfirm:{zh:"删除这个配置？",en:"Delete this entry?"}, configName:{zh:"名称",en:"Name"}, test:{zh:"发送测试通知",en:"Send test"}, testTitle:{zh:"测试",en:"Test"}, testBody:{zh:"发一条测试消息，确认配置无误。",en:"Send a test message to confirm everything's wired up."}, testSent:{zh:"测试通知已发送，请到对应渠道查看。",en:"Test sent — check the channel."}, tg:{zh:"Telegram",en:"Telegram"}, tgDesc:{zh:"通过 Telegram 机器人发送。",en:"Send via a Telegram bot."}, email:{zh:"邮件",en:"Email"}, emailDesc:{zh:"通过 SMTP 发送邮件。",en:"Send email over SMTP."}, wecom:{zh:"企业微信",en:"WeCom"}, wecomDesc:{zh:"通过企业微信群机器人发送。",en:"Send via a WeCom group bot."}, bark:{zh:"Bark",en:"Bark"}, barkDesc:{zh:"通过 Bark 推送到 iPhone。",en:"Push to iPhone through Bark."}, webhook:{zh:"Webhook",en:"Webhook"}, webhookDesc:{zh:"发送到你自定义的 HTTP 地址。",en:"POST to your own HTTP endpoint."}, botToken:{zh:"Bot Token",en:"Bot Token"}, chatId:{zh:"Chat ID",en:"Chat ID"}, smtpHost:{zh:"SMTP 主机",en:"SMTP host"}, smtpPort:{zh:"端口",en:"Port"}, username:{zh:"用户名",en:"Username"}, password:{zh:"密码",en:"Password"}, from:{zh:"发件人",en:"From"}, to:{zh:"收件人",en:"To"}, serverUrl:{zh:"服务器地址",en:"Server URL"}, deviceKey:{zh:"设备 Key",en:"Device Key"}, url:{zh:"地址 URL",en:"URL"}, method:{zh:"请求方法",en:"Method"}, rulesTitle:{zh:"通知规则",en:"Notification rules"}, rulesBody:{zh:"选择每种事件要发到哪些渠道。",en:"Choose which channels each event goes to."}, templatesTitle:{zh:"消息模板",en:"Message templates"}, templatesBody:{zh:"按事件自定义通知正文；留空时使用内建默认模板。",en:"Customize the message body per event; blank uses the built-in default."}, evtStart:{zh:"备份开始",en:"Backup started"}, evtSuccess:{zh:"备份成功",en:"Backup succeeded"}, evtFailed:{zh:"备份失败",en:"Backup failed"}, evtOnline:{zh:"设备上线",en:"Device online"}, evtOffline:{zh:"设备离线",en:"Device offline"}, evtError:{zh:"系统错误",en:"System error"}, none:{zh:"未配置任何渠道",en:"No channels configured"} },
-  common: { console:{zh:"备份控制台",en:"Console"}, logout:{zh:"退出登录",en:"Sign out"} }
-};
-
-function dpath(o,p){return p.split('.').reduce(function(a,k){return a&&a[k];},o);}
-let lang;
-try{ lang = localStorage.getItem('iosbk_lang') || ((navigator.language||'en').toLowerCase().indexOf('zh')===0?'zh':'en'); }catch(e){ lang='en'; }
-function tr(key){ var n=dpath(IOSBK_DICT,key); return n?(n[lang]||n.en):key; }
-function L(zh,en){ return lang==='zh'?zh:en; }
-function applyI18n(){
-  document.querySelectorAll('[data-i18n]').forEach(function(el){ var n=dpath(IOSBK_DICT,el.getAttribute('data-i18n')); if(n) el.textContent=n[lang]||n.en; });
-  document.documentElement.lang = lang==='zh'?'zh-CN':'en';
-  document.querySelectorAll('.lang-btn').forEach(function(b){ b.classList.toggle('active', b.dataset.lang===lang); });
-}
-function setLang(l){ lang=l; try{ localStorage.setItem('iosbk_lang',l); }catch(e){} applyI18n(); render(); }
+function tr(key, params){ return IOSBKI18n.t(key, params); }
+function apiMessage(payload, fallbackKey){ return IOSBKI18n.message(payload, fallbackKey); }
+function applyI18n(){ IOSBKI18n.apply(); }
+function setLang(l){ IOSBKI18n.setLocale(l); }
+window.addEventListener('iosbk:localechange', function(){ applyI18n(); render(); document.getElementById('toast').classList.add('hidden'); });
 
 let toastTimer;
 function iconHTML(name){ return '<svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-'+name+'"></use></svg>'; }
 function toast(msg,isErr){ var box=document.getElementById('toast'),icon=document.getElementById('toastIcon'),use=icon.querySelector('use'); document.getElementById('toastMsg').textContent=msg; if(use) use.setAttribute('href','/static/ui-icons.svg#icon-'+(isErr?'alert':'check-circle')); icon.style.color=isErr?'#FF8A80':'#5FD0A0'; box.classList.remove('hidden'); box.style.animation='iosbktoast .25s ease'; clearTimeout(toastTimer); toastTimer=setTimeout(function(){ box.classList.add('hidden'); },2600); }
 
 const IOSBK_CSRF=(document.querySelector('meta[name="iosbk-csrf"]')||{}).content||'';
-function csrfFetch(url,opts){ opts=opts||{}; opts.headers=Object.assign({'X-IOSBK-CSRF':IOSBK_CSRF},opts.headers||{}); return fetch(url,opts); }
+function csrfFetch(url,opts){ opts=opts||{}; opts.headers=Object.assign({'X-IOSBK-CSRF':IOSBK_CSRF},opts.headers||{}); return IOSBKI18n.fetch(url,opts); }
 function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
 /* ============== config state ============== */
-let cfg = { enabled:true, telegram_configs:[], email_configs:[], wecom_configs:[], bark_configs:[], webhook_configs:[], notification_rules:{}, notification_templates:{} };
+let cfg = { enabled:true, language:'zh-CN', telegram_configs:[], email_configs:[], wecom_configs:[], bark_configs:[], webhook_configs:[], notification_rules:{}, notification_templates:{} };
 
 const CHANNELS = [
   { key:'telegram_configs', type:'Telegram', titleKey:'notif.tg', descKey:'notif.tgDesc', icon:'telegram', color:'#2C62C6', soft:'#EAF1FC', border:'#C5DAF6', dn:'telegram',
@@ -217,30 +213,31 @@ function renderTemplates(){
 
 /* ============== render ============== */
 function render(){
+  document.getElementById('notificationLanguage').value=cfg.language||'zh-CN';
   document.getElementById('masterToggle').outerHTML =
-    '<button id="masterToggle" onclick="toggleMaster()" style="width:46px;height:26px;flex:none;border-radius:999px;border:none;cursor:pointer;padding:0;position:relative;background:'+(cfg.enabled?'#2C62C6':'#CAD5DE')+'"><span style="position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(35,52,68,.3);transition:transform .15s;transform:translateX('+(cfg.enabled?'20px':'0')+')"></span></button>';
+    '<button aria-label="'+esc(tr('notif.masterTitle'))+'" id="masterToggle" onclick="toggleMaster()" style="width:46px;height:26px;flex:none;border-radius:999px;border:none;cursor:pointer;padding:0;position:relative;background:'+(cfg.enabled?'#2C62C6':'#CAD5DE')+'"><span style="position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(35,52,68,.3);transition:transform .15s;transform:translateX('+(cfg.enabled?'20px':'0')+')"></span></button>';
   document.getElementById('channelsArea').style.cssText = cfg.enabled ? '' : 'opacity:.5;pointer-events:none;';
 
   var ch_html = CHANNELS.map(function(ch){
     var entries=(cfg[ch.key]||[]);
     var entriesHtml = entries.map(function(e,i){
       var fields = ch.fields.map(function(f){
-		var ph=(f.secret&&e.configured)?L('已配置；留空即保留','Configured; leave blank to keep'):(f.ph||'');
+		var ph=(f.secret&&e.configured)?tr('action.render.configuredLeaveBlankToKeep'):(f.ph||'');
         return '<div><label style="display:block;font-size:11.5px;color:#6F7E8C;margin-bottom:4px;font-weight:500">'+tr(f.lbl)+'</label>'+
 		  '<input type="'+f.type+'" value="'+esc(e[f.k])+'" placeholder="'+esc(ph)+'" oninput="setField(\''+ch.key+'\','+i+',\''+f.k+'\',this.value,'+(f.secret?'true':'false')+')" class="iosbk-in"></div>';
       }).join('');
-      var tg='<button onclick="toggleEntry(\''+ch.key+'\','+i+')" style="width:42px;height:24px;flex:none;border-radius:999px;border:none;cursor:pointer;padding:0;position:relative;background:'+(e.enabled?'#2E7D5B':'#CAD5DE')+'"><span style="position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(35,52,68,.3);transition:transform .15s;transform:translateX('+(e.enabled?'18px':'0')+')"></span></button>';
+      var tg='<button aria-label="'+esc(tr('notif.enableChannel'))+'" onclick="toggleEntry(\''+ch.key+'\','+i+')" style="width:42px;height:24px;flex:none;border-radius:999px;border:none;cursor:pointer;padding:0;position:relative;background:'+(e.enabled?'#2E7D5B':'#CAD5DE')+'"><span style="position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(35,52,68,.3);transition:transform .15s;transform:translateX('+(e.enabled?'18px':'0')+')"></span></button>';
       return '<div style="border:1px solid #E7EDF2;border-radius:var(--iosbk-radius);padding:14px;margin-top:12px;background:#FBFCFD">'+
         '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">'+
           '<span id="channelTitle-'+ch.key+'-'+i+'" style="font-size:12.5px;font-weight:600;color:#607181">'+esc(tr(ch.titleKey)+' · '+(e.name||('#'+(i+1))))+'</span>'+
-		  '<div style="display:flex;align-items:center;gap:12px">'+(e.configured?'<button onclick="clearEntrySecret(\''+ch.key+'\','+i+')" style="background:none;border:none;color:#B45309;cursor:pointer;font-size:12px">'+L('清除密钥','Clear secret')+'</button>':'')+tg+
-            '<button onclick="removeEntry(\''+ch.key+'\','+i+')" style="display:inline-flex;align-items:center;justify-content:center;background:none;border:none;color:#BD2C24;cursor:pointer;padding:4px">'+iconHTML('trash')+'</button>'+
+		  '<div style="display:flex;align-items:center;gap:12px">'+(e.configured?'<button onclick="clearEntrySecret(\''+ch.key+'\','+i+')" style="background:none;border:none;color:#B45309;cursor:pointer;font-size:12px">'+tr('action.render.clearSecret')+'</button>':'')+tg+
+            '<button aria-label="'+esc(tr('notif.deleteChannel'))+'" onclick="removeEntry(\''+ch.key+'\','+i+')" style="display:inline-flex;align-items:center;justify-content:center;background:none;border:none;color:#BD2C24;cursor:pointer;padding:4px">'+iconHTML('trash')+'</button>'+
           '</div>'+
         '</div>'+
         '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px">'+fields+'</div>'+
       '</div>';
     }).join('');
-    var emptyHtml = entries.length===0 ? '<div style="font-size:12.5px;color:#ADB9C2;font-style:italic;padding:12px 2px 2px">'+L('尚未添加，点右上「添加」。','None yet — tap “Add”.')+'</div>' : '';
+    var emptyHtml = entries.length===0 ? '<div style="font-size:12.5px;color:#ADB9C2;font-style:italic;padding:12px 2px 2px">'+tr('action.render.noneYetTapAdd')+'</div>' : '';
     return '<div style="background:#fff;border:1px solid #D8E2EA;border-radius:var(--iosbk-radius);padding:16px 18px;margin-bottom:14px">'+
       '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:4px">'+
         '<div style="display:flex;align-items:center;gap:12px">'+
@@ -258,10 +255,11 @@ function render(){
 
 /* ============== load / save / test ============== */
 function loadConfig(){
-  fetch('/api/notifications/config').then(function(r){return r.json();}).then(function(data){
+  IOSBKI18n.fetch('/api/notifications/config').then(function(r){return r.json();}).then(function(data){
     if(data && !data.error){
       cfg = {
         enabled: data.enabled!==false,
+        language: data.language==='en'?'en':'zh-CN',
         telegram_configs: data.telegram_configs||[],
         email_configs: data.email_configs||[],
         wecom_configs: data.wecom_configs||[],
@@ -275,15 +273,27 @@ function loadConfig(){
     render();
   }).catch(function(){ render(); });
 }
-function reloadConfig(){ loadConfig(); toast(L('已重新加载','Reloaded')); }
+function reloadConfig(){ loadConfig(); toast(tr('action.reloadConfig.reloaded')); }
 function saveConfig(){
   csrfFetch('/api/notifications/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(cfg)})
-    .then(function(r){return r.json();}).then(function(data){ if(data.error){ toast(L('保存失败：','Save failed: ')+data.error,true); } else { clearNotifDirty(); toast(tr('notif.saved')); loadConfig(); } }).catch(function(e){ toast(L('保存失败：','Save failed: ')+e,true); });
+    .then(function(r){return r.json();}).then(function(data){ if(data.error){ toast(apiMessage(data),true); } else { clearNotifDirty(); toast(tr('notif.saved')); loadConfig(); } }).catch(function(e){ toast(tr('common.operationFailed'),true); });
 }
 function testNotification(){
   var mt=document.getElementById('testType').value;
-  csrfFetch('/api/notifications/test',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message_type:mt})})
-    .then(function(r){return r.json();}).then(function(data){ toast(data.error?(L('测试失败：','Test failed: ')+data.error):tr('notif.testSent'), !!data.error); }).catch(function(e){ toast(L('测试失败：','Test failed: ')+e,true); });
+  return csrfFetch('/api/notifications/test',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message_type:mt})})
+    .then(function(response){return response.json().then(function(data){return {ok:response.ok,data:data};});})
+    .then(function(result){
+      var data=result.data;
+      if(data.error){ toast(apiMessage(data),true); return; }
+      if(data.attempted===0){ toast(tr('notif.testNoTargets'),true); return; }
+      if(data.succeeded>0 && data.failed>0){
+        var numbers=new Intl.NumberFormat(IOSBKI18n.getLocale());
+        toast(tr('notif.testPartial',{succeeded:numbers.format(data.succeeded),failed:numbers.format(data.failed)}),true);
+        return;
+      }
+      if(result.ok && data.attempted>0 && data.succeeded===data.attempted && data.failed===0){ toast(tr('notif.testSent')); return; }
+      toast(tr('notif.testFailed'),true);
+    }).catch(function(){ toast(tr('notif.testFailed'),true); });
 }
 
 window.addEventListener('DOMContentLoaded', function(){ applyI18n(); loadConfig(); });

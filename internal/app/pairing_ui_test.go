@@ -47,8 +47,7 @@ func TestPairingPageShowsAsyncResult(t *testing.T) {
 	if start < 0 || end <= start {
 		t.Fatal("缺少配对状态渲染")
 	}
-	program := `const assert=require('node:assert/strict');
-let lang='zh';function L(zh,en){return lang==='zh'?zh:en;}
+	program := frontendI18nProgram(t) + `const assert=require('node:assert/strict');
 const latestPairingStatuses={};
 const autoRefreshEnabled=false;
 const box={textContent:'',style:{},classList:{toggle(){}}};
@@ -69,7 +68,7 @@ function fetch(){return Promise.resolve({ok:true,json:()=>Promise.resolve({devic
  assert.ok(box.textContent.includes('USB'));
  renderPairingResult({udid:'PHONE',pairing_state:'paired'});
  assert.ok(box.textContent.includes('配对正常'));
- lang='en';
+ IOSBKI18n.setLocale('en');
  assert.ok(pairingStatusText({pairing_state:'failed',pairing_error_code:'device_unavailable'}).includes('not found'));
 })().catch(e=>{console.error(e);process.exitCode=1;});
 `

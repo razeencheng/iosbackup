@@ -31,7 +31,7 @@ Log in using the [installation guide](installation.md) and protect default `secr
 ## Check test delivery, then a real event
 
 1. In “Test”, choose “Backup succeeded” and click “Send test”. This actually sends messages to the channels assigned to that event.
-2. **At the receiver** , look for the test message and verify destination and time. The UI's “sent” toast alone does not establish delivery to every channel; it currently does not display all per-channel results in the response.
+2. **At the receiver** , look for the test message and verify destination and time. The UI distinguishes no matching channel, complete failure, partial delivery and success. It summarizes delivery counts; inspect the response for per-channel results and confirm receipt at each destination.
 3. Check each configured destination. For failures, inspect logs and [failure branches](#when-messages-do-not-arrive) below. If necessary, use browser developer tools to inspect the per-channel results in that `/api/notifications/test` response using [test responses](#test-responses). Do not share credential or CSRF request headers.
 4. **On the device page** , start one permitted real backup following [first USB backup](usb-backup.md). Confirm the start event, then the success event after completion. Do not disconnect or manufacture data errors to test failures; use the test event to validate failure-message formatting.
 5. Record the date, channel names and app version of a successful check. Always inspect the actual job result when a message is missing.
@@ -69,9 +69,15 @@ A device temporarily missing, a pairing-check timeout, a locked device or pairin
 
 With automatic backups enabled, due checks must explicitly report invalid pairing at least three consecutive times over at least five minutes before sending one “Device needs pairing” warning. Successful validation resets this warning; a temporary disconnect does not rearm it. Connection services notify after three consecutive failed queries outside the startup grace period, and rearm only after successful queries spanning one minute. Deduplication is held in memory and starts afresh after application restart. The master switch, channel rules and asynchronous delivery behavior still apply.
 
+## Notification language
+
+Choose **Notification language** in notification settings, then save. This setting controls generated titles, default bodies, channel labels and test messages even while the browser is closed. The interface language switch only changes the page. Supported values are English (`en`) and Simplified Chinese (`zh-CN`); existing configurations without `language` continue to use Simplified Chinese.
+
+To use the selected language's default body, leave that event's template blank. Existing nonempty templates, including Chinese text copied from an older example, are kept as custom content. Changing language never overwrites them; clear the relevant template and save to return to the built-in default. Device names and original diagnostic details are not automatically translated. Notification timestamps still use Beijing time with an explicit UTC offset.
+
 ## Body templates
 
-Each event can have a body template; blank uses the built-in default. Supported variables are `${title}` (built-in title), `${content}` (original body), `${device_name}`, `${device_udid}`, `${timestamp}` (RFC 3339 in Beijing time), `${type}`, `${level}` and `${reason}` (failure reason). Unknown variables are rejected; not every event contains a device or failure reason.
+Each event can have a body template; blank uses the built-in default. Supported variables are `${title}` (built-in title), `${content}` (original body), `${device_name}`, `${device_udid}`, `${timestamp}` (RFC 3339 in Beijing time), `${type}`, `${level}` `${reason}` (localized failure reason) and `${diagnostics}` (original diagnostic details, when available). Unknown variables are rejected; not every event contains a device or failure reason.
 
 ```text
 [${type}] ${device_name}

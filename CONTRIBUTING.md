@@ -23,7 +23,7 @@ Default tests must remain offline. The real-notification test requires all three
 
 - Keep each pull request focused and explain compatibility/security risk and verification evidence.
 - For behavior fixes, add a failing regression test before the implementation.
-- Preserve Simplified Chinese in existing user-facing messages and keep paired English UI text semantically aligned.
+- Keep English and Simplified Chinese user-facing resources semantically aligned. Use stable message codes and named parameters; see [internationalization](docs/DEVELOPMENT.md#internationalization). Keep application logs in English with stable event codes; source comments may remain Chinese.
 - Keep HTTP paths/JSON, environment variables, persisted formats, locking, and cancellation behavior compatible unless the change explicitly proposes a migration.
 - Release changes must keep `release/manifest.env`, `internal/buildinfo`, `CHANGELOG.md`, image metadata, and documentation consistent. Follow the [maintainer release preparation guide](docs/UPDATE_VERSION.en.md) ([中文](docs/UPDATE_VERSION.md)).
 - New or changed image components require updates to `third_party/components.lock.json`, license materials, notices, and verification.

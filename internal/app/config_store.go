@@ -12,7 +12,7 @@ import (
 
 const backupConfigSchemaVersion = 1
 
-var errUnsupportedBackupConfigSchema = errors.New("不支持的备份配置 schema_version")
+var errUnsupportedBackupConfigSchema = errors.New("unsupported backup configuration schema_version")
 
 type backupConfigEnvelope struct {
 	SchemaVersion int                     `json:"schema_version"`
@@ -56,17 +56,17 @@ func (s *backupConfigStore) Load() (map[string]backupConfig, error) {
 		}
 		fallback, fallbackErr := os.ReadFile(s.lastGoodPath)
 		if fallbackErr != nil {
-			return nil, fmt.Errorf("读取备份配置失败: %v；last-good 不可用: %w", err, fallbackErr)
+			return nil, fmt.Errorf("read backup configuration: %v; last-good unavailable: %w", err, fallbackErr)
 		}
 		configs, _, fallbackErr = s.decode(fallback)
 		if fallbackErr != nil {
-			return nil, fmt.Errorf("读取备份配置失败: %v；last-good 损坏: %w", err, fallbackErr)
+			return nil, fmt.Errorf("read backup configuration: %v; last-good invalid: %w", err, fallbackErr)
 		}
 	}
 
 	if legacy {
 		if err := s.saveLocked(configs); err != nil {
-			return nil, fmt.Errorf("迁移旧备份配置: %w", err)
+			return nil, fmt.Errorf("migrate legacy backup configuration: %w", err)
 		}
 	}
 	s.configs = cloneBackupConfigs(configs)
@@ -95,7 +95,7 @@ func (s *backupConfigStore) Replace(configs map[string]backupConfig) error {
 	for key, cfg := range configs {
 		cfg.UDID = key
 		if err := validateBackupConfig(cfg, s.allowedRoots); err != nil {
-			return fmt.Errorf("配置 %s: %w", key, err)
+			return fmt.Errorf("configuration %s: %w", key, err)
 		}
 		next[key] = cfg
 	}
@@ -146,7 +146,7 @@ func (s *backupConfigStore) validateMap(configs map[string]backupConfig) error {
 		cfg.UDID = key
 		configs[key] = cfg
 		if err := validateBackupConfig(cfg, s.allowedRoots); err != nil {
-			return fmt.Errorf("配置 %s: %w", key, err)
+			return fmt.Errorf("configuration %s: %w", key, err)
 		}
 	}
 	return nil
@@ -159,7 +159,7 @@ func (s *backupConfigStore) saveLocked(configs map[string]backupConfig) error {
 		return err
 	}
 	if err := writeFileAtomic(s.lastGoodPath, data, 0600); err != nil {
-		return fmt.Errorf("写入 last-good: %w", err)
+		return fmt.Errorf("write last-good configuration: %w", err)
 	}
 	if err := writeFileAtomic(s.path, data, 0600); err != nil {
 		return err
@@ -176,7 +176,7 @@ func decodeStrictJSON(data []byte, target any) error {
 	var extra any
 	if err := decoder.Decode(&extra); !errors.Is(err, io.EOF) {
 		if err == nil {
-			return fmt.Errorf("JSON 只能包含一个值")
+			return fmt.Errorf("JSON must contain exactly one value")
 		}
 		return err
 	}

@@ -43,7 +43,7 @@ func initLogLevel() {
 	default:
 		currentLogLevel = logLevelInfo // 默认级别
 	}
-	log.Printf("日志级别设置为: %s", logLevelNames[currentLogLevel])
+	log.Printf("event=logging.configured level=%s", logLevelNames[currentLogLevel])
 }
 
 // 设置东八区时区
@@ -81,7 +81,7 @@ func (app *application) addLogWithLevel(udid, message string, level logLevel) {
 	defer func() {
 		// 防止日志记录导致panic
 		if r := recover(); r != nil {
-			log.Printf("日志记录发生panic: %v", r)
+			log.Printf("event=logging.panic error=%v", r)
 		}
 	}()
 

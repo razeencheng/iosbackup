@@ -11,9 +11,10 @@ import (
 	"time"
 
 	"iosbackup/internal/buildinfo"
+	"iosbackup/internal/i18n"
 )
 
-var errDeviceDisconnected = errors.New("设备 Wi-Fi 连接持续中断，操作已取消")
+var errDeviceDisconnected = errors.New("device Wi-Fi connection remained unavailable; operation cancelled")
 
 type activeDeviceCommand struct {
 	connection string
@@ -86,6 +87,7 @@ type deviceStatusDTO struct {
 	Online              bool               `json:"online"`
 	Battery             int                `json:"battery"`
 	Charging            bool               `json:"charging"`
+	LastBackupAt        string             `json:"last_backup_at,omitempty"`
 	LastBackup          string             `json:"last_backup"` // 北京时间 "2006-01-02 15:04" 或空
 	BackingUp           bool               `json:"backing_up"`
 	PairingState        string             `json:"pairing_state"`
@@ -116,7 +118,7 @@ type statusSnapshot struct {
 	Version            string                 `json:"version"` // 构建版本；前端比对以检测「已部署新版本」（SSE 重连即拿到新版本）
 }
 
-// connCode 把中文连接串映射为机器码（USB 优先规则已体现在 Connection 上）。
+// connCode maps internal connection identifiers to public status codes.
 func connCode(d *device) string {
 	if d.PresenceUnknown {
 		return "unknown"
@@ -197,6 +199,7 @@ func (app *application) buildStatusSnapshot() statusSnapshot {
 			Battery:             d.BatteryLevel,
 			Charging:            d.IsCharging,
 			LastBackup:          lastBackupStr(d.LastBackup),
+			LastBackupAt:        removedDeviceTime(d.LastBackup),
 			BackingUp:           app.backupInProgress[udid],
 			PairingState:        operationState.PairingState,
 			PairingErrorCode:    operationState.PairingErrorCode,
@@ -417,13 +420,19 @@ func (app *application) applyPresenceSnapshotValid(online, networkOnline map[str
 			d.LastSeen = now
 			d.Connection = od.Connection
 		} else {
-			app.devices[udid] = &device{UDID: udid, Name: udid, IsOnline: true, Connection: od.Connection, LastSeen: now}
+			d := &device{UDID: udid, IsOnline: true, Connection: od.Connection, LastSeen: now}
+			var savedName string
+			if config := app.configs[udid]; config != nil {
+				savedName = config.Name
+			}
+			d.applyNameFallback(savedName)
+			app.devices[udid] = d
 			newOnline = true
-			presenceNotifications = append(presenceNotifications, pendingPresenceNotification{udid: udid, name: udid, online: true})
+			presenceNotifications = append(presenceNotifications, pendingPresenceNotification{udid: udid, name: d.Name, online: true})
 		}
 		delete(app.devicePresenceMissingSince, udid)
 		// 发现即建默认配置，保证「立即备份」可用（首页提速后不再在请求路径上建配置）
-		if app.ensureConfigUnsafe(udid, app.devices[udid].Name) {
+		if app.ensureConfigUnsafe(udid, app.devices[udid].knownName()) {
 			configCreated = true
 		}
 	}
@@ -494,7 +503,7 @@ func (app *application) applyPresenceSnapshotValid(online, networkOnline map[str
 	app.mu.Unlock()
 
 	for _, item := range pending {
-		app.addWarnLog(item.udid, fmt.Sprintf("Wi-Fi 设备连续离线 %s，正在取消长任务", grace))
+		app.addWarnLog(item.udid, fmt.Sprintf("event=device.disconnected Cancelling long operation after Wi-Fi unavailable for %s", grace))
 		item.cancel(errDeviceDisconnected)
 	}
 	if manager := app.notificationManagerSnapshot(); manager != nil {
@@ -541,6 +550,7 @@ func (app *application) refreshDetails() {
 	for _, copy := range copies {
 		if d := app.devices[copy.UDID]; d != nil && d.IsOnline && !d.PresenceUnknown && d.Connection == copy.Connection && app.connectionEpochUnsafe(d) == epochs[d.UDID] {
 			d.Name, d.DeviceType, d.BatteryLevel, d.IsCharging = copy.Name, copy.DeviceType, copy.BatteryLevel, copy.IsCharging
+			d.nameIsFallback = copy.nameIsFallback
 		}
 	}
 }
@@ -550,13 +560,13 @@ func (app *application) refreshDetails() {
 func (app *application) handleEvents(w http.ResponseWriter, r *http.Request) {
 	ip := requestIP(r)
 	if app.sseLimiter == nil || !app.sseLimiter.Acquire(ip) {
-		writeError(w, http.StatusServiceUnavailable, "SSE 连接数已达上限")
+		writeError(w, http.StatusServiceUnavailable, i18n.SSECapacity)
 		return
 	}
 	defer app.sseLimiter.Release(ip)
 	flusher, ok := w.(http.Flusher)
 	if !ok {
-		http.Error(w, "streaming unsupported", http.StatusInternalServerError)
+		writeError(w, http.StatusInternalServerError, i18n.OperationFailed)
 		return
 	}
 	w.Header().Set("Content-Type", "text/event-stream")

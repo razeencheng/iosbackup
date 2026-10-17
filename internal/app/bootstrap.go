@@ -78,11 +78,11 @@ func (e *exitError) Error() string { return e.prefix + e.err.Error() }
 func (e *exitError) Unwrap() error { return e.err }
 
 func newRuntimeConfigExitError(err error) error {
-	return &exitError{prefix: "运行配置无效: ", err: err}
+	return &exitError{prefix: "event=config.invalid Invalid runtime configuration: ", err: err}
 }
 
 func newApplicationExitError(err error) error {
-	return &exitError{prefix: "应用退出: ", err: err}
+	return &exitError{prefix: "event=application.failed Application failed: ", err: err}
 }
 
 func run(ctx context.Context, cfg runtimeConfig) error {
@@ -106,7 +106,7 @@ func run(ctx context.Context, cfg runtimeConfig) error {
 	// 初始化通知管理器
 	notificationManager, err := initNotificationManagerFromStore(app.notificationConfigStore, cfg.WebhookAllowCIDRs)
 	if err != nil {
-		log.Printf("初始化通知管理器失败: %v", err)
+		log.Printf("event=notification.init_failed error=%v", err)
 		// 创建一个空的通知管理器，但禁用通知功能
 		notificationManager = newNotificationManager()
 		notificationManager.Disable()
@@ -117,17 +117,17 @@ func run(ctx context.Context, cfg runtimeConfig) error {
 
 	// 加载配置
 	if err := app.loadConfigs(); err != nil {
-		log.Printf("加载配置失败: %v", err)
+		log.Printf("event=config.load_failed error=%v", err)
 	}
 
 	// 启动 usbmuxd（USB 设备）
 	if err := app.StartUSBMuxD(); err != nil {
-		log.Printf("启动 usbmuxd 失败: %v", err)
+		log.Printf("event=usb.start_failed error=%v", err)
 	}
 
 	// 启动 netmuxd（Wi-Fi 设备）
 	if err := app.StartNetmuxd(); err != nil {
-		log.Printf("启动 netmuxd 失败: %v", err)
+		log.Printf("event=network.netmuxd_start_failed error=%v", err)
 	} else {
 		// netmuxd 启动后重放 add_device（异步，不阻塞启动流程）
 		go app.replayAddDevice()
@@ -135,7 +135,7 @@ func run(ctx context.Context, cfg runtimeConfig) error {
 
 	// 初始刷新设备列表
 	if err := app.RefreshDevices(); err != nil {
-		log.Printf("初始刷新设备列表失败: %v", err)
+		log.Printf("event=device.initial_refresh_failed error=%v", err)
 	}
 
 	// 每条退出路径均先取消 worker，避免 HTTP 意外退出后后台再次重启进程。
@@ -165,8 +165,8 @@ func run(ctx context.Context, cfg runtimeConfig) error {
 
 	server := newHTTPServer(addr, mux)
 
-	log.Printf("iOS 备份管理服务器 %s (%s) 启动在 %s", buildinfo.Version, buildinfo.Description, addr)
-	log.Printf("构建日期: %s", buildinfo.BuildDate)
+	log.Printf("event=server.started iOS Backup version=%s description=%s address=%s", buildinfo.Version, buildinfo.Description, addr)
+	log.Printf("event=build.date date=%s", buildinfo.BuildDate)
 	serverErr := make(chan error, 1)
 	go func() {
 		err := server.ListenAndServe()
@@ -187,7 +187,7 @@ func run(ctx context.Context, cfg runtimeConfig) error {
 		shutdownErr := server.Shutdown(shutdownCtx)
 		app.notificationManagerSnapshot().Close()
 		if shutdownErr != nil {
-			return fmt.Errorf("关闭 HTTP 服务器: %w", shutdownErr)
+			return fmt.Errorf("shut down HTTP server: %w", shutdownErr)
 		}
 		return nil
 	}
@@ -198,27 +198,27 @@ func (app *application) initializeSecurity() error {
 	cfg, paths := app.runtimeConfig, app.paths
 	store, err := initSecretStore(cfg, paths)
 	if err != nil {
-		return fmt.Errorf("初始化加密存储: %w", err)
+		return fmt.Errorf("initialize encrypted storage: %w", err)
 	}
 	auth, generatedPassword, err := newAuthManager(cfg, paths)
 	if err != nil {
-		return fmt.Errorf("初始化管理员认证: %w", err)
+		return fmt.Errorf("initialize administrator authentication: %w", err)
 	}
 	csrf, err := newCSRFManager(paths.CSRFSecretFile)
 	if err != nil {
-		return fmt.Errorf("初始化 CSRF 防护: %w", err)
+		return fmt.Errorf("initialize CSRF protection: %w", err)
 	}
 	app.authManager, app.csrfManager, app.secretStore = auth, csrf, store
 	if !cfg.AuthEnabled {
-		log.Printf("WARN: 管理员认证已关闭；建议在 NAS 部署中启用 IOSBK_AUTH_ENABLED=true")
+		log.Printf("event=auth.disabled WARN: Administrator authentication is disabled; enable IOSBK_AUTH_ENABLED=true for NAS deployments")
 	} else if generatedPassword != "" {
-		log.Printf("首次生成管理员密码（仅显示一次）：password=%s；已保存到 %s", generatedPassword, paths.AdminPasswordFile)
+		log.Printf("event=auth.password_generated Initial administrator password (shown once): password=%s; saved to %s", generatedPassword, paths.AdminPasswordFile)
 	} else if cfg.AdminPasswordFile != "" {
-		log.Printf("管理员密码认证已启用；密码来源文件：%s", cfg.AdminPasswordFile)
+		log.Printf("event=auth.enabled Administrator password source=%s", cfg.AdminPasswordFile)
 	} else if _, err := os.Lstat(paths.AdminPasswordFile); err == nil {
-		log.Printf("管理员密码认证已启用；密码文件：%s", paths.AdminPasswordFile)
+		log.Printf("event=auth.enabled Administrator password file=%s", paths.AdminPasswordFile)
 	} else {
-		log.Printf("管理员密码认证已启用；沿用旧认证摘要，未生成替代密码")
+		log.Printf("event=auth.enabled Using existing password digest; no replacement password generated")
 	}
 	return nil
 }

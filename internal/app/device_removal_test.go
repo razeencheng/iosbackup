@@ -438,7 +438,7 @@ func TestRemovedDeviceRoutesRejectBeforeMutationOrProbe(t *testing.T) {
 			req.Header.Set(csrfHeader, "test")
 			rr := httptest.NewRecorder()
 			tc.handler(rr, req)
-			if rr.Code != http.StatusConflict || !strings.Contains(rr.Body.String(), "已移除") {
+			if rr.Code != http.StatusConflict || !strings.Contains(rr.Body.String(), `"code":"api.device_removed_operation"`) {
 				t.Fatalf("已移除设备应在入口返回 409: code=%d body=%s", rr.Code, rr.Body.String())
 			}
 		})

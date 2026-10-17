@@ -21,8 +21,8 @@ const (
 	powerAssertionShutdownTimeout = 5 * time.Second
 )
 
-var errPowerAssertionExited = errors.New("Wi-Fi power assertion 提前退出")
-var errPowerAssertionLost = errors.New("Wi-Fi power assertion 已丢失")
+var errPowerAssertionExited = errors.New("Wi-Fi power assertion exited early")
+var errPowerAssertionLost = errors.New("Wi-Fi power assertion lost")
 
 type powerAssertionLease interface {
 	Done() <-chan error
@@ -75,13 +75,13 @@ func (s execPowerAssertionStarter) Start(ctx context.Context, udid string, extra
 	stdout, err := cmd.cmd.StdoutPipe()
 	if err != nil {
 		cancel()
-		return nil, fmt.Errorf("创建 assertion 输出管道: %w", err)
+		return nil, fmt.Errorf("create assertion output pipe: %w", err)
 	}
 	var stderr bytes.Buffer
 	cmd.SetStderr(&stderr)
 	if err := cmd.Start(); err != nil {
 		cancel()
-		return nil, fmt.Errorf("启动 assertion helper: %w", err)
+		return nil, fmt.Errorf("start assertion helper: %w", err)
 	}
 
 	lease := &execPowerAssertionLease{
@@ -124,10 +124,10 @@ func (s execPowerAssertionStarter) Start(ctx context.Context, udid string, extra
 		if message == "" {
 			message = "helper exited before ASSERTION_ACQUIRED"
 		}
-		return nil, fmt.Errorf("获取 Wi-Fi power assertion 失败: %s: %w", message, err)
+		return nil, fmt.Errorf("acquire Wi-Fi power assertion: %s: %w", message, err)
 	case <-timer.C:
 		lease.Release()
-		return nil, fmt.Errorf("获取 Wi-Fi power assertion 超时（%s）", acquireTimeout)
+		return nil, fmt.Errorf("acquire Wi-Fi power assertion timed out (%s)", acquireTimeout)
 	case <-ctx.Done():
 		lease.Release()
 		return nil, context.Cause(ctx)
@@ -203,18 +203,18 @@ func (app *application) startWiFiPowerAssertion(ctx context.Context, udid string
 			case <-ticker.C:
 				next, renewErr := starter.Start(sessionCtx, udid, env)
 				if renewErr != nil {
-					app.addWarnLog(udid, fmt.Sprintf("Wi-Fi power assertion 续租失败，继续保留旧租约: %v", renewErr))
+					app.addWarnLog(udid, fmt.Sprintf("event=power_assertion.renew_failed Keeping previous lease error=%v", renewErr))
 					continue
 				}
 				old := current
 				current = next
 				old.Release()
-				app.addInfoLog(udid, "Wi-Fi power assertion 已续租")
+				app.addInfoLog(udid, "event=power_assertion.renewed")
 			}
 		}
 	}()
 
-	app.addInfoLog(udid, "Wi-Fi power assertion 已建立")
+	app.addInfoLog(udid, "event=power_assertion.established")
 	return session, nil
 }
 
@@ -226,7 +226,7 @@ func (app *application) guardWiFiBackupPowerAssertion(
 ) (func(), error) {
 	session, err := app.startWiFiPowerAssertion(ctx, udid, isNetwork)
 	if err != nil {
-		return nil, fmt.Errorf("建立 Wi-Fi power assertion: %w", err)
+		return nil, fmt.Errorf("establish Wi-Fi power assertion: %w", err)
 	}
 	if session == nil {
 		return func() {}, nil

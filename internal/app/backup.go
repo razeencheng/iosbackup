@@ -8,6 +8,8 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"iosbackup/internal/i18n"
 )
 
 // PerformBackup 执行备份
@@ -129,7 +131,7 @@ func (app *application) performBackupInTask(udid string) (retErr error) {
 	// 检查设备是否已经在备份中
 	if app.backupInProgress[udid] {
 		app.mu.Unlock()
-		return fmt.Errorf("设备 %s 已经在备份中", udid)
+		return i18n.NewError(i18n.Busy, nil)
 	}
 
 	// 标记设备为备份中状态
@@ -148,23 +150,23 @@ func (app *application) performBackupInTask(udid string) (retErr error) {
 	}()
 
 	if !exists {
-		return fmt.Errorf("设备 %s 不存在", udid)
+		return i18n.NewError(i18n.DeviceNotFound, nil)
 	}
 
 	if !configExists {
-		return fmt.Errorf("设备 %s 没有配置", udid)
+		return i18n.NewError(i18n.ConfigInvalid, nil)
 	}
 
 	// 检查备份条件
 	if config.OnlyWhenCharging && !device.IsCharging {
-		return fmt.Errorf("设备未充电，跳过备份")
+		return i18n.NewError(i18n.NotCharging, nil)
 	}
 
 	if device.BatteryLevel < config.MinBatteryLevel {
-		return fmt.Errorf("电量不足（%d%%），跳过备份", device.BatteryLevel)
+		return i18n.NewError(i18n.LowBattery, map[string]any{"battery": device.BatteryLevel, "min_battery": config.MinBatteryLevel})
 	}
 
-	backupLog("开始备份...")
+	backupLog("event=backup.started")
 
 	// 确保备份目录存在
 	os.MkdirAll(config.BackupDirectory, 0755)
@@ -174,9 +176,9 @@ func (app *application) performBackupInTask(udid string) (retErr error) {
 
 	connType := device.Connection
 	if connType == connectionTypeDesc(connectTypeNetwork) {
-		backupLog("使用 Wi-Fi 连接进行备份")
+		backupLog("event=backup.transport connection=network")
 	} else {
-		backupLog("使用 USB 连接进行备份")
+		backupLog("event=backup.transport connection=usb")
 	}
 
 	// 构建备份命令（通过 runIdeviceCmd 注入 socket 和 -n）
@@ -188,14 +190,14 @@ func (app *application) performBackupInTask(udid string) (retErr error) {
 	isNetwork := device.Connection == connectionTypeDesc(connectTypeNetwork)
 	releasePowerAssertion, err := app.guardWiFiBackupPowerAssertion(backupCtx, backupCancel, udid, isNetwork)
 	if err != nil {
-		backupLog(fmt.Sprintf("备份失败: %v", err))
+		backupLog(fmt.Sprintf("event=backup.failed error=%v", err))
 		return err
 	}
 	defer releasePowerAssertion()
 
 	err = app.runBackupCommand(backupCtx, backupCancel, udid, sessionID, config.BackupDirectory, isNetwork)
 	if err != nil {
-		backupLog(fmt.Sprintf("备份失败: %v", err))
+		backupLog(fmt.Sprintf("event=backup.failed error=%v", err))
 
 		// 发送备份失败通知
 		if manager := app.notificationManagerSnapshot(); manager != nil {
@@ -205,7 +207,8 @@ func (app *application) performBackupInTask(udid string) (retErr error) {
 				deviceName = device.Name
 			}
 			app.mu.RUnlock()
-			manager.SendBackupFailed(deviceName, udid, err.Error())
+			_, code := backupFailureState(err)
+			manager.SendBackupFailure(deviceName, udid, code, err.Error())
 		}
 
 		return err
@@ -221,7 +224,9 @@ func (app *application) performBackupInTask(udid string) (retErr error) {
 		config.LastBackup = backupTime
 		config.LastBackupConnection = connTypeFromDesc(connType)
 		if device, exists := app.devices[udid]; exists {
-			config.Name = device.Name
+			if name := device.knownName(); name != "" {
+				config.Name = name
+			}
 		}
 	}
 	app.mu.Unlock()
@@ -229,7 +234,7 @@ func (app *application) performBackupInTask(udid string) (retErr error) {
 	// 保存配置到文件
 	app.saveConfigs()
 
-	backupLog("备份完成")
+	backupLog("event=backup.completed")
 
 	// 发送备份成功通知
 	if manager := app.notificationManagerSnapshot(); manager != nil {
@@ -250,7 +255,7 @@ func (app *application) readBackupOutput(udid, sessionID string, pipe interface{
 	defer func() {
 		// 确保goroutine能够正常退出
 		if r := recover(); r != nil {
-			app.addLog(udid, backupSessionLog(sessionID, fmt.Sprintf("[%s] 读取输出协程发生panic: %v", logType, r)))
+			app.addLog(udid, backupSessionLog(sessionID, fmt.Sprintf("event=backup.output_panic stream=%s error=%v", logType, r)))
 		}
 	}()
 
@@ -293,7 +298,7 @@ func (app *application) readBackupOutput(udid, sessionID string, pipe interface{
 		return nil
 	})
 	if err != nil {
-		app.addLog(udid, backupSessionLog(sessionID, fmt.Sprintf("[%s] 读取输出错误: %v", logType, err)))
+		app.addLog(udid, backupSessionLog(sessionID, fmt.Sprintf("event=backup.output_read_failed stream=%s error=%v", logType, err)))
 	}
 }
 
@@ -323,7 +328,7 @@ func (app *application) performBackupWithConnection(udid, connectionType, sessio
 	// 检查设备是否已经在备份中
 	if app.backupInProgress[udid] {
 		app.mu.Unlock()
-		return fmt.Errorf("设备 %s 已经在备份中", udid)
+		return i18n.NewError(i18n.Busy, nil)
 	}
 
 	// 标记设备为备份中状态
@@ -341,11 +346,11 @@ func (app *application) performBackupWithConnection(udid, connectionType, sessio
 	}()
 
 	if !exists {
-		return fmt.Errorf("设备 %s 不存在", udid)
+		return i18n.NewError(i18n.DeviceNotFound, nil)
 	}
 
 	if !configExists {
-		return fmt.Errorf("设备 %s 没有配置", udid)
+		return i18n.NewError(i18n.ConfigInvalid, nil)
 	}
 
 	backupDir := config.BackupDirectory
@@ -353,11 +358,11 @@ func (app *application) performBackupWithConnection(udid, connectionType, sessio
 		backupDir = dirBackups
 	}
 
-	backupLog(fmt.Sprintf("开始自动备份到 %s", backupDir))
+	backupLog(fmt.Sprintf("event=backup.started source=scheduler directory=%s", backupDir))
 
 	err := os.MkdirAll(backupDir, 0755)
 	if err != nil {
-		backupLog(fmt.Sprintf("创建备份目录失败: %v", err))
+		backupLog(fmt.Sprintf("event=backup.directory_create_failed error=%v", err))
 		return err
 	}
 	if manager := app.notificationManagerSnapshot(); manager != nil {
@@ -373,23 +378,23 @@ func (app *application) performBackupWithConnection(udid, connectionType, sessio
 	// 根据连接方式构建备份命令（手动注入 socket，因为需要 StdoutPipe/StderrPipe）
 	isNetwork := isNetworkConnection(connectionType)
 	if isNetwork {
-		backupLog("使用 Wi-Fi 连接进行自动备份")
+		backupLog("event=backup.transport source=scheduler connection=network")
 	} else {
-		backupLog("使用 USB 连接进行自动备份")
+		backupLog("event=backup.transport source=scheduler connection=usb")
 	}
 
 	backupCtx, backupCancel := context.WithCancelCause(app.rootCtx)
 	defer backupCancel(nil)
 	releasePowerAssertion, err := app.guardWiFiBackupPowerAssertion(backupCtx, backupCancel, udid, isNetwork)
 	if err != nil {
-		backupLog(fmt.Sprintf("自动备份失败: %v", err))
+		backupLog(fmt.Sprintf("event=backup.failed source=scheduler error=%v", err))
 		return err
 	}
 	defer releasePowerAssertion()
 
 	err = app.runBackupCommand(backupCtx, backupCancel, udid, sessionID, backupDir, isNetwork)
 	if err != nil {
-		backupLog(fmt.Sprintf("自动备份失败: %v", err))
+		backupLog(fmt.Sprintf("event=backup.failed source=scheduler error=%v", err))
 
 		if manager := app.notificationManagerSnapshot(); manager != nil {
 			deviceName := udid
@@ -398,7 +403,8 @@ func (app *application) performBackupWithConnection(udid, connectionType, sessio
 				deviceName = device.Name
 			}
 			app.mu.RUnlock()
-			manager.SendBackupFailed(deviceName, udid, err.Error())
+			_, code := backupFailureState(err)
+			manager.SendBackupFailure(deviceName, udid, code, err.Error())
 		}
 
 		return err
@@ -418,13 +424,15 @@ func (app *application) performBackupWithConnection(udid, connectionType, sessio
 			config.LastBackupConnection = connectTypeUSB
 		}
 		if device, exists := app.devices[udid]; exists {
-			config.Name = device.Name
+			if name := device.knownName(); name != "" {
+				config.Name = name
+			}
 		}
 	}
 	app.mu.Unlock()
 
 	app.saveConfigs()
-	backupLog("自动备份完成")
+	backupLog("event=backup.completed source=scheduler")
 
 	if manager := app.notificationManagerSnapshot(); manager != nil {
 		deviceName := udid

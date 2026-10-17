@@ -10,6 +10,9 @@ import (
 	"strings"
 	"sync"
 	"unicode/utf8"
+
+	"iosbackup/internal/i18n"
+	notificationpkg "iosbackup/internal/notification"
 )
 
 const notificationConfigSchemaVersion = 1
@@ -39,10 +42,11 @@ func defaultNotificationRules() map[string][]string {
 
 func defaultNotificationConfig() *notificationConfig {
 	return &notificationConfig{
+		Language:        "zh-CN",
 		TelegramConfigs: []telegramConfig{}, EmailConfigs: []emailConfig{},
 		WecomConfigs: []wecomConfig{}, BarkConfigs: []barkConfig{}, WebhookConfigs: []webhookConfig{},
 		NotificationRules:     defaultNotificationRules(),
-		NotificationTemplates: defaultNotificationTemplates(),
+		NotificationTemplates: mergeNotificationTemplates(nil),
 	}
 }
 
@@ -74,7 +78,7 @@ func (s *notificationConfigStore) Public() (*notificationConfig, error) {
 // HTTP 保存路径先用它做完整 notifier 校验，避免“已落盘但实际没有通知器”的假成功。
 func (s *notificationConfigStore) Preview(incoming *notificationConfig) (*notificationConfig, error) {
 	if incoming == nil {
-		return nil, errors.New("通知配置不能为空")
+		return nil, i18n.NewError(i18n.NotificationConfigRequired, nil)
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -86,6 +90,9 @@ func (s *notificationConfigStore) Preview(incoming *notificationConfig) (*notifi
 		return nil, err
 	}
 	next := cloneNotificationConfig(incoming)
+	if _, err := notificationpkg.NormalizeLanguage(next.Language); err != nil {
+		return nil, err
+	}
 	normalizeNotificationConfig(next)
 	if err := validateNotificationNames(next); err != nil {
 		return nil, err
@@ -131,7 +138,7 @@ func previewTelegramSecrets(current, next *notificationConfig) error {
 		}
 		cfg.BotToken, cfg.SecretConfigured = secret, secret != ""
 		if cfg.Enabled && secret == "" {
-			return fmt.Errorf("Telegram %s: 启用前必须配置秘密", cfg.Name)
+			return i18n.NewError(i18n.NotificationSecretRequired, map[string]any{"channel": "Telegram", "name": cfg.Name})
 		}
 	}
 	return nil
@@ -151,7 +158,7 @@ func previewBarkSecrets(current, next *notificationConfig) error {
 		}
 		cfg.DeviceKey, cfg.SecretConfigured = secret, secret != ""
 		if cfg.Enabled && secret == "" {
-			return fmt.Errorf("Bark %s: 启用前必须配置设备Key", cfg.Name)
+			return i18n.NewError(i18n.NotificationBarkKeyRequired, map[string]any{"name": cfg.Name})
 		}
 	}
 	return nil
@@ -170,7 +177,7 @@ func previewEmailSecrets(current, next *notificationConfig) error {
 		}
 		cfg.Password, cfg.SecretConfigured = secret, secret != ""
 		if cfg.Enabled && secret == "" {
-			return fmt.Errorf("Email %s: 启用前必须配置秘密", cfg.Name)
+			return i18n.NewError(i18n.NotificationSecretRequired, map[string]any{"channel": "Email", "name": cfg.Name})
 		}
 	}
 	return nil
@@ -190,7 +197,7 @@ func previewWecomSecrets(current, next *notificationConfig) error {
 		}
 		cfg.WebhookURL, cfg.SecretConfigured = secret, secret != ""
 		if cfg.Enabled && secret == "" {
-			return fmt.Errorf("WeCom %s: 启用前必须配置秘密", cfg.Name)
+			return i18n.NewError(i18n.NotificationSecretRequired, map[string]any{"channel": "WeCom", "name": cfg.Name})
 		}
 	}
 	return nil
@@ -216,7 +223,7 @@ func previewWebhookSecrets(current, next *notificationConfig) error {
 		}
 		cfg.URL, cfg.SecretConfigured = secret, secret != ""
 		if cfg.Enabled && secret == "" {
-			return fmt.Errorf("Webhook %s: 启用前必须配置秘密", cfg.Name)
+			return i18n.NewError(i18n.NotificationSecretRequired, map[string]any{"channel": "Webhook", "name": cfg.Name})
 		}
 	}
 	return nil
@@ -224,19 +231,19 @@ func previewWebhookSecrets(current, next *notificationConfig) error {
 
 func previewSecret(incoming string, replace, clear, oldConfigured bool, oldValue string) (string, error) {
 	if replace && clear {
-		return "", errors.New("replace_secret 与 clear_secret 不能同时设置")
+		return "", i18n.NewError(i18n.NotificationSecretActionsConflict, nil)
 	}
 	if clear {
 		return "", nil
 	}
 	if replace {
 		if incoming == "" {
-			return "", errors.New("replace_secret 需要新秘密")
+			return "", i18n.NewError(i18n.NotificationReplacementSecretRequired, nil)
 		}
 		return incoming, nil
 	}
 	if incoming != "" {
-		return "", errors.New("提供秘密时必须显式设置 replace_secret")
+		return "", i18n.NewError(i18n.NotificationReplaceSecretRequired, nil)
 	}
 	if oldConfigured {
 		return oldValue, nil
@@ -257,7 +264,7 @@ func cloneStringMap(values map[string]string) map[string]string {
 
 func (s *notificationConfigStore) Save(incoming *notificationConfig) error {
 	if incoming == nil {
-		return errors.New("通知配置不能为空")
+		return i18n.NewError(i18n.NotificationConfigRequired, nil)
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -266,6 +273,9 @@ func (s *notificationConfigStore) Save(incoming *notificationConfig) error {
 		return err
 	}
 	next := cloneNotificationConfig(incoming)
+	if _, err := notificationpkg.NormalizeLanguage(next.Language); err != nil {
+		return err
+	}
 	if err := validateNotificationNames(next); err != nil {
 		return err
 	}
@@ -303,7 +313,7 @@ func (s *notificationConfigStore) Save(incoming *notificationConfig) error {
 		if s.secrets != nil && s.secrets.Available() {
 			if err := s.secrets.DeleteSecret(key); err != nil {
 				// 配置已安全落盘；遗留密文不再被引用，不把成功更新回报成失败。
-				log.Printf("WARN: 清理未引用通知密文 %s 失败: %v", key, err)
+				log.Printf("event=notification.orphan_secret_cleanup_failed key=%s error=%v", key, err)
 			}
 		}
 	}
@@ -321,7 +331,7 @@ func (s *notificationConfigStore) applyBarkUpdates(current, next *notificationCo
 		seen[cfg.Name] = true
 		old, ok := existing[cfg.Name]
 		if !ok && cfg.SecretConfigured && !cfg.ReplaceSecret && !cfg.ClearSecret {
-			return fmt.Errorf("Bark %s: 名称变化后必须重新提供设备Key并设置 replace_secret", cfg.Name)
+			return i18n.NewError(i18n.NotificationRenamedBarkKeyRequired, map[string]any{"name": cfg.Name})
 		}
 		configured, err := s.applySecretUpdate(notificationSecretKey("bark", cfg.Name, "device_key"), cfg.DeviceKey, cfg.ReplaceSecret, cfg.ClearSecret, ok && old.SecretConfigured, deletes)
 		if err != nil {
@@ -329,7 +339,7 @@ func (s *notificationConfigStore) applyBarkUpdates(current, next *notificationCo
 		}
 		cfg.SecretConfigured = configured
 		if cfg.Enabled && !configured {
-			return fmt.Errorf("Bark %s: 启用前必须配置设备Key", cfg.Name)
+			return i18n.NewError(i18n.NotificationBarkKeyRequired, map[string]any{"name": cfg.Name})
 		}
 	}
 	for name, cfg := range existing {
@@ -351,14 +361,17 @@ func (s *notificationConfigStore) loadAndMigrateLocked() (*notificationConfig, e
 		SchemaVersion *int `json:"schema_version"`
 	}
 	if err := json.Unmarshal(data, &probe); err != nil {
-		return nil, fmt.Errorf("解析通知配置失败: %w", err)
+		return nil, fmt.Errorf("parse notification configuration: %w", err)
 	}
 	if probe.SchemaVersion != nil {
 		if *probe.SchemaVersion != notificationConfigSchemaVersion {
-			return nil, fmt.Errorf("不支持的通知配置 schema_version: %d", *probe.SchemaVersion)
+			return nil, fmt.Errorf("unsupported notification configuration schema_version: %d", *probe.SchemaVersion)
 		}
 		var envelope notificationConfigEnvelope
 		if err := decodeStrictJSON(data, &envelope); err != nil {
+			return nil, err
+		}
+		if _, err := notificationpkg.NormalizeLanguage(envelope.Config.Language); err != nil {
 			return nil, err
 		}
 		normalizeNotificationConfig(&envelope.Config)
@@ -367,7 +380,10 @@ func (s *notificationConfigStore) loadAndMigrateLocked() (*notificationConfig, e
 
 	var legacy notificationConfig
 	if err := decodeStrictJSON(data, &legacy); err != nil {
-		return nil, fmt.Errorf("解析旧通知配置失败: %w", err)
+		return nil, fmt.Errorf("parse legacy notification configuration: %w", err)
+	}
+	if _, err := notificationpkg.NormalizeLanguage(legacy.Language); err != nil {
+		return nil, err
 	}
 	normalizeNotificationConfig(&legacy)
 	if err := s.migrateLegacySecretsLocked(&legacy); err != nil {
@@ -495,7 +511,7 @@ func (s *notificationConfigStore) applyTelegramUpdates(current, next *notificati
 		seen[cfg.Name] = true
 		old, ok := existing[cfg.Name]
 		if !ok && cfg.SecretConfigured && !cfg.ReplaceSecret && !cfg.ClearSecret {
-			return fmt.Errorf("Telegram %s: 名称变化后必须重新提供秘密并设置 replace_secret", cfg.Name)
+			return i18n.NewError(i18n.NotificationRenamedSecretRequired, map[string]any{"channel": "Telegram", "name": cfg.Name})
 		}
 		configured, err := s.applySecretUpdate(notificationSecretKey("telegram", cfg.Name, "token"), cfg.BotToken, cfg.ReplaceSecret, cfg.ClearSecret, ok && old.SecretConfigured, deletes)
 		if err != nil {
@@ -503,7 +519,7 @@ func (s *notificationConfigStore) applyTelegramUpdates(current, next *notificati
 		}
 		cfg.SecretConfigured = configured
 		if cfg.Enabled && !configured {
-			return fmt.Errorf("Telegram %s: 启用前必须配置秘密", cfg.Name)
+			return i18n.NewError(i18n.NotificationSecretRequired, map[string]any{"channel": "Telegram", "name": cfg.Name})
 		}
 	}
 	for name, cfg := range existing {
@@ -525,7 +541,7 @@ func (s *notificationConfigStore) applyEmailUpdates(current, next *notificationC
 		seen[cfg.Name] = true
 		old, ok := existing[cfg.Name]
 		if !ok && cfg.SecretConfigured && !cfg.ReplaceSecret && !cfg.ClearSecret {
-			return fmt.Errorf("Email %s: 名称变化后必须重新提供秘密并设置 replace_secret", cfg.Name)
+			return i18n.NewError(i18n.NotificationRenamedSecretRequired, map[string]any{"channel": "Email", "name": cfg.Name})
 		}
 		configured, err := s.applySecretUpdate(notificationSecretKey("email", cfg.Name, "password"), cfg.Password, cfg.ReplaceSecret, cfg.ClearSecret, ok && old.SecretConfigured, deletes)
 		if err != nil {
@@ -533,7 +549,7 @@ func (s *notificationConfigStore) applyEmailUpdates(current, next *notificationC
 		}
 		cfg.SecretConfigured = configured
 		if cfg.Enabled && !configured {
-			return fmt.Errorf("Email %s: 启用前必须配置秘密", cfg.Name)
+			return i18n.NewError(i18n.NotificationSecretRequired, map[string]any{"channel": "Email", "name": cfg.Name})
 		}
 	}
 	for name, cfg := range existing {
@@ -555,7 +571,7 @@ func (s *notificationConfigStore) applyWecomUpdates(current, next *notificationC
 		seen[cfg.Name] = true
 		old, ok := existing[cfg.Name]
 		if !ok && cfg.SecretConfigured && !cfg.ReplaceSecret && !cfg.ClearSecret {
-			return fmt.Errorf("WeCom %s: 名称变化后必须重新提供秘密并设置 replace_secret", cfg.Name)
+			return i18n.NewError(i18n.NotificationRenamedSecretRequired, map[string]any{"channel": "WeCom", "name": cfg.Name})
 		}
 		configured, err := s.applySecretUpdate(notificationSecretKey("wecom", cfg.Name, "url"), cfg.WebhookURL, cfg.ReplaceSecret, cfg.ClearSecret, ok && old.SecretConfigured, deletes)
 		if err != nil {
@@ -563,7 +579,7 @@ func (s *notificationConfigStore) applyWecomUpdates(current, next *notificationC
 		}
 		cfg.SecretConfigured = configured
 		if cfg.Enabled && !configured {
-			return fmt.Errorf("WeCom %s: 启用前必须配置秘密", cfg.Name)
+			return i18n.NewError(i18n.NotificationSecretRequired, map[string]any{"channel": "WeCom", "name": cfg.Name})
 		}
 	}
 	for name, cfg := range existing {
@@ -585,10 +601,10 @@ func (s *notificationConfigStore) applyWebhookUpdates(current, next *notificatio
 		seen[cfg.Name] = true
 		old, ok := existing[cfg.Name]
 		if !ok && cfg.SecretConfigured && !cfg.ReplaceSecret && !cfg.ClearSecret {
-			return fmt.Errorf("Webhook %s: 名称变化后必须重新提供秘密并设置 replace_secret", cfg.Name)
+			return i18n.NewError(i18n.NotificationRenamedSecretRequired, map[string]any{"channel": "Webhook", "name": cfg.Name})
 		}
 		if cfg.ReplaceSecret && cfg.URL == "" {
-			return fmt.Errorf("Webhook %s: replace_secret 需要 URL", cfg.Name)
+			return i18n.NewError(i18n.NotificationReplacementURLRequired, map[string]any{"name": cfg.Name})
 		}
 		configured, err := s.applySecretUpdate(notificationSecretKey("webhook", cfg.Name, "url"), cfg.URL, cfg.ReplaceSecret, cfg.ClearSecret, ok && old.SecretConfigured, deletes)
 		if err != nil {
@@ -605,7 +621,7 @@ func (s *notificationConfigStore) applyWebhookUpdates(current, next *notificatio
 		}
 		cfg.SecretConfigured = configured
 		if cfg.Enabled && !configured {
-			return fmt.Errorf("Webhook %s: 启用前必须配置秘密", cfg.Name)
+			return i18n.NewError(i18n.NotificationSecretRequired, map[string]any{"channel": "Webhook", "name": cfg.Name})
 		}
 	}
 	for name, cfg := range existing {
@@ -618,7 +634,7 @@ func (s *notificationConfigStore) applyWebhookUpdates(current, next *notificatio
 
 func (s *notificationConfigStore) applySecretUpdate(key, value string, replace, clear, oldConfigured bool, deletes *[]string) (bool, error) {
 	if replace && clear {
-		return false, errors.New("replace_secret 与 clear_secret 不能同时设置")
+		return false, i18n.NewError(i18n.NotificationSecretActionsConflict, nil)
 	}
 	if clear {
 		*deletes = append(*deletes, key)
@@ -626,7 +642,7 @@ func (s *notificationConfigStore) applySecretUpdate(key, value string, replace, 
 	}
 	if replace {
 		if value == "" {
-			return false, errors.New("replace_secret 需要新秘密")
+			return false, i18n.NewError(i18n.NotificationReplacementSecretRequired, nil)
 		}
 		if err := s.setSecret(key, value); err != nil {
 			return false, err
@@ -634,7 +650,7 @@ func (s *notificationConfigStore) applySecretUpdate(key, value string, replace, 
 		return true, nil
 	}
 	if value != "" {
-		return false, errors.New("提供秘密时必须显式设置 replace_secret")
+		return false, i18n.NewError(i18n.NotificationReplaceSecretRequired, nil)
 	}
 	return oldConfigured, nil
 }
@@ -670,11 +686,11 @@ func validateNotificationNames(cfg *notificationConfig) error {
 	seen := make(map[string]bool)
 	check := func(kind, name string) error {
 		if name == "" || utf8.RuneCountInString(name) > 64 || strings.ContainsAny(name, "/\\\r\n\x00") {
-			return fmt.Errorf("%s 名称无效", kind)
+			return i18n.NewError(i18n.NotificationNameInvalid, map[string]any{"channel": kind})
 		}
 		key := kind + "\x00" + name
 		if seen[key] {
-			return fmt.Errorf("%s 名称重复: %s", kind, name)
+			return i18n.NewError(i18n.NotificationNameDuplicate, map[string]any{"channel": kind, "name": name})
 		}
 		seen[key] = true
 		return nil
@@ -708,6 +724,9 @@ func validateNotificationNames(cfg *notificationConfig) error {
 }
 
 func normalizeNotificationConfig(cfg *notificationConfig) {
+	if language, err := notificationpkg.NormalizeLanguage(cfg.Language); err == nil {
+		cfg.Language = language
+	}
 	if cfg.TelegramConfigs == nil {
 		cfg.TelegramConfigs = []telegramConfig{}
 	}
@@ -727,7 +746,7 @@ func normalizeNotificationConfig(cfg *notificationConfig) {
 		cfg.NotificationRules = defaultNotificationRules()
 	}
 	if cfg.NotificationTemplates == nil {
-		cfg.NotificationTemplates = defaultNotificationTemplates()
+		cfg.NotificationTemplates = mergeNotificationTemplates(nil)
 	} else {
 		cfg.NotificationTemplates = mergeNotificationTemplates(cfg.NotificationTemplates)
 	}

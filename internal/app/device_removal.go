@@ -4,13 +4,15 @@ import (
 	"errors"
 	"fmt"
 	"time"
+
+	"iosbackup/internal/i18n"
 )
 
 var (
-	errDeviceNotFound       = errors.New("设备不存在")
-	errDeviceBusy           = errors.New("设备正在执行任务")
-	errDeviceRemoved        = errors.New("设备已移除")
-	errDeviceRemovalPending = errors.New("设备正在移除")
+	errDeviceNotFound       = errors.New("device not found")
+	errDeviceBusy           = errors.New("device is busy")
+	errDeviceRemoved        = errors.New("device removed")
+	errDeviceRemovalPending = errors.New("device removal in progress")
 )
 
 // isDeviceRemovedUnsafe 仅可在持有 app.mu 的情况下调用。
@@ -50,7 +52,7 @@ func (app *application) deviceRemovalBusyUnsafe(udid string) bool {
 // 配置必须先成功落盘，内存状态才会发布，避免重启后“设备重新出现”的半成功状态。
 func (app *application) removeDevice(udid string) (time.Time, error) {
 	if !udidPattern.MatchString(udid) {
-		return time.Time{}, fmt.Errorf("无效的设备UDID")
+		return time.Time{}, i18n.NewError(i18n.InvalidUDID, nil)
 	}
 
 	app.configPersistMu.Lock()
@@ -104,7 +106,7 @@ func (app *application) removeDevice(udid string) (time.Time, error) {
 		app.mu.Lock()
 		delete(app.deviceRemovalPending, udid)
 		app.mu.Unlock()
-		return time.Time{}, fmt.Errorf("保存设备移除状态: %w", err)
+		return time.Time{}, fmt.Errorf("save device removal state: %w", err)
 	}
 
 	app.mu.Lock()
@@ -122,7 +124,7 @@ func (app *application) removeDevice(udid string) (time.Time, error) {
 // restoreRemovedDevice 清除归档标记并恢复一张离线设备卡片；真实在线状态由后续刷新更新。
 func (app *application) restoreRemovedDevice(udid string) error {
 	if !udidPattern.MatchString(udid) {
-		return fmt.Errorf("无效的设备UDID")
+		return i18n.NewError(i18n.InvalidUDID, nil)
 	}
 
 	app.configPersistMu.Lock()
@@ -150,7 +152,7 @@ func (app *application) restoreRemovedDevice(udid string) error {
 	app.mu.Unlock()
 
 	if err := app.configStore.Put(candidate); err != nil {
-		return fmt.Errorf("保存设备恢复状态: %w", err)
+		return fmt.Errorf("save device restoration state: %w", err)
 	}
 
 	app.mu.Lock()

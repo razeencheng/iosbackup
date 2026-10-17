@@ -9,13 +9,15 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"iosbackup/internal/i18n"
 )
 
 var udidPattern = regexp.MustCompile(`^[A-Za-z0-9-]{1,128}$`)
 
 func validateBackupConfig(cfg backupConfig, allowedRoots []string) error {
 	if !udidPattern.MatchString(cfg.UDID) {
-		return fmt.Errorf("UDID 格式无效")
+		return i18n.NewError(i18n.InvalidUDID, nil)
 	}
 	if err := validateClock("start_time", cfg.StartTime); err != nil {
 		return err
@@ -24,13 +26,13 @@ func validateBackupConfig(cfg backupConfig, allowedRoots []string) error {
 		return err
 	}
 	if cfg.BackupInterval < 1 || cfg.BackupInterval > 720 {
-		return fmt.Errorf("backup_interval 必须在 1 到 720 小时之间")
+		return i18n.NewError(i18n.BackupIntervalRange, map[string]any{"min": 1, "max": 720})
 	}
 	if cfg.MinBatteryLevel < 0 || cfg.MinBatteryLevel > 100 {
-		return fmt.Errorf("min_battery_level 必须在 0 到 100 之间")
+		return i18n.NewError(i18n.BatteryLevelRange, map[string]any{"min": 0, "max": 100})
 	}
 	if cfg.BackupDirectory == "" || !pathWithinRoots(cfg.BackupDirectory, allowedRoots) {
-		return fmt.Errorf("backup_directory 必须位于允许的备份目录内")
+		return i18n.NewError(i18n.BackupDirectoryNotAllowed, nil)
 	}
 	if cfg.NetworkAddress != "" {
 		if _, err := parseDeviceNetworkAddress(cfg.NetworkAddress); err != nil {
@@ -45,11 +47,11 @@ func validateBackupConfig(cfg backupConfig, allowedRoots []string) error {
 func parseDeviceNetworkAddress(value string) (netip.Addr, error) {
 	addr, err := netip.ParseAddr(strings.TrimSpace(value))
 	if err != nil {
-		return netip.Addr{}, fmt.Errorf("不是有效 IP: %w", err)
+		return netip.Addr{}, &i18n.Error{Code: i18n.IPInvalid, Detail: err.Error(), Cause: err}
 	}
 	addr = addr.Unmap()
 	if addr.IsUnspecified() || addr.IsLoopback() || addr.IsMulticast() || addr.IsLinkLocalUnicast() || addr.IsLinkLocalMulticast() || addr.String() == "255.255.255.255" {
-		return netip.Addr{}, fmt.Errorf("不允许使用未指定、回环、组播、广播或链路本地地址")
+		return netip.Addr{}, i18n.NewError(i18n.IPNotAllowed, nil)
 	}
 	return addr, nil
 }
@@ -57,7 +59,7 @@ func parseDeviceNetworkAddress(value string) (netip.Addr, error) {
 func validateClock(field, value string) error {
 	parsed, err := time.Parse("15:04", value)
 	if err != nil || parsed.Format("15:04") != value {
-		return fmt.Errorf("%s 必须使用 HH:mm 格式", field)
+		return i18n.NewError(i18n.InvalidClock, map[string]any{"field": field})
 	}
 	return nil
 }

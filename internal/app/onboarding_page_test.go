@@ -14,6 +14,7 @@ func TestOnboardingPageUsesEmbeddedRuntimeState(t *testing.T) {
 	app := newApplication()
 	handler := app.setupRoutes()
 	req := httptest.NewRequest(http.MethodGet, "/onboarding", nil)
+	req.Header.Set("Accept-Language", "zh-CN")
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, req)
 

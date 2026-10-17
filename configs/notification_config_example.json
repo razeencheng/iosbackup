@@ -58,19 +58,30 @@
     }
   ],
   "notification_rules": {
-    "backup_start": ["Telegram_main_bot"],
-    "backup_success": ["Telegram_main_bot"],
-    "backup_failed": ["Telegram_main_bot", "Email_gmail"],
+    "backup_start": [
+      "Telegram_main_bot"
+    ],
+    "backup_success": [
+      "Telegram_main_bot"
+    ],
+    "backup_failed": [
+      "Telegram_main_bot",
+      "Email_gmail"
+    ],
     "device_online": [],
     "device_offline": [],
-    "system_error": ["Telegram_main_bot", "Email_gmail"]
+    "system_error": [
+      "Telegram_main_bot",
+      "Email_gmail"
+    ]
   },
   "notification_templates": {
-    "backup_start": "设备 ${device_name} 开始备份",
-    "backup_success": "设备 ${device_name} 备份成功完成",
-    "backup_failed": "设备 ${device_name} 备份失败\n原因: ${reason}",
-    "device_online": "设备 ${device_name} 已连接",
-    "device_offline": "设备 ${device_name} 已断开连接",
-    "system_error": "${content}"
-  }
-} 
+    "backup_start": "",
+    "backup_success": "",
+    "backup_failed": "",
+    "device_online": "",
+    "device_offline": "",
+    "system_error": ""
+  },
+  "language": "zh-CN"
+}

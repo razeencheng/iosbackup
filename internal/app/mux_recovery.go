@@ -221,7 +221,7 @@ func (app *application) executeConnectionRecovery(ctx context.Context, targets [
 			s.attempts = append(trimConnectionAttempts(s.attempts, nowBeijing()), nowBeijing())
 		}
 		app.mu.Unlock()
-		app.addWarnLog("SYSTEM", fmt.Sprintf("开始恢复连接服务：backend=%d manual=%t", target, manual))
+		app.addWarnLog("SYSTEM", fmt.Sprintf("event=connection.recovery_started backend=%d manual=%t", target, manual))
 		var err error
 		if target == connectionUSB {
 			err = app.restartUSBMuxDProcess()
@@ -260,9 +260,9 @@ func (app *application) executeConnectionRecovery(ctx context.Context, targets [
 		}
 		app.mu.Unlock()
 		if err != nil {
-			app.addWarnLog("SYSTEM", fmt.Sprintf("连接服务恢复验证失败：backend=%d", target))
+			app.addWarnLog("SYSTEM", fmt.Sprintf("event=connection.recovery_failed backend=%d", target))
 		} else {
-			app.addInfoLog("SYSTEM", fmt.Sprintf("连接服务协议验证成功：backend=%d", target))
+			app.addInfoLog("SYSTEM", fmt.Sprintf("event=connection.recovery_verified backend=%d", target))
 		}
 	}
 	return retErr
@@ -337,7 +337,7 @@ func (app *application) RestartNetmuxd() {
 		return
 	}
 	if err := app.restartConnectionsSync([]int{connectionWiFi}); err != nil && !errors.Is(err, context.Canceled) {
-		app.addWarnLog("SYSTEM", err.Error())
+		app.addWarnLog("SYSTEM", fmt.Sprintf("event=connection.recovery_failed error=%v", err))
 	}
 }
 

@@ -11,6 +11,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"iosbackup/internal/i18n"
 )
 
 const (
@@ -32,6 +34,7 @@ type Options struct {
 type Manager struct {
 	notifiers             []Notifier
 	enabled               bool
+	language              string
 	notificationRules     map[string][]string
 	notificationTemplates map[string]string
 	mu                    sync.RWMutex
@@ -86,8 +89,9 @@ func NewManager(options Options) *Manager {
 	manager := &Manager{
 		notifiers:             make([]Notifier, 0),
 		enabled:               true,
+		language:              "zh-CN",
 		notificationRules:     make(map[string][]string),
-		notificationTemplates: DefaultTemplates(),
+		notificationTemplates: MergeTemplates(nil),
 		queue:                 make(chan job, queueSize),
 		ctx:                   ctx,
 		cancel:                cancel,
@@ -114,9 +118,9 @@ func (manager *Manager) worker() {
 			delivery := Delivery{Notifier: work.notifier.GetName()}
 			if err := work.notifier.Send(&work.message); err != nil {
 				delivery.Error = err.Error()
-				manager.logf("通知器 %s 发送失败: %v", work.notifier.GetName(), err)
+				manager.logf("event=notification.delivery_failed notifier=%s error=%v", work.notifier.GetName(), err)
 			} else {
-				manager.logf("通知器 %s 发送成功: %s", work.notifier.GetName(), work.message.Title)
+				manager.logf("event=notification.delivery_succeeded notifier=%s type=%s", work.notifier.GetName(), work.message.Type)
 			}
 			if work.result != nil {
 				work.result <- delivery
@@ -128,15 +132,15 @@ func (manager *Manager) worker() {
 // AddNotifier 添加并验证通知器。
 func (manager *Manager) AddNotifier(notifier Notifier) error {
 	if isNilNotifier(notifier) {
-		return fmt.Errorf("通知器不能为空")
+		return fmt.Errorf("notifier must not be nil")
 	}
 	if err := notifier.Validate(); err != nil {
-		return fmt.Errorf("通知器 %s 配置验证失败: %v", notifier.GetName(), err)
+		return fmt.Errorf("notifier %s validation failed: %w", notifier.GetName(), err)
 	}
 	manager.mu.Lock()
 	manager.notifiers = append(manager.notifiers, notifier)
 	manager.mu.Unlock()
-	manager.logf("已添加通知器: %s", notifier.GetName())
+	manager.logf("event=notification.notifier_added notifier=%s", notifier.GetName())
 	return nil
 }
 
@@ -203,7 +207,7 @@ func (manager *Manager) Send(message *Message) {
 	targets, messageCopy := manager.deliveryTargets(message)
 	if len(targets) == 0 {
 		if message != nil {
-			manager.logf("消息类型 %s 没有可用通知器，跳过发送", message.Type)
+			manager.logf("event=notification.no_targets type=%s action=skip", message.Type)
 		}
 		return
 	}
@@ -268,16 +272,18 @@ func (manager *Manager) deliveryTargets(message *Message) ([]Notifier, Message) 
 	notifiers := append([]Notifier(nil), manager.notifiers...)
 	rules := CloneRules(manager.notificationRules)
 	templates := CloneStringMap(manager.notificationTemplates)
+	language := manager.language
 	manager.mu.RUnlock()
 	if !enabled {
 		return nil, Message{}
 	}
 	messageCopy := CloneMessage(*message)
 	messageCopy.Timestamp = manager.now()
+	messageCopy = localizeMessage(messageCopy, language)
 	messageCopy.Content = renderTemplate(messageCopy, templates)
 	allowed, exists := rules[string(message.Type)]
 	if !exists || len(allowed) == 0 {
-		manager.logf("消息类型 %s 没有配置通知规则或规则为空，跳过发送", message.Type)
+		manager.logf("event=notification.no_rule type=%s action=skip", message.Type)
 		return nil, messageCopy
 	}
 	allowedSet := make(map[string]bool, len(allowed))
@@ -328,7 +334,7 @@ func (manager *Manager) Enable() {
 	manager.mu.Lock()
 	manager.enabled = true
 	manager.mu.Unlock()
-	manager.logf("通知管理器已启用")
+	manager.logf("event=notification.enabled")
 }
 
 func (manager *Manager) Disable() {
@@ -338,7 +344,7 @@ func (manager *Manager) Disable() {
 	manager.mu.Lock()
 	manager.enabled = false
 	manager.mu.Unlock()
-	manager.logf("通知管理器已禁用")
+	manager.logf("event=notification.disabled")
 }
 
 func (manager *Manager) GetNotifiers() []map[string]interface{} {
@@ -355,48 +361,42 @@ func (manager *Manager) GetNotifiers() []map[string]interface{} {
 }
 
 func (manager *Manager) SendBackupStart(deviceName, deviceUDID string) {
-	manager.Send(&Message{Type: BackupStart, Level: LevelInfo, Title: "✅ 设备备份开始", Content: fmt.Sprintf("设备 %s 开始备份", deviceName), DeviceName: deviceName, DeviceUDID: deviceUDID})
+	manager.Send(&Message{Type: BackupStart, Level: LevelInfo, EventCode: string(BackupStart), DeviceName: deviceName, DeviceUDID: deviceUDID})
 }
 
 func (manager *Manager) SendBackupSuccess(deviceName, deviceUDID string) {
-	manager.Send(&Message{Type: BackupSuccess, Level: LevelInfo, Title: "✅ 设备备份完成", Content: fmt.Sprintf("设备 %s 备份成功完成", deviceName), DeviceName: deviceName, DeviceUDID: deviceUDID})
+	manager.Send(&Message{Type: BackupSuccess, Level: LevelInfo, EventCode: string(BackupSuccess), DeviceName: deviceName, DeviceUDID: deviceUDID})
 }
 
 func (manager *Manager) SendBackupFailed(deviceName, deviceUDID, reason string) {
-	manager.Send(&Message{Type: BackupFailed, Level: LevelError, Title: "❌ 设备备份失败", Content: fmt.Sprintf("设备 %s 备份失败\n原因: %s", deviceName, reason), DeviceName: deviceName, DeviceUDID: deviceUDID, ExtraFields: map[string]string{"reason": reason}})
+	manager.Send(&Message{Type: BackupFailed, Level: LevelError, EventCode: string(BackupFailed), DeviceName: deviceName, DeviceUDID: deviceUDID, ExtraFields: map[string]string{"reason": reason}})
 }
 
 func (manager *Manager) SendDeviceOnline(deviceName, deviceUDID string) {
-	manager.Send(&Message{Type: DeviceOnline, Level: LevelInfo, Title: "✅ 设备上线", Content: fmt.Sprintf("设备 %s 已连接", deviceName), DeviceName: deviceName, DeviceUDID: deviceUDID})
+	manager.Send(&Message{Type: DeviceOnline, Level: LevelInfo, EventCode: string(DeviceOnline), DeviceName: deviceName, DeviceUDID: deviceUDID})
 }
 
 func (manager *Manager) SendDeviceOffline(deviceName, deviceUDID string) {
-	manager.Send(&Message{Type: DeviceOffline, Level: LevelWarning, Title: "❌ 设备离线", Content: fmt.Sprintf("设备 %s 已断开连接", deviceName), DeviceName: deviceName, DeviceUDID: deviceUDID})
+	manager.Send(&Message{Type: DeviceOffline, Level: LevelWarning, EventCode: string(DeviceOffline), DeviceName: deviceName, DeviceUDID: deviceUDID})
 }
 
 func (manager *Manager) SendSystemError(title, content string) {
-	manager.Send(&Message{Type: SystemError, Level: LevelError, Title: fmt.Sprintf("⚠️ 系统错误: %s", title), Content: content})
+	manager.Send(&Message{Type: SystemError, Level: LevelError, EventCode: string(SystemError), ExtraFields: map[string]string{"diagnostics": title + ": " + content}})
 }
 
 var templateVariablePattern = regexp.MustCompile(`\$\{([a-z_][a-z0-9_]*)\}`)
 
-func DefaultTemplates() map[string]string {
-	return map[string]string{
-		string(BackupStart):   "设备 ${device_name} 开始备份",
-		string(BackupSuccess): "设备 ${device_name} 备份成功完成",
-		string(BackupFailed):  "设备 ${device_name} 备份失败\n原因: ${reason}",
-		string(DeviceOnline):  "设备 ${device_name} 已连接",
-		string(DeviceOffline): "设备 ${device_name} 已断开连接",
-		string(SystemError):   "${content}",
-	}
-}
+// DefaultTemplates preserves the legacy Chinese examples for existing callers.
+// Persisted configuration uses MergeTemplates instead, so empty means built-in.
+func DefaultTemplates() map[string]string { return defaultTemplatesFor("zh-CN") }
 
 func MergeTemplates(templates map[string]string) map[string]string {
-	merged := DefaultTemplates()
+	merged := make(map[string]string)
+	for event := range defaultTemplatesFor("zh-CN") {
+		merged[event] = ""
+	}
 	for key, value := range templates {
-		if value != "" {
-			merged[key] = value
-		}
+		merged[key] = value
 	}
 	return merged
 }
@@ -408,18 +408,18 @@ func ValidateTemplates(templates map[string]string) error {
 	}
 	knownVariables := map[string]bool{
 		"type": true, "level": true, "title": true, "content": true,
-		"device_name": true, "device_udid": true, "timestamp": true, "reason": true,
+		"device_name": true, "device_udid": true, "timestamp": true, "reason": true, "diagnostics": true,
 	}
 	for eventType, template := range templates {
 		if !knownTypes[eventType] {
-			return fmt.Errorf("未知通知模板类型: %s", eventType)
+			return i18n.NewError(i18n.NotificationEventUnknown, map[string]any{"setting": "notification_templates", "event": eventType})
 		}
 		if len(template) > 8192 {
-			return fmt.Errorf("通知模板 %s 过长", eventType)
+			return i18n.NewError(i18n.NotificationTemplateLength, map[string]any{"event": eventType, "max": 8192})
 		}
 		for _, match := range templateVariablePattern.FindAllStringSubmatch(template, -1) {
 			if !knownVariables[match[1]] {
-				return fmt.Errorf("通知模板 %s 使用了未知变量 ${%s}", eventType, match[1])
+				return i18n.NewError(i18n.NotificationTemplateVariable, map[string]any{"event": eventType, "variable": "${" + match[1] + "}"})
 			}
 		}
 	}
@@ -435,6 +435,9 @@ func renderTemplate(message Message, templates map[string]string) string {
 		"type": string(message.Type), "level": string(message.Level), "title": message.Title,
 		"content": message.Content, "device_name": message.DeviceName, "device_udid": message.DeviceUDID,
 		"timestamp": message.Timestamp.Format(time.RFC3339),
+	}
+	for key, value := range message.Params {
+		values[key] = value
 	}
 	for key, value := range message.ExtraFields {
 		values[key] = value
@@ -459,15 +462,15 @@ func ValidateRules(rules map[string][]string, notifiers []map[string]interface{}
 	}
 	for messageType, names := range rules {
 		if !knownTypes[messageType] {
-			return fmt.Errorf("未知通知消息类型: %s", messageType)
+			return i18n.NewError(i18n.NotificationEventUnknown, map[string]any{"setting": "notification_rules", "event": messageType})
 		}
 		seen := make(map[string]bool, len(names))
 		for _, name := range names {
 			if !knownNotifiers[name] {
-				return fmt.Errorf("通知规则 %s 引用了不存在或未启用的通知器 %s", messageType, name)
+				return i18n.NewError(i18n.NotificationRuleTargetMissing, map[string]any{"event": messageType, "channel": name})
 			}
 			if seen[name] {
-				return fmt.Errorf("通知规则 %s 重复引用通知器 %s", messageType, name)
+				return i18n.NewError(i18n.NotificationRuleTargetDuplicate, map[string]any{"event": messageType, "channel": name})
 			}
 			seen[name] = true
 		}
@@ -478,9 +481,18 @@ func ValidateRules(rules map[string][]string, notifiers []map[string]interface{}
 // NewManagerFromConfig 根据已由应用层解密的配置构造通知管理器。
 func NewManagerFromConfig(config *Config, allowPrivate []netip.Prefix, options Options) (*Manager, error) {
 	if config == nil {
-		return nil, fmt.Errorf("通知配置不能为空")
+		return nil, i18n.NewError(i18n.NotificationConfigRequired, nil)
+	}
+	language, err := NormalizeLanguage(config.Language)
+	if err != nil {
+		return nil, err
 	}
 	manager := NewManager(options)
+	manager.language = language
+	if err := manager.SetTemplates(config.NotificationTemplates); err != nil {
+		manager.Close()
+		return nil, err
+	}
 	if !config.Enabled {
 		manager.Disable()
 		return manager, nil

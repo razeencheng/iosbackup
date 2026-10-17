@@ -48,50 +48,50 @@ func WriteFileAtomic(path string, data []byte, mode os.FileMode) error {
 func writeFileAtomic(path string, data []byte, mode os.FileMode, ops atomicOps) (retErr error) {
 	dir := filepath.Dir(path)
 	if err := ops.mkdirAll(dir, 0o700); err != nil {
-		return fmt.Errorf("创建配置目录: %w", err)
+		return fmt.Errorf("create configuration directory: %w", err)
 	}
 
 	tmp, err := ops.createTemp(dir, "."+filepath.Base(path)+"-*")
 	if err != nil {
-		return fmt.Errorf("创建临时文件: %w", err)
+		return fmt.Errorf("create temporary file: %w", err)
 	}
 	tmpPath := tmp.Name()
 	closeAttempted := false
 	defer func() {
 		if !closeAttempted {
 			if closeErr := tmp.Close(); retErr == nil && closeErr != nil {
-				retErr = fmt.Errorf("关闭临时文件: %w", closeErr)
+				retErr = fmt.Errorf("close temporary file: %w", closeErr)
 			}
 		}
 		_ = os.Remove(tmpPath)
 	}()
 
 	if _, err := tmp.Write(data); err != nil {
-		return fmt.Errorf("写入临时文件: %w", err)
+		return fmt.Errorf("write temporary file: %w", err)
 	}
 	if err := tmp.Chmod(mode); err != nil {
-		return fmt.Errorf("设置临时文件权限: %w", err)
+		return fmt.Errorf("set temporary file permissions: %w", err)
 	}
 	if err := tmp.Sync(); err != nil {
-		return fmt.Errorf("同步临时文件: %w", err)
+		return fmt.Errorf("sync temporary file: %w", err)
 	}
 	closeErr := tmp.Close()
 	closeAttempted = true
 	if closeErr != nil {
-		return fmt.Errorf("关闭临时文件: %w", closeErr)
+		return fmt.Errorf("close temporary file: %w", closeErr)
 	}
 
 	if err := ops.rename(tmpPath, path); err != nil {
-		return fmt.Errorf("替换配置文件: %w", err)
+		return fmt.Errorf("replace configuration file: %w", err)
 	}
 
 	dirFile, err := ops.openDir(dir)
 	if err != nil {
-		return fmt.Errorf("打开配置目录: %w", err)
+		return fmt.Errorf("open configuration directory: %w", err)
 	}
 	defer dirFile.Close()
 	if err := dirFile.Sync(); err != nil {
-		return fmt.Errorf("同步配置目录: %w", err)
+		return fmt.Errorf("sync configuration directory: %w", err)
 	}
 	return nil
 }

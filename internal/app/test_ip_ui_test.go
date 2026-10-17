@@ -19,10 +19,8 @@ func TestIndexTemplateTestConnUI(t *testing.T) {
 		`id="ipResult-U-OFF2"`,          // 结果占位
 		`data-i18n="bset.offlineHelp"`,  // 离线排障提示（仅离线时）
 		"function testDeviceIP",         // 前端逻辑
-		"offlineHelp:{zh:",              // 字典含排障文案
 		`id="autoNote-U-OFF2"`,          // 自动备份锁屏密码提示元素
 		`data-i18n="bset.passcodeNote"`, // 锁屏密码提示文案
-		"passcodeNote:{zh:",             // 字典含锁屏密码文案
 	} {
 		if !strings.Contains(html, want) {
 			t.Errorf("离线卡片应包含 %q", want)
@@ -45,16 +43,30 @@ func TestIndexTemplateOnlineNoOfflineHelp(t *testing.T) {
 		t.Error("在线设备也应有测试连接按钮")
 	}
 	// 加密状态徽章 + 加载逻辑 + 忘记密码链接（双语 URL）+ 备份管理修订（文件数/解包图标）
-	for _, want := range []string{`id="encState-U-ON2"`, "function loadEncStatus", "stateOn:{zh:", "/api/encryption-status/",
-		`data-i18n-href="enc.forgotUrl"`, "support.apple.com/zh-cn/108313", "support.apple.com/en-us/108313",
-		`count:{zh:"备份文件数"`, "ui-icons.svg#icon-unpack",
+	for _, want := range []string{`id="encState-U-ON2"`, "function loadEncStatus", "/api/encryption-status/",
+		`data-i18n-href="enc.forgotUrl"`,
+		"ui-icons.svg#icon-unpack",
 		"checkBackupDir('U-ON2')", "function checkBackupDir", "/api/check-dir",
-		"confirmDeleteBackup('U-ON2'", "function confirmDeleteBackup", "delDataTitle:{zh:"} {
+		"confirmDeleteBackup('U-ON2'", "function confirmDeleteBackup"} {
 		if !strings.Contains(html, want) {
 			t.Errorf("加密页应包含 %q", want)
 		}
 	}
 	if strings.Contains(html, `data-i18n="bset.offlineHelp"`) {
 		t.Error("在线设备不应渲染离线提示块")
+	}
+}
+
+func TestIndexSharedHelpMessages(t *testing.T) {
+	catalog := uiMessageCatalog(t)
+	for _, key := range []string{"bset.offlineHelp", "bset.passcodeNote", "enc.stateOn", "bmgmt.count", "bmgmt.delDataTitle"} {
+		for _, locale := range []string{"en", "zh-CN"} {
+			if catalog[locale][key] == "" {
+				t.Errorf("missing %s: %s", locale, key)
+			}
+		}
+	}
+	if catalog["en"]["enc.forgotUrl"] != "https://support.apple.com/en-us/108313" || catalog["zh-CN"]["enc.forgotUrl"] != "https://support.apple.com/zh-cn/108313" {
+		t.Error("password help links must follow locale")
 	}
 }

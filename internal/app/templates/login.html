@@ -1,10 +1,10 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="{{.Locale}}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="light">
-<title>登录 · iOS Backup</title>
+<title data-i18n="page.login">{{t $.Locale "page.login"}}</title>
 <link rel="icon" href="/static/favicon.ico?v={{.Version}}" type="image/x-icon">
 <style>
   :root{--iosbk-radius:9px;--ink:#213041;--muted:#718090;--line:#dce4ea;--blue:#2c62c6;--blue-deep:#2454ae;--paper:#fbfcfd;--soft:#eef3f7;--green:#2e7d5b;--amber:#9a5b12;font-family:-apple-system,"SF Pro Text","PingFang SC","Noto Sans SC",system-ui,sans-serif;color:var(--ink);background:#edf2f6}
@@ -32,7 +32,7 @@
   .form-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:42px}
   .eyebrow{color:#82909c;font-size:10.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase}
   .lang{display:flex;gap:3px;padding:3px;background:#f0f1ed;border-radius:var(--iosbk-radius)}
-  .lang button{border:0;border-radius:var(--iosbk-radius);padding:5px 8px;background:transparent;color:#8a8c92;font-size:11px;cursor:pointer}
+  .lang button{white-space:nowrap;border:0;border-radius:var(--iosbk-radius);padding:5px 8px;background:transparent;color:#8a8c92;font-size:11px;cursor:pointer}
   .lang button.active{background:#fff;color:#33353a;box-shadow:0 1px 2px rgba(20,20,20,.12)}
   h2{margin:0;font-size:28px;line-height:1.15;letter-spacing:-.04em}
   .subtitle{margin:9px 0 0;color:var(--muted);font-size:12.5px;line-height:1.6}
@@ -59,56 +59,52 @@
   @media(max-width:390px){.story-copy h1{font-size:26px}.story,.main{padding-left:19px;padding-right:19px}}
   @media(prefers-reduced-motion:reduce){*{animation-duration:.001ms!important;transition-duration:.001ms!important}}
 </style>
+<script src="/static/i18n.js?v={{.Version}}"></script>
+<script src="/static/ui-messages.js?v={{.Version}}"></script>
+<script src="/static/api-messages.js?v={{.Version}}"></script>
 </head>
 <body>
 <main class="page">
   <div class="shell">
     <section class="story" aria-label="iOS Backup">
-      <div class="brand"><span class="logo" aria-hidden="true"><img src="/static/logo-mark.png" alt=""></span><span class="brand-copy"><b>iOS Backup</b><span>Private console</span></span></div>
+      <div class="brand"><span class="logo" aria-hidden="true"><img src="/static/logo-mark.png" alt=""></span><span class="brand-copy"><b>iOS Backup</b><span data-i18n="login.privateConsole">{{t $.Locale "login.privateConsole"}}</span></span></div>
       <div class="story-copy">
-        <h1><span data-zh="回到家。" data-en="Home again.">回到家。</span><br><span data-zh="连上 Wi‑Fi。" data-en="Wi‑Fi connected.">连上 Wi‑Fi。</span><br><span data-zh="备份自然发生。" data-en="Backup happens automatically.">备份自然发生。</span></h1>
-        <p data-zh="将 iPhone 和 iPad 自动备份到家里的 NAS，随时查看设备与任务状态。" data-en="Back up iPhone and iPad to your home NAS, with device and task status always in view.">将 iPhone 和 iPad 自动备份到家里的 NAS，随时查看设备与任务状态。</p>
+        <h1><span data-i18n="login.storyHome">{{t $.Locale "login.storyHome"}}</span><br><span data-i18n="login.storyWifi">{{t $.Locale "login.storyWifi"}}</span><br><span data-i18n="login.storyBackup">{{t $.Locale "login.storyBackup"}}</span></h1>
+        <p data-i18n="login.storyLead">{{t $.Locale "login.storyLead"}}</p>
       </div>
-      <div class="metrics" aria-label="产品特点">
-        <div class="metric"><b>Local</b><span data-zh="数据留在本地" data-en="Data stays local">数据留在本地</span></div>
-        <div class="metric"><b>USB / Wi‑Fi</b><span data-zh="两种连接方式" data-en="Two connections">两种连接方式</span></div>
-        <div class="metric"><b>Open</b><span>AGPL-3.0</span></div>
+      <div class="metrics" data-i18n-aria="login.features" aria-label="{{t $.Locale "login.features"}}">
+        <div class="metric"><b data-i18n="login.local">{{t $.Locale "login.local"}}</b><span data-i18n="login.localData">{{t $.Locale "login.localData"}}</span></div>
+        <div class="metric"><b>USB / Wi‑Fi</b><span data-i18n="login.connections">{{t $.Locale "login.connections"}}</span></div>
+        <div class="metric"><b data-i18n="login.open">{{t $.Locale "login.open"}}</b><span>AGPL-3.0</span></div>
       </div>
     </section>
-    <section class="main" aria-label="管理员登录">
+    <section class="main" data-i18n-aria="login.admin" aria-label="{{t $.Locale "login.admin"}}">
       <div class="form-panel">
-        <div class="form-top"><span class="eyebrow">Admin access</span><div class="lang"><button type="button" data-lang="zh" class="active">中文</button><button type="button" data-lang="en">EN</button></div></div>
-        <h2 data-zh="身份验证" data-en="Sign in">身份验证</h2>
-        <p class="subtitle" data-zh="输入管理员密码以打开控制台。" data-en="Enter the administrator password to open the console.">输入管理员密码以打开控制台。</p>
+        <div class="form-top"><span class="eyebrow" data-i18n="login.adminAccess">{{t $.Locale "login.adminAccess"}}</span><div class="lang" role="group" data-i18n-aria="common.language" aria-label="{{t $.Locale "common.language"}}"><button type="button" data-lang="zh-CN" class="{{if eq $.Locale "zh-CN"}}active{{end}}" aria-pressed="{{if eq $.Locale "zh-CN"}}true{{else}}false{{end}}">中文</button><button type="button" data-lang="en" class="{{if ne $.Locale "zh-CN"}}active{{end}}" aria-pressed="{{if ne $.Locale "zh-CN"}}true{{else}}false{{end}}">EN</button></div></div>
+        <h2 data-i18n="login.title">{{t $.Locale "login.title"}}</h2>
+        <p class="subtitle" data-i18n="login.subtitle">{{t $.Locale "login.subtitle"}}</p>
         <form method="post" action="/login" id="loginForm">
           <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
           <input type="hidden" name="next" value="{{.Next}}">
-          <label class="field"><span class="field-label" data-zh="密码" data-en="Password">密码</span><span class="input-wrap password"><input id="password" name="password" type="password" maxlength="4096" autocomplete="current-password" required data-zh-placeholder="输入管理员密码" data-en-placeholder="Enter administrator password" placeholder="输入管理员密码"><button id="togglePassword" class="toggle" type="button" data-zh="显示" data-en="Show">显示</button></span></label>
-          <button id="submitButton" class="submit" type="submit"><span class="button-label" data-zh="验证并进入" data-en="Verify and continue">验证并进入</span><span class="spinner" aria-hidden="true"></span></button>
+          <label class="field"><span class="field-label" data-i18n="login.password">{{t $.Locale "login.password"}}</span><span class="input-wrap password"><input id="password" name="password" type="password" maxlength="4096" autocomplete="current-password" required data-i18n-ph="login.passwordPlaceholder" placeholder="{{t $.Locale "login.passwordPlaceholder"}}"><button id="togglePassword" class="toggle" type="button" data-i18n="login.showPassword">{{t $.Locale "login.showPassword"}}</button></span></label>
+          <button id="submitButton" class="submit" type="submit"><span class="button-label" data-i18n="login.submit">{{t $.Locale "login.submit"}}</span><span class="spinner" aria-hidden="true"></span></button>
         </form>
-        {{if .Error}}<div class="alert error" role="alert">{{.Error}}</div>{{end}}
-        {{if .Insecure}}<div class="alert warning"><span class="dot"></span><span data-zh="局域网 HTTP 模式：密码传输未加密。请仅在可信网络中登录。" data-en="LAN HTTP mode: password transport is not encrypted. Sign in only on a trusted network.">局域网 HTTP 模式：密码传输未加密。请仅在可信网络中登录。</span></div>{{else}}<div class="alert secure"><span class="dot"></span><span data-zh="当前连接已启用 HTTPS。" data-en="This connection is protected with HTTPS.">当前连接已启用 HTTPS。</span></div>{{end}}
-        <div class="trust"><span>iOS Backup {{.Version}} · <a href="{{.SourceURL}}/tree/{{.Commit}}" rel="noreferrer">Source {{.Commit}}</a> · AGPL-3.0-only</span><b data-zh="服务在线" data-en="Service online">服务在线</b></div>
+        {{if .Error}}<div class="alert error" role="alert" data-i18n="{{.ErrorCode}}">{{.Error}}</div>{{end}}
+        {{if .Insecure}}<div class="alert warning"><span class="dot"></span><span data-i18n="login.insecure">{{t $.Locale "login.insecure"}}</span></div>{{else}}<div class="alert secure"><span class="dot"></span><span data-i18n="login.secure">{{t $.Locale "login.secure"}}</span></div>{{end}}
+        <div class="trust"><span>iOS Backup {{.Version}} · <a href="{{.SourceURL}}/tree/{{.Commit}}" rel="noreferrer"><span data-i18n="common.source">{{t $.Locale "common.source"}}</span> {{.Commit}}</a> · AGPL-3.0-only</span><b data-i18n="login.serviceOnline">{{t $.Locale "login.serviceOnline"}}</b></div>
       </div>
     </section>
   </div>
 </main>
 <script>
 (function(){
-  var language='zh';
-  try{language=localStorage.getItem('iosbk_lang')||((navigator.language||'').toLowerCase().indexOf('zh')===0?'zh':'en');}catch(e){}
-  function applyLanguage(next){
-    language=next==='en'?'en':'zh';
-    document.documentElement.lang=language==='zh'?'zh-CN':'en';
-    document.querySelectorAll('[data-zh]').forEach(function(el){el.textContent=el.getAttribute(language==='zh'?'data-zh':'data-en');});
-    document.querySelectorAll('[data-zh-placeholder]').forEach(function(el){el.placeholder=el.getAttribute(language==='zh'?'data-zh-placeholder':'data-en-placeholder');});
-    document.querySelectorAll('[data-lang]').forEach(function(el){el.classList.toggle('active',el.getAttribute('data-lang')===language);});
-    try{localStorage.setItem('iosbk_lang',language);}catch(e){}
-  }
-  document.querySelectorAll('[data-lang]').forEach(function(button){button.addEventListener('click',function(){applyLanguage(button.getAttribute('data-lang'));});});
   var password=document.getElementById('password'),toggle=document.getElementById('togglePassword');
-  toggle.addEventListener('click',function(){var showing=password.type==='text';password.type=showing?'password':'text';toggle.textContent=language==='zh'?(showing?'显示':'隐藏'):(showing?'Show':'Hide');});
-  applyLanguage(language);
+  function renderPasswordToggle(){ toggle.setAttribute('data-i18n',password.type==='text'?'login.hidePassword':'login.showPassword'); toggle.textContent=IOSBKI18n.t(password.type==='text'?'login.hidePassword':'login.showPassword'); toggle.setAttribute('aria-pressed',password.type==='text'?'true':'false'); }
+  function applyLanguage(){ IOSBKI18n.apply(); renderPasswordToggle(); }
+  document.querySelectorAll('[data-lang]').forEach(function(button){button.addEventListener('click',function(){IOSBKI18n.setLocale(button.getAttribute('data-lang'));});});
+  toggle.addEventListener('click',function(){password.type=password.type==='text'?'password':'text';renderPasswordToggle();});
+  window.addEventListener('iosbk:localechange',applyLanguage);
+  applyLanguage();
 })();
 </script>
 </body>

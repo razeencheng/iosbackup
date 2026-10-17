@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="{{.Locale}}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="iosbk-csrf" content="{{.CSRFToken}}">
-<title>iOS Device Backup</title>
+<title data-i18n="page.console">{{t $.Locale "page.console"}}</title>
 <link rel="icon" href="/static/favicon.ico?v={{.Version}}" type="image/x-icon">
 <style>
   :root{--iosbk-radius:9px}
@@ -151,6 +151,9 @@
   }
   @media(prefers-reduced-motion:reduce){.backup-overall-fill{transition:none}.backup-overall-track.indeterminate .backup-overall-fill{animation:none;transform:translateX(95%)}}
 </style>
+<script src="/static/i18n.js?v={{.Version}}"></script>
+<script src="/static/ui-messages.js?v={{.Version}}"></script>
+<script src="/static/api-messages.js?v={{.Version}}"></script>
 </head>
 <body>
 <div style="min-height:100vh;padding:22px 16px 64px">
@@ -162,43 +165,43 @@
       <div style="display:flex;align-items:center;gap:13px;min-width:0">
         <span class="iosbk-brand-logo" aria-hidden="true"><img src="/static/logo-mark.png" alt=""></span>
         <div style="min-width:0">
-          <div style="font-size:18px;font-weight:700;letter-spacing:-.01em;line-height:1.15" data-i18n="app.title"></div>
-          <div style="font-size:12.5px;color:#6F7E8C;margin-top:2px;line-height:1.3" data-i18n="app.subtitle"></div>
+          <div style="font-size:18px;font-weight:700;letter-spacing:-.01em;line-height:1.15" data-i18n="app.title">{{t $.Locale "app.title"}}</div>
+          <div style="font-size:12.5px;color:#6F7E8C;margin-top:2px;line-height:1.3" data-i18n="app.subtitle">{{t $.Locale "app.subtitle"}}</div>
         </div>
       </div>
-      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
-        <div class="language-switch">
-          <button class="lang-btn" data-lang="en" onclick="setLang('en')">EN</button>
-          <button class="lang-btn" data-lang="zh" onclick="setLang('zh')">中文</button>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-inline-start:auto">
+        <div class="language-switch" role="group" data-i18n-aria="common.language" aria-label="{{t $.Locale "common.language"}}">
+          <button class="lang-btn {{if ne $.Locale "zh-CN"}}active{{end}}" data-lang="en" onclick="setLang('en')" aria-pressed="{{if ne $.Locale "zh-CN"}}true{{else}}false{{end}}">EN</button>
+          <button class="lang-btn {{if eq $.Locale "zh-CN"}}active{{end}}" data-lang="zh-CN" onclick="setLang('zh-CN')" aria-pressed="{{if eq $.Locale "zh-CN"}}true{{else}}false{{end}}">中文</button>
         </div>
         <div style="position:relative">
-          <button id="menuBtn" class="toolbar-icon-btn" onclick="toggleMenu(event)" data-i18n-title="menu.title" style="display:inline-flex;align-items:center;background:#fff;color:#27384A;border:1px solid #D8E2EA;border-radius:var(--iosbk-radius);font-size:13.5px;font-weight:500;cursor:pointer;font-family:inherit"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-settings"></use></svg></button>
+          <button id="menuBtn" class="toolbar-icon-btn" onclick="toggleMenu(event)" data-i18n-title="menu.title" style="display:inline-flex;align-items:center;background:#fff;color:#27384A;border:1px solid #D8E2EA;border-radius:var(--iosbk-radius);font-size:13.5px;font-weight:500;cursor:pointer;font-family:inherit" title="{{t $.Locale "menu.title"}}"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-settings"></use></svg></button>
           <div id="menuDropdown" class="hidden" style="position:absolute;right:0;top:calc(100% + 6px);z-index:50;background:#fff;border:1px solid #D8E2EA;border-radius:var(--iosbk-radius);box-shadow:0 12px 28px -12px rgba(35,52,68,.3);padding:6px;min-width:248px">
             <button id="removedDevicesMenuItem" type="button" onclick="openRemovedDevicesDrawer()" class="menu-item">
               <span style="width:30px;height:30px;flex:none;border-radius:var(--iosbk-radius);display:flex;align-items:center;justify-content:center;background:#EAF1FC;color:#2356B8"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-archive"></use></svg></span>
-              <span style="min-width:0"><span style="font-size:13.5px;font-weight:600;display:block" data-i18n="removed.title"></span><span style="font-size:11.5px;color:#718090;line-height:1.4;display:block;margin-top:2px" data-i18n="removed.menuHint"></span></span>
+              <span style="min-width:0"><span style="font-size:13.5px;font-weight:600;display:block" data-i18n="removed.title">{{t $.Locale "removed.title"}}</span><span style="font-size:11.5px;color:#718090;line-height:1.4;display:block;margin-top:2px" data-i18n="removed.menuHint">{{t $.Locale "removed.menuHint"}}</span></span>
               <span id="removedDeviceCountBadge" class="menu-count hidden">0</span>
             </button>
             <a href="/onboarding" class="menu-item">
               <span style="width:30px;height:30px;flex:none;border-radius:var(--iosbk-radius);display:flex;align-items:center;justify-content:center;background:#EAF1FC;color:#2356B8"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-guide"></use></svg></span>
-              <span><span style="font-size:13.5px;font-weight:600;display:block" data-i18n="menu.onboarding"></span><span style="font-size:11.5px;color:#718090;line-height:1.4;display:block;margin-top:2px" data-i18n="menu.onboardingHint"></span></span>
+              <span><span style="font-size:13.5px;font-weight:600;display:block" data-i18n="menu.onboarding">{{t $.Locale "menu.onboarding"}}</span><span style="font-size:11.5px;color:#718090;line-height:1.4;display:block;margin-top:2px" data-i18n="menu.onboardingHint">{{t $.Locale "menu.onboardingHint"}}</span></span>
             </a>
             <a href="/notifications" class="menu-item">
               <span style="width:30px;height:30px;flex:none;border-radius:var(--iosbk-radius);display:flex;align-items:center;justify-content:center;background:#EAF1FC;color:#2356B8"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-bell"></use></svg></span>
-              <span><span style="font-size:13.5px;font-weight:600;display:block" data-i18n="header.notifications"></span><span style="font-size:11.5px;color:#718090;line-height:1.4;display:block;margin-top:2px" data-i18n="menu.notifHint"></span></span>
+              <span><span style="font-size:13.5px;font-weight:600;display:block" data-i18n="header.notifications">{{t $.Locale "header.notifications"}}</span><span style="font-size:11.5px;color:#718090;line-height:1.4;display:block;margin-top:2px" data-i18n="menu.notifHint">{{t $.Locale "menu.notifHint"}}</span></span>
             </a>
             <button onclick="refreshDevices();closeMenu()" class="menu-item">
               <span style="width:30px;height:30px;flex:none;border-radius:var(--iosbk-radius);display:flex;align-items:center;justify-content:center;background:#F3F7FA;color:#607181"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-refresh"></use></svg></span>
-              <span><span style="font-size:13.5px;font-weight:600;display:block" data-i18n="header.refresh"></span><span style="font-size:11.5px;color:#718090;line-height:1.4;display:block;margin-top:2px" data-i18n="menu.refreshHint"></span></span>
+              <span><span style="font-size:13.5px;font-weight:600;display:block" data-i18n="header.refresh">{{t $.Locale "header.refresh"}}</span><span style="font-size:11.5px;color:#718090;line-height:1.4;display:block;margin-top:2px" data-i18n="menu.refreshHint">{{t $.Locale "menu.refreshHint"}}</span></span>
             </button>
             <button onclick="restartConnection();closeMenu()" class="menu-item">
               <span style="width:30px;height:30px;flex:none;border-radius:var(--iosbk-radius);display:flex;align-items:center;justify-content:center;background:#FBF1E2;color:#9A5B12"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-reconnect"></use></svg></span>
-              <span><span style="font-size:13.5px;font-weight:600;display:block" data-i18n="header.restart"></span><span style="font-size:11.5px;color:#718090;line-height:1.4;display:block;margin-top:2px" data-i18n="header.restartHint"></span></span>
+              <span><span style="font-size:13.5px;font-weight:600;display:block" data-i18n="header.restart">{{t $.Locale "header.restart"}}</span><span style="font-size:11.5px;color:#718090;line-height:1.4;display:block;margin-top:2px" data-i18n="header.restartHint">{{t $.Locale "header.restartHint"}}</span></span>
             </button>
             {{if .AuthEnabled}}
             <button data-logout-control onclick="logoutSession();closeMenu()" class="menu-item">
               <span style="width:30px;height:30px;flex:none;border-radius:var(--iosbk-radius);display:flex;align-items:center;justify-content:center;background:#FBEBE9;color:#9F231C"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-log-out"></use></svg></span>
-              <span><span style="font-size:13.5px;font-weight:600;display:block" data-i18n="menu.logout"></span><span style="font-size:11.5px;color:#718090;line-height:1.4;display:block;margin-top:2px" data-i18n="menu.logoutHint"></span></span>
+              <span><span style="font-size:13.5px;font-weight:600;display:block" data-i18n="menu.logout">{{t $.Locale "menu.logout"}}</span><span style="font-size:11.5px;color:#718090;line-height:1.4;display:block;margin-top:2px" data-i18n="menu.logoutHint">{{t $.Locale "menu.logoutHint"}}</span></span>
             </button>
             {{end}}
           </div>
@@ -206,9 +209,9 @@
       </div>
     </div>
     <div style="display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;margin-top:13px;padding-top:12px;border-top:1px solid #E7EDF2;font-size:12.5px;color:#6F7E8C">
-      <span style="display:inline-flex;align-items:center;gap:7px"><span id="autoDot" style="width:8px;height:8px;border-radius:50%;background:#2E7D5B;animation:iosbkpulse 1.6s ease-in-out infinite"></span><span id="autoText"></span><button id="autoToggle" onclick="toggleAutoRefresh()" style="background:none;border:none;color:#2C62C6;font-weight:600;cursor:pointer;font-size:12.5px;font-family:inherit;padding:0 0 0 2px"></button></span>
-      <span style="display:inline-flex;align-items:center;gap:6px"><svg class="ui-icon" style="width:13px;height:13px" aria-hidden="true"><use href="/static/ui-icons.svg#icon-clock"></use></svg><span data-i18n="header.tz"></span></span>
-      <span style="margin-left:auto;color:#96A3AE"><span data-i18n="app.version"></span> {{.Version}}</span>
+      <span style="display:inline-flex;align-items:center;gap:7px"><span id="autoDot" style="width:8px;height:8px;border-radius:50%;background:#2E7D5B;animation:iosbkpulse 1.6s ease-in-out infinite"></span><span id="autoText">{{t $.Locale "header.autoOn"}}</span><button id="autoToggle" onclick="toggleAutoRefresh()" style="background:none;border:none;color:#2C62C6;font-weight:600;cursor:pointer;font-size:12.5px;font-family:inherit;padding:0 0 0 2px">{{t $.Locale "header.pauseAuto"}}</button></span>
+      <span style="display:inline-flex;align-items:center;gap:6px"><svg class="ui-icon" style="width:13px;height:13px" aria-hidden="true"><use href="/static/ui-icons.svg#icon-clock"></use></svg><span data-i18n="header.tz">{{t $.Locale "header.tz"}}</span></span>
+      <span style="margin-left:auto;color:#96A3AE"><span data-i18n="app.version">{{t $.Locale "app.version"}}</span> {{.Version}}</span>
     </div>
   </div>
 
@@ -221,7 +224,7 @@
     {{$cfg := index $.Configs $d.UDID}}
     {{$backingUp := index $.BackupStatuses $d.UDID}}
     {{$disc := index $.DiscoveredIPs $d.UDID}}
-    {{$conn := "offline"}}{{if $d.IsOnline}}{{if eq $d.Connection "USB 已连接"}}{{$conn = "usb"}}{{else}}{{$conn = "wifi"}}{{end}}{{end}}
+    {{$conn := "offline"}}{{if $d.IsOnline}}{{if eq $d.Connection "usb"}}{{$conn = "usb"}}{{else}}{{$conn = "wifi"}}{{end}}{{end}}
     {{if $d.PresenceUnknown}}{{$conn = "unknown"}}{{end}}
     {{$isPad := contains $d.DeviceType "iPad"}}
       <div data-udid-card="{{$d.UDID}}" style="background:#fff;border:1px solid #D8E2EA;border-radius:var(--iosbk-radius);box-shadow:0 1px 2px rgba(35,52,68,.04),0 18px 36px -28px rgba(35,52,68,.22);overflow:hidden">
@@ -232,105 +235,105 @@
           <div style="flex:1;min-width:180px">
             <div class="device-heading-row">
               <span id="name-{{$d.UDID}}" class="device-name" style="font-size:17px;font-weight:700;letter-spacing:-.01em;{{if eq $conn "offline"}}color:#96A3AE;{{else}}color:#213041;{{end}}">{{$d.Name}}</span>
-              <span id="battery-{{$d.UDID}}" class="device-battery">{{if and $d.IsOnline (not $d.PresenceUnknown)}}<svg class="battery-icon" viewBox="0 0 20 12" aria-hidden="true" style="color:{{if $d.IsCharging}}#2E7D5B{{else if le $d.BatteryLevel 20}}#BD2C24{{else}}#718090{{end}}"><rect x="0.75" y="0.75" width="16" height="10.5" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"></rect><path d="M18.25 4v4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path><rect x="3" y="3" width="11" height="6" rx="1" fill="currentColor" opacity=".24"></rect></svg>{{$d.BatteryLevel}}%{{if $d.IsCharging}}<span style="color:#2E7D5B;font-weight:600">· <span data-i18n="battery.charging"></span></span>{{end}}{{end}}</span>
+              <span id="battery-{{$d.UDID}}" class="device-battery">{{if and $d.IsOnline (not $d.PresenceUnknown)}}<svg class="battery-icon" viewBox="0 0 20 12" aria-hidden="true" style="color:{{if $d.IsCharging}}#2E7D5B{{else if le $d.BatteryLevel 20}}#BD2C24{{else}}#718090{{end}}"><rect x="0.75" y="0.75" width="16" height="10.5" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"></rect><path d="M18.25 4v4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path><rect x="3" y="3" width="11" height="6" rx="1" fill="currentColor" opacity=".24"></rect></svg>{{$d.BatteryLevel}}%{{if $d.IsCharging}}<span style="color:#2E7D5B;font-weight:600">· <span data-i18n="battery.charging">{{t $.Locale "battery.charging"}}</span></span>{{end}}{{end}}</span>
             </div>
-            <div style="font-size:12.5px;color:#718090;margin-top:3px"><span data-i18n="device.model"></span> · {{$d.DeviceType}}</div>
-            <div style="font-size:12.5px;color:#6F7E8C;margin-top:4px;display:flex;align-items:center;gap:5px"><svg class="ui-icon" style="width:13px;height:13px;color:#96A3AE" aria-hidden="true"><use href="/static/ui-icons.svg#icon-clock"></use></svg><span data-i18n="device.lastBackup"></span> · <span id="lastbackup-{{$d.UDID}}">{{if $d.LastBackup.IsZero}}<span data-i18n="device.never"></span>{{else}}{{$d.LastBackup.Format "2006-01-02 15:04"}}{{end}}</span></div>
+            <div style="font-size:12.5px;color:#718090;margin-top:3px"><span data-i18n="device.model">{{t $.Locale "device.model"}}</span> · {{$d.DeviceType}}</div>
+            <div style="font-size:12.5px;color:#6F7E8C;margin-top:4px;display:flex;align-items:center;gap:5px"><svg class="ui-icon" style="width:13px;height:13px;color:#96A3AE" aria-hidden="true"><use href="/static/ui-icons.svg#icon-clock"></use></svg><span data-i18n="device.lastBackup">{{t $.Locale "device.lastBackup"}}</span> · <span id="lastbackup-{{$d.UDID}}">{{if $d.LastBackup.IsZero}}<span data-i18n="device.never">{{t $.Locale "device.never"}}</span>{{else}}<time data-time="{{$d.LastBackup.Format "2006-01-02T15:04:05Z07:00"}}">{{$d.LastBackup.Format "2006-01-02 15:04"}}</time>{{end}}</span></div>
           </div>
           <div class="device-action-row">
             <div id="connbox-{{$d.UDID}}" style="text-align:right;white-space:nowrap">
-              {{if eq $conn "unknown"}}<span class="connection-badge" style="color:#78521E" data-i18n="status.unknown">设备状态暂时无法确认</span>
-              {{else if eq $conn "usb"}}<span class="connection-badge" style="gap:7px;padding:5px 11px;background:#EAF1FC;color:#2356B8;border:1px solid #C5DAF6;font-size:12.5px;font-weight:600;white-space:nowrap"><svg class="connection-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2.2v10.1m0-10.1L7.9 4.3M10 2.2l2.1 2.1M10 8.1h3.1a2.2 2.2 0 0 1 2.2 2.2v1.2m-5.3.8H6.9a2.2 2.2 0 0 0-2.2 2.2v.9" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path><circle cx="4.7" cy="16.5" r="1.4" fill="currentColor"></circle><rect x="14" y="11.4" width="2.6" height="2.6" rx=".5" fill="currentColor"></rect></svg><span data-i18n="status.usb"></span></span>
-              {{else if eq $conn "wifi"}}<span class="connection-badge" style="gap:7px;padding:5px 11px;background:#E2F3EF;color:#0B7565;border:1px solid #B9E2DA;font-size:12.5px;font-weight:600;white-space:nowrap"><svg class="connection-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M3 7.6a10.7 10.7 0 0 1 14 0M5.7 10.5a6.7 6.7 0 0 1 8.6 0M8.4 13.3a2.7 2.7 0 0 1 3.2 0" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path><circle cx="10" cy="16" r="1.25" fill="currentColor"></circle></svg><span data-i18n="status.wifi"></span></span>
-              {{else}}<span class="connection-badge" style="gap:7px;padding:5px 11px;background:#F3F7FA;color:#718090;border:1px solid #D8E2EA;font-size:12.5px;font-weight:600;white-space:nowrap"><svg class="connection-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2.6v6.1M5.5 5.7a6.2 6.2 0 1 0 9 0" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path></svg><span data-i18n="status.offline"></span></span>{{end}}
+              {{if eq $conn "unknown"}}<span class="connection-badge" style="color:#78521E" data-i18n="status.unknown">{{t $.Locale "status.unknown"}}</span>
+              {{else if eq $conn "usb"}}<span class="connection-badge" style="gap:7px;padding:5px 11px;background:#EAF1FC;color:#2356B8;border:1px solid #C5DAF6;font-size:12.5px;font-weight:600;white-space:nowrap"><svg class="connection-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2.2v10.1m0-10.1L7.9 4.3M10 2.2l2.1 2.1M10 8.1h3.1a2.2 2.2 0 0 1 2.2 2.2v1.2m-5.3.8H6.9a2.2 2.2 0 0 0-2.2 2.2v.9" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path><circle cx="4.7" cy="16.5" r="1.4" fill="currentColor"></circle><rect x="14" y="11.4" width="2.6" height="2.6" rx=".5" fill="currentColor"></rect></svg><span data-i18n="status.usb">{{t $.Locale "status.usb"}}</span></span>
+              {{else if eq $conn "wifi"}}<span class="connection-badge" style="gap:7px;padding:5px 11px;background:#E2F3EF;color:#0B7565;border:1px solid #B9E2DA;font-size:12.5px;font-weight:600;white-space:nowrap"><svg class="connection-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M3 7.6a10.7 10.7 0 0 1 14 0M5.7 10.5a6.7 6.7 0 0 1 8.6 0M8.4 13.3a2.7 2.7 0 0 1 3.2 0" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path><circle cx="10" cy="16" r="1.25" fill="currentColor"></circle></svg><span data-i18n="status.wifi">{{t $.Locale "status.wifi"}}</span></span>
+              {{else}}<span class="connection-badge" style="gap:7px;padding:5px 11px;background:#F3F7FA;color:#718090;border:1px solid #D8E2EA;font-size:12.5px;font-weight:600;white-space:nowrap"><svg class="connection-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2.6v6.1M5.5 5.7a6.2 6.2 0 1 0 9 0" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path></svg><span data-i18n="status.offline">{{t $.Locale "status.offline"}}</span></span>{{end}}
             </div>
-            <button id="backupBtn-{{$d.UDID}}" class="backup-action" onclick="event.stopPropagation();startBackup('{{$d.UDID}}',this)" {{if or (eq $conn "offline") $backingUp}}disabled{{end}} style="gap:9px;padding:10px 17px;font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit;border:none;white-space:nowrap;min-width:132px;{{if or (eq $conn "offline") $backingUp}}background:#F3F7FA;color:#ADB9C2;cursor:not-allowed;{{else}}background:#2C62C6;color:#fff;{{end}}">{{if $backingUp}}<span data-i18n="device.backingUp"></span>{{else}}<span data-i18n="device.backupNow"></span>{{end}}</button>
+            <button id="backupBtn-{{$d.UDID}}" class="backup-action" onclick="event.stopPropagation();startBackup('{{$d.UDID}}',this)" {{if or (eq $conn "offline") $backingUp}}disabled{{end}} style="gap:9px;padding:10px 17px;font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit;border:none;white-space:nowrap;min-width:132px;{{if or (eq $conn "offline") $backingUp}}background:#F3F7FA;color:#ADB9C2;cursor:not-allowed;{{else}}background:#2C62C6;color:#fff;{{end}}">{{if $backingUp}}<span data-i18n="device.backingUp">{{t $.Locale "device.backingUp"}}</span>{{else}}<span data-i18n="device.backupNow">{{t $.Locale "device.backupNow"}}</span>{{end}}</button>
             <svg id="chev-{{$d.UDID}}" class="ui-icon" style="color:#ADB9C2;width:15px;height:15px" aria-hidden="true"><use href="/static/ui-icons.svg#icon-chevron-down"></use></svg>
           </div>
         </div>
 
         <div id="bkbar-{{$d.UDID}}" class="backup-progress-panel{{if not $backingUp}} hidden{{end}}" data-progress-mode="preparing">
           <div class="backup-progress-heading">
-            <div class="backup-progress-heading-copy"><strong id="bkprogress-title-{{$d.UDID}}" data-i18n="progress.preparingTitle"></strong><span id="bkprogress-subtitle-{{$d.UDID}}" data-i18n="progress.preparingSubtitle"></span></div>
+            <div class="backup-progress-heading-copy"><strong id="bkprogress-title-{{$d.UDID}}" data-i18n="progress.preparingTitle">{{t $.Locale "progress.preparingTitle"}}</strong><span id="bkprogress-subtitle-{{$d.UDID}}" data-i18n="progress.preparingSubtitle">{{t $.Locale "progress.preparingSubtitle"}}</span></div>
             <span id="bkprogress-value-{{$d.UDID}}" class="backup-progress-value">—</span>
           </div>
           <div id="bkprogress-track-{{$d.UDID}}" class="backup-overall-track indeterminate" role="progressbar" aria-valuemin="0" aria-valuemax="100"><div id="bkprogress-fill-{{$d.UDID}}" class="backup-overall-fill"></div></div>
           <div id="bkprogress-current-{{$d.UDID}}" class="backup-current-file hidden">
-            <div class="backup-current-copy"><span class="backup-current-icon"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-download"></use></svg></span><span><strong data-i18n="progress.currentFile"></strong><br><span data-i18n="progress.currentFileHint"></span></span></div>
+            <div class="backup-current-copy"><span class="backup-current-icon"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-download"></use></svg></span><span><strong data-i18n="progress.currentFile">{{t $.Locale "progress.currentFile"}}</strong><br><span data-i18n="progress.currentFileHint">{{t $.Locale "progress.currentFileHint"}}</span></span></div>
             <span id="bkprogress-current-value-{{$d.UDID}}" class="backup-current-value"></span>
           </div>
           <div id="bkprogress-status-{{$d.UDID}}" class="backup-status-message">
             <svg class="ui-icon" aria-hidden="true"><use id="bkprogress-status-icon-{{$d.UDID}}" href="/static/ui-icons.svg#icon-info"></use></svg>
-            <div><strong id="bkprogress-status-title-{{$d.UDID}}" data-i18n="progress.preparingTitle"></strong><span data-i18n="progress.separator" aria-hidden="true">。 </span><span id="bkprogress-status-hint-{{$d.UDID}}" data-i18n="progress.preparingHint"></span><div id="bkprogress-activity-{{$d.UDID}}" style="margin-top:6px;font-size:12px;opacity:.8"></div></div>
+            <div><strong id="bkprogress-status-title-{{$d.UDID}}" data-i18n="progress.preparingTitle">{{t $.Locale "progress.preparingTitle"}}</strong><span data-i18n="progress.separator" aria-hidden="true">{{t $.Locale "progress.separator"}}</span><span id="bkprogress-status-hint-{{$d.UDID}}" data-i18n="progress.preparingHint">{{t $.Locale "progress.preparingHint"}}</span><div id="bkprogress-activity-{{$d.UDID}}" style="margin-top:6px;font-size:12px;opacity:.8"></div></div>
           </div>
         </div>
 
         {{if and (not $d.IsOnline) (and (eq $cfg.LastBackupConnection "network") (and (eq $cfg.NetworkAddress "") (not $d.LastBackup.IsZero)))}}
         <div style="margin:0 20px 16px;display:flex;gap:10px;align-items:flex-start;background:#FBF1E2;border:1px solid #F0DBB6;border-radius:var(--iosbk-radius);padding:12px 13px">
           <svg class="ui-icon" style="color:#B45309;margin-top:2px" aria-hidden="true"><use href="/static/ui-icons.svg#icon-alert"></use></svg>
-          <div style="flex:1;font-size:12.5px;color:#8A5A12;line-height:1.5" data-i18n="migration.text"></div>
-          <button onclick="gotoFillIP('{{$d.UDID}}')" style="white-space:nowrap;background:#fff;border:1px solid #E6C98C;color:#9A5B12;border-radius:var(--iosbk-radius);padding:6px 11px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit" data-i18n="migration.action"></button>
+          <div style="flex:1;font-size:12.5px;color:#8A5A12;line-height:1.5" data-i18n="migration.text">{{t $.Locale "migration.text"}}</div>
+          <button onclick="gotoFillIP('{{$d.UDID}}')" style="white-space:nowrap;background:#fff;border:1px solid #E6C98C;color:#9A5B12;border-radius:var(--iosbk-radius);padding:6px 11px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit" data-i18n="migration.action">{{t $.Locale "migration.action"}}</button>
         </div>
         {{end}}
 
         <!-- ----- EXPANDED PANEL ----- -->
         <div id="panel-{{$d.UDID}}" class="hidden" style="border-top:1px solid #E7EDF2;background:#FBFCFD">
           <div style="display:flex;flex-wrap:wrap;gap:7px;padding:14px 20px 0">
-            <button class="snav active" data-udid="{{$d.UDID}}" data-sec="backup" onclick="switchSection('{{$d.UDID}}','backup')"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-backup-settings"></use></svg><span data-i18n="sec.backup"></span></button>
-            <button class="snav" data-udid="{{$d.UDID}}" data-sec="backups" onclick="switchSection('{{$d.UDID}}','backups')"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-backup-library"></use></svg><span data-i18n="sec.backups"></span></button>
-            <button class="snav" data-udid="{{$d.UDID}}" data-sec="enc" onclick="switchSection('{{$d.UDID}}','enc')"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-lock"></use></svg><span data-i18n="sec.encryption"></span></button>
-            <button class="snav" data-udid="{{$d.UDID}}" data-sec="danger" onclick="switchSection('{{$d.UDID}}','danger')"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-restore"></use></svg><span data-i18n="sec.danger"></span></button>
-            <button class="snav remove-tab" data-danger="true" data-udid="{{$d.UDID}}" data-sec="remove" onclick="switchSection('{{$d.UDID}}','remove')"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-device-remove"></use></svg><span data-i18n="sec.remove"></span></button>
+            <button class="snav active" data-udid="{{$d.UDID}}" data-sec="backup" onclick="switchSection('{{$d.UDID}}','backup')"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-backup-settings"></use></svg><span data-i18n="sec.backup">{{t $.Locale "sec.backup"}}</span></button>
+            <button class="snav" data-udid="{{$d.UDID}}" data-sec="backups" onclick="switchSection('{{$d.UDID}}','backups')"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-backup-library"></use></svg><span data-i18n="sec.backups">{{t $.Locale "sec.backups"}}</span></button>
+            <button class="snav" data-udid="{{$d.UDID}}" data-sec="enc" onclick="switchSection('{{$d.UDID}}','enc')"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-lock"></use></svg><span data-i18n="sec.encryption">{{t $.Locale "sec.encryption"}}</span></button>
+            <button class="snav" data-udid="{{$d.UDID}}" data-sec="danger" onclick="switchSection('{{$d.UDID}}','danger')"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-restore"></use></svg><span data-i18n="sec.danger">{{t $.Locale "sec.danger"}}</span></button>
+            <button class="snav remove-tab" data-danger="true" data-udid="{{$d.UDID}}" data-sec="remove" onclick="switchSection('{{$d.UDID}}','remove')"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-device-remove"></use></svg><span data-i18n="sec.remove">{{t $.Locale "sec.remove"}}</span></button>
           </div>
 
           <!-- ===== BACKUP SETTINGS ===== -->
           <div data-sec-panel="backup" data-udid="{{$d.UDID}}" style="padding:20px">
             <div style="display:flex;flex-direction:column;gap:18px">
               <div style="display:flex;flex-wrap:wrap;gap:6px 18px;align-items:center">
-                <div style="width:170px;min-width:140px"><div style="font-size:13.5px;font-weight:600" data-i18n="bset.window"></div><div style="font-size:11.5px;color:#718090;margin-top:2px;line-height:1.4" data-i18n="bset.windowHint"></div></div>
-                <div style="display:flex;align-items:center;gap:9px"><input type="time" value="{{$cfg.StartTime}}" id="startTime-{{$d.UDID}}" class="iosbk-in" style="width:120px"><span style="color:#718090;font-size:13px" data-i18n="bset.to"></span><input type="time" value="{{$cfg.EndTime}}" id="endTime-{{$d.UDID}}" class="iosbk-in" style="width:120px"></div>
+                <div style="width:170px;min-width:140px"><div style="font-size:13.5px;font-weight:600" data-i18n="bset.window">{{t $.Locale "bset.window"}}</div><div style="font-size:11.5px;color:#718090;margin-top:2px;line-height:1.4" data-i18n="bset.windowHint">{{t $.Locale "bset.windowHint"}}</div></div>
+                <div style="display:flex;align-items:center;gap:9px"><input type="time" value="{{$cfg.StartTime}}" id="startTime-{{$d.UDID}}" class="iosbk-in" style="width:120px"><span style="color:#718090;font-size:13px" data-i18n="bset.to">{{t $.Locale "bset.to"}}</span><input type="time" value="{{$cfg.EndTime}}" id="endTime-{{$d.UDID}}" class="iosbk-in" style="width:120px"></div>
               </div>
               <div style="display:flex;flex-wrap:wrap;gap:6px 18px;align-items:center">
-                <div style="width:170px;min-width:140px;font-size:13.5px;font-weight:600" data-i18n="bset.interval"></div>
-                <select class="iosbk-in" id="backupInterval-{{$d.UDID}}" style="min-width:150px"><option value="6" {{if eq $cfg.BackupInterval 6}}selected{{end}} data-i18n="bset.h6"></option><option value="12" {{if eq $cfg.BackupInterval 12}}selected{{end}} data-i18n="bset.h12"></option><option value="24" {{if eq $cfg.BackupInterval 24}}selected{{end}} data-i18n="bset.h24"></option><option value="48" {{if eq $cfg.BackupInterval 48}}selected{{end}} data-i18n="bset.h48"></option></select>
+                <div style="width:170px;min-width:140px;font-size:13.5px;font-weight:600" data-i18n="bset.interval">{{t $.Locale "bset.interval"}}</div>
+                <select class="iosbk-in" id="backupInterval-{{$d.UDID}}" style="min-width:150px"><option value="6" {{if eq $cfg.BackupInterval 6}}selected{{end}} data-i18n="bset.h6">{{t $.Locale "bset.h6"}}</option><option value="12" {{if eq $cfg.BackupInterval 12}}selected{{end}} data-i18n="bset.h12">{{t $.Locale "bset.h12"}}</option><option value="24" {{if eq $cfg.BackupInterval 24}}selected{{end}} data-i18n="bset.h24">{{t $.Locale "bset.h24"}}</option><option value="48" {{if eq $cfg.BackupInterval 48}}selected{{end}} data-i18n="bset.h48">{{t $.Locale "bset.h48"}}</option></select>
               </div>
               <div style="display:flex;flex-wrap:wrap;gap:6px 18px;align-items:center">
-                <div style="width:170px;min-width:140px"><div style="font-size:13.5px;font-weight:600" data-i18n="bset.minBattery"></div><div style="font-size:11.5px;color:#718090;margin-top:2px;line-height:1.4" data-i18n="bset.minBatteryHint"></div></div>
+                <div style="width:170px;min-width:140px"><div style="font-size:13.5px;font-weight:600" data-i18n="bset.minBattery">{{t $.Locale "bset.minBattery"}}</div><div style="font-size:11.5px;color:#718090;margin-top:2px;line-height:1.4" data-i18n="bset.minBatteryHint">{{t $.Locale "bset.minBatteryHint"}}</div></div>
                 <div style="flex:1;min-width:200px;max-width:340px;display:flex;align-items:center;gap:13px"><input type="range" min="0" max="100" value="{{$cfg.MinBatteryLevel}}" id="minBattery-{{$d.UDID}}" oninput="document.getElementById('minBatLabel-{{$d.UDID}}').textContent=this.value+'%'" class="iosbk-range"><span id="minBatLabel-{{$d.UDID}}" style="font-size:13px;font-weight:600;color:#2C62C6;width:42px;text-align:right">{{$cfg.MinBatteryLevel}}%</span></div>
               </div>
               <div style="display:flex;gap:18px;align-items:center;padding-top:2px">
-                <div style="width:170px;min-width:140px;font-size:13.5px;font-weight:600" data-i18n="bset.onlyCharging"></div>
+                <div style="width:170px;min-width:140px;font-size:13.5px;font-weight:600" data-i18n="bset.onlyCharging">{{t $.Locale "bset.onlyCharging"}}</div>
                 <button id="chargingToggle-{{$d.UDID}}" class="tgl g {{if $cfg.OnlyWhenCharging}}on{{end}}" onclick="flipToggle(this)"><span class="tgl-knob"></span></button>
               </div>
               <div>
                 <div style="display:flex;gap:18px;align-items:center">
-                  <div style="width:170px;min-width:140px"><div style="font-size:13.5px;font-weight:600" data-i18n="bset.autoBackup"></div><div style="font-size:11.5px;color:#718090;margin-top:2px;line-height:1.4" data-i18n="bset.autoBackupHint"></div></div>
+                  <div style="width:170px;min-width:140px"><div style="font-size:13.5px;font-weight:600" data-i18n="bset.autoBackup">{{t $.Locale "bset.autoBackup"}}</div><div style="font-size:11.5px;color:#718090;margin-top:2px;line-height:1.4" data-i18n="bset.autoBackupHint">{{t $.Locale "bset.autoBackupHint"}}</div></div>
                   <button id="autoBackupToggle-{{$d.UDID}}" class="tgl b {{if $cfg.AutoBackupEnabled}}on{{end}}" onclick="flipToggle(this)"><span class="tgl-knob"></span></button>
                 </div>
-                <div id="autoNote-{{$d.UDID}}" class="{{if not $cfg.AutoBackupEnabled}}hidden{{end}}" style="margin-top:11px;display:flex;gap:9px;align-items:flex-start;background:#FBF1E2;border:1px solid #F0DBB6;border-radius:var(--iosbk-radius);padding:10px 12px;font-size:12px;color:#8A5A12;line-height:1.6"><svg class="ui-icon" style="margin-top:2px" aria-hidden="true"><use href="/static/ui-icons.svg#icon-key"></use></svg><span data-i18n="bset.passcodeNote"></span></div>
+                <div id="autoNote-{{$d.UDID}}" class="{{if not $cfg.AutoBackupEnabled}}hidden{{end}}" style="margin-top:11px;display:flex;gap:9px;align-items:flex-start;background:#FBF1E2;border:1px solid #F0DBB6;border-radius:var(--iosbk-radius);padding:10px 12px;font-size:12px;color:#8A5A12;line-height:1.6"><svg class="ui-icon" style="margin-top:2px" aria-hidden="true"><use href="/static/ui-icons.svg#icon-key"></use></svg><span data-i18n="bset.passcodeNote">{{t $.Locale "bset.passcodeNote"}}</span></div>
               </div>
               <div style="display:flex;flex-wrap:wrap;gap:6px 18px;align-items:center">
-                <div style="width:170px;min-width:140px"><div style="font-size:13.5px;font-weight:600" data-i18n="bset.dir"></div><div style="font-size:11.5px;color:#718090;margin-top:2px;line-height:1.4" data-i18n="bset.dirHint"></div></div>
+                <div style="width:170px;min-width:140px"><div style="font-size:13.5px;font-weight:600" data-i18n="bset.dir">{{t $.Locale "bset.dir"}}</div><div style="font-size:11.5px;color:#718090;margin-top:2px;line-height:1.4" data-i18n="bset.dirHint">{{t $.Locale "bset.dirHint"}}</div></div>
                 <input type="text" value="{{$cfg.BackupDirectory}}" id="backupDir-{{$d.UDID}}" class="iosbk-in" style="flex:1;min-width:180px;font-family:'IBM Plex Mono',monospace;font-size:13px">
-                <button onclick="checkBackupDir('{{$d.UDID}}')" style="display:inline-flex;align-items:center;justify-content:center;min-width:104px;gap:7px;padding:9px 14px;background:#fff;color:#27384A;border:1px solid #D8E2EA;border-radius:var(--iosbk-radius);font-size:13px;font-weight:500;cursor:pointer;font-family:inherit;white-space:nowrap"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-folder-check"></use></svg><span data-i18n="bset.checkDir"></span></button>
+                <button onclick="checkBackupDir('{{$d.UDID}}')" style="display:inline-flex;align-items:center;justify-content:center;min-width:104px;gap:7px;padding:9px 14px;background:#fff;color:#27384A;border:1px solid #D8E2EA;border-radius:var(--iosbk-radius);font-size:13px;font-weight:500;cursor:pointer;font-family:inherit;white-space:nowrap"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-folder-check"></use></svg><span data-i18n="bset.checkDir">{{t $.Locale "bset.checkDir"}}</span></button>
               </div>
               <div id="dirResult-{{$d.UDID}}" class="hidden" style="font-size:12px;margin-top:7px;line-height:1.5;font-weight:500"></div>
               <div>
                 <div style="display:flex;flex-wrap:wrap;gap:6px 18px;align-items:center">
-                  <div style="width:170px;min-width:140px;font-size:13.5px;font-weight:600"><span data-i18n="bset.ip"></span> <span style="font-weight:400;color:#96A3AE;font-size:12px">(<span data-i18n="bset.ipOptional"></span>)</span></div>
-                  <input type="text" value="{{$cfg.NetworkAddress}}" id="networkAddress-{{$d.UDID}}" data-i18n-ph="bset.ipPlaceholder" class="iosbk-in" style="flex:1;min-width:200px;font-family:'IBM Plex Mono',monospace;font-size:13px">
-                  <button id="testIPBtn-{{$d.UDID}}" onclick="testDeviceIP('{{$d.UDID}}')" style="display:inline-flex;align-items:center;justify-content:center;min-width:104px;gap:7px;padding:9px 14px;background:#fff;color:#27384A;border:1px solid #D8E2EA;border-radius:var(--iosbk-radius);font-size:13px;font-weight:500;cursor:pointer;font-family:inherit;white-space:nowrap"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-network-check"></use></svg><span data-i18n="bset.testConn"></span></button>
+                  <div style="width:170px;min-width:140px;font-size:13.5px;font-weight:600"><span data-i18n="bset.ip">{{t $.Locale "bset.ip"}}</span> <span style="font-weight:400;color:#96A3AE;font-size:12px">(<span data-i18n="bset.ipOptional">{{t $.Locale "bset.ipOptional"}}</span>)</span></div>
+                  <input type="text" value="{{$cfg.NetworkAddress}}" id="networkAddress-{{$d.UDID}}" data-i18n-ph="bset.ipPlaceholder" class="iosbk-in" style="flex:1;min-width:200px;font-family:'IBM Plex Mono',monospace;font-size:13px" placeholder="{{t $.Locale "bset.ipPlaceholder"}}">
+                  <button id="testIPBtn-{{$d.UDID}}" onclick="testDeviceIP('{{$d.UDID}}')" style="display:inline-flex;align-items:center;justify-content:center;min-width:104px;gap:7px;padding:9px 14px;background:#fff;color:#27384A;border:1px solid #D8E2EA;border-radius:var(--iosbk-radius);font-size:13px;font-weight:500;cursor:pointer;font-family:inherit;white-space:nowrap"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-network-check"></use></svg><span data-i18n="bset.testConn">{{t $.Locale "bset.testConn"}}</span></button>
                 </div>
                 <div id="ipResult-{{$d.UDID}}" class="hidden" style="font-size:12px;margin-top:7px;line-height:1.5;font-weight:500"></div>
-                <div style="font-size:11.5px;color:#718090;margin-top:6px;line-height:1.5" data-i18n="bset.ipHint"></div>
-                {{if $disc}}<div style="font-size:12px;color:#0B7565;margin-top:6px;display:flex;align-items:center;gap:6px"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-search"></use></svg><span data-i18n="bset.discovered"></span>:&nbsp;<span style="font-family:'IBM Plex Mono',monospace;font-weight:500">{{$disc}}</span></div>{{end}}
-                {{if not $d.IsOnline}}<div id="offlineHelp-{{$d.UDID}}" style="margin-top:9px;display:flex;gap:9px;align-items:flex-start;background:#FBF1E2;border:1px solid #F0DBB6;border-radius:var(--iosbk-radius);padding:10px 12px;font-size:12px;color:#8A5A12;line-height:1.6"><svg class="ui-icon" style="margin-top:2px" aria-hidden="true"><use href="/static/ui-icons.svg#icon-info"></use></svg><span data-i18n="bset.offlineHelp"></span></div>{{end}}
+                <div style="font-size:11.5px;color:#718090;margin-top:6px;line-height:1.5" data-i18n="bset.ipHint">{{t $.Locale "bset.ipHint"}}</div>
+                {{if $disc}}<div style="font-size:12px;color:#0B7565;margin-top:6px;display:flex;align-items:center;gap:6px"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-search"></use></svg><span data-i18n="bset.discovered">{{t $.Locale "bset.discovered"}}</span>:&nbsp;<span style="font-family:'IBM Plex Mono',monospace;font-weight:500">{{$disc}}</span></div>{{end}}
+                {{if not $d.IsOnline}}<div id="offlineHelp-{{$d.UDID}}" style="margin-top:9px;display:flex;gap:9px;align-items:flex-start;background:#FBF1E2;border:1px solid #F0DBB6;border-radius:var(--iosbk-radius);padding:10px 12px;font-size:12px;color:#8A5A12;line-height:1.6"><svg class="ui-icon" style="margin-top:2px" aria-hidden="true"><use href="/static/ui-icons.svg#icon-info"></use></svg><span data-i18n="bset.offlineHelp">{{t $.Locale "bset.offlineHelp"}}</span></div>{{end}}
               </div>
-              <div style="display:flex;gap:9px;align-items:flex-start;font-size:12px;color:#6F7E8C;background:#fff;border:1px dashed #D8E2EA;border-radius:var(--iosbk-radius);padding:11px 13px;line-height:1.5"><svg class="ui-icon" style="color:#2C62C6;margin-top:2px" aria-hidden="true"><use href="/static/ui-icons.svg#icon-pair"></use></svg><span data-i18n="bset.pairHint"></span></div>
+              <div style="display:flex;gap:9px;align-items:flex-start;font-size:12px;color:#6F7E8C;background:#fff;border:1px dashed #D8E2EA;border-radius:var(--iosbk-radius);padding:11px 13px;line-height:1.5"><svg class="ui-icon" style="color:#2C62C6;margin-top:2px" aria-hidden="true"><use href="/static/ui-icons.svg#icon-pair"></use></svg><span data-i18n="bset.pairHint">{{t $.Locale "bset.pairHint"}}</span></div>
               <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:flex-end;padding-top:2px">
-                <span id="dirty-{{$d.UDID}}" class="dirty-hint hidden" style="margin-right:auto"><span class="ddot"></span><span data-i18n="bset.unsaved"></span></span>
+                <span id="dirty-{{$d.UDID}}" class="dirty-hint hidden" style="margin-right:auto"><span class="ddot"></span><span data-i18n="bset.unsaved">{{t $.Locale "bset.unsaved"}}</span></span>
                 <button id="pairBtn-{{$d.UDID}}" onclick="pairDevice('{{$d.UDID}}')" style="display:inline-flex;align-items:center;gap:8px;padding:10px 16px;background:#fff;color:#27384A;border:1px solid #D8E2EA;border-radius:var(--iosbk-radius);font-size:13.5px;font-weight:500;cursor:pointer;font-family:inherit"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-pair"></use></svg><span data-i18n="{{if $d.IsOnline}}bset.repair{{else}}bset.pair{{end}}"></span></button>
-                <button id="saveBtn-{{$d.UDID}}" onclick="saveConfig('{{$d.UDID}}')" style="display:inline-flex;align-items:center;gap:8px;padding:10px 18px;background:#2C62C6;color:#fff;border:none;border-radius:var(--iosbk-radius);font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-save"></use></svg><span data-i18n="bset.save"></span></button>
+                <button id="saveBtn-{{$d.UDID}}" onclick="saveConfig('{{$d.UDID}}')" style="display:inline-flex;align-items:center;gap:8px;padding:10px 18px;background:#2C62C6;color:#fff;border:none;border-radius:var(--iosbk-radius);font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-save"></use></svg><span data-i18n="bset.save">{{t $.Locale "bset.save"}}</span></button>
               </div>
               <div id="pairingResult-{{$d.UDID}}" class="hidden" role="status" aria-live="polite" style="font-size:12.5px;line-height:1.6"></div>
             </div>
@@ -338,33 +341,33 @@
 
           <!-- ===== BACKUP MANAGEMENT ===== -->
           <div data-sec-panel="backups" data-udid="{{$d.UDID}}" class="hidden" style="padding:20px">
-            {{if not $d.IsOnline}}<div style="display:flex;gap:9px;align-items:center;background:#F3F7FA;border:1px solid #D8E2EA;border-radius:var(--iosbk-radius);padding:11px 13px;margin-bottom:16px;font-size:12.5px;color:#6F7E8C"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-power"></use></svg><span data-i18n="bmgmt.offlineNote"></span></div>{{end}}
+            {{if not $d.IsOnline}}<div style="display:flex;gap:9px;align-items:center;background:#F3F7FA;border:1px solid #D8E2EA;border-radius:var(--iosbk-radius);padding:11px 13px;margin-bottom:16px;font-size:12.5px;color:#6F7E8C"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-power"></use></svg><span data-i18n="bmgmt.offlineNote">{{t $.Locale "bmgmt.offlineNote"}}</span></div>{{end}}
             <div style="{{if not $d.IsOnline}}opacity:.5;pointer-events:none;{{end}}">
-              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px"><div style="font-size:13.5px;font-weight:600" data-i18n="bmgmt.infoTitle"></div><button onclick="loadBackups('{{$d.UDID}}')" style="display:inline-flex;align-items:center;gap:5px;background:none;border:none;color:#2C62C6;font-weight:600;cursor:pointer;font-size:12.5px;font-family:inherit"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-refresh"></use></svg><span data-i18n="bmgmt.infoRefresh"></span></button></div>
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px"><div style="font-size:13.5px;font-weight:600" data-i18n="bmgmt.infoTitle">{{t $.Locale "bmgmt.infoTitle"}}</div><button onclick="loadBackups('{{$d.UDID}}')" style="display:inline-flex;align-items:center;gap:5px;background:none;border:none;color:#2C62C6;font-weight:600;cursor:pointer;font-size:12.5px;font-family:inherit"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-refresh"></use></svg><span data-i18n="bmgmt.infoRefresh">{{t $.Locale "bmgmt.infoRefresh"}}</span></button></div>
               <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:20px">
-                <div style="background:#F3F7FA;border:1px solid #E7EDF2;border-radius:var(--iosbk-radius);padding:13px"><div style="font-size:11.5px;color:#718090" data-i18n="bmgmt.size"></div><div id="bkSize-{{$d.UDID}}" style="font-size:18px;font-weight:700;margin-top:3px">—</div></div>
-                <div style="background:#F3F7FA;border:1px solid #E7EDF2;border-radius:var(--iosbk-radius);padding:13px"><div style="font-size:11.5px;color:#718090" data-i18n="bmgmt.count"></div><div id="bkCount-{{$d.UDID}}" style="font-size:18px;font-weight:700;margin-top:3px">—</div></div>
-                <div style="background:#F3F7FA;border:1px solid #E7EDF2;border-radius:var(--iosbk-radius);padding:13px"><div style="font-size:11.5px;color:#718090" data-i18n="bmgmt.encrypted"></div><div id="bkEnc-{{$d.UDID}}" style="font-size:14px;font-weight:600;margin-top:6px;color:#718090">—</div></div>
-                <div style="background:#F3F7FA;border:1px solid #E7EDF2;border-radius:var(--iosbk-radius);padding:13px"><div style="font-size:11.5px;color:#718090" data-i18n="bmgmt.latest"></div><div style="font-size:13px;font-weight:600;margin-top:6px">{{if $d.LastBackup.IsZero}}<span data-i18n="device.never"></span>{{else}}{{$d.LastBackup.Format "2006-01-02 15:04"}}{{end}}</div></div>
+                <div style="background:#F3F7FA;border:1px solid #E7EDF2;border-radius:var(--iosbk-radius);padding:13px"><div style="font-size:11.5px;color:#718090" data-i18n="bmgmt.size">{{t $.Locale "bmgmt.size"}}</div><div id="bkSize-{{$d.UDID}}" style="font-size:18px;font-weight:700;margin-top:3px">—</div></div>
+                <div style="background:#F3F7FA;border:1px solid #E7EDF2;border-radius:var(--iosbk-radius);padding:13px"><div style="font-size:11.5px;color:#718090" data-i18n="bmgmt.count">{{t $.Locale "bmgmt.count"}}</div><div id="bkCount-{{$d.UDID}}" style="font-size:18px;font-weight:700;margin-top:3px">—</div></div>
+                <div style="background:#F3F7FA;border:1px solid #E7EDF2;border-radius:var(--iosbk-radius);padding:13px"><div style="font-size:11.5px;color:#718090" data-i18n="bmgmt.encrypted">{{t $.Locale "bmgmt.encrypted"}}</div><div id="bkEnc-{{$d.UDID}}" style="font-size:14px;font-weight:600;margin-top:6px;color:#718090">—</div></div>
+                <div style="background:#F3F7FA;border:1px solid #E7EDF2;border-radius:var(--iosbk-radius);padding:13px"><div style="font-size:11.5px;color:#718090" data-i18n="bmgmt.latest">{{t $.Locale "bmgmt.latest"}}</div><div style="font-size:13px;font-weight:600;margin-top:6px">{{if $d.LastBackup.IsZero}}<span data-i18n="device.never">{{t $.Locale "device.never"}}</span>{{else}}<time data-time="{{$d.LastBackup.Format "2006-01-02T15:04:05Z07:00"}}">{{$d.LastBackup.Format "2006-01-02 15:04"}}</time>{{end}}</div></div>
               </div>
               <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px">
-                <div><span style="font-size:13.5px;font-weight:600" data-i18n="bmgmt.filesTitle"></span> <span style="font-size:11.5px;color:#96A3AE">· <span data-i18n="bmgmt.filesNote"></span></span></div>
-                <a href="/api/backup-list/{{$d.UDID}}?format=csv" style="display:inline-flex;align-items:center;gap:5px;font-size:12.5px;color:#2C62C6;font-weight:600;text-decoration:none"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-download"></use></svg><span data-i18n="bmgmt.downloadCsv"></span></a>
+                <div><span style="font-size:13.5px;font-weight:600" data-i18n="bmgmt.filesTitle">{{t $.Locale "bmgmt.filesTitle"}}</span> <span style="font-size:11.5px;color:#96A3AE">· <span data-i18n="bmgmt.filesNote">{{t $.Locale "bmgmt.filesNote"}}</span></span></div>
+                <a href="/api/backup-list/{{$d.UDID}}?format=csv" style="display:inline-flex;align-items:center;gap:5px;font-size:12.5px;color:#2C62C6;font-weight:600;text-decoration:none"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-download"></use></svg><span data-i18n="bmgmt.downloadCsv">{{t $.Locale "bmgmt.downloadCsv"}}</span></a>
               </div>
-              <input type="text" data-i18n-ph="bmgmt.search" oninput="filterBackupList('{{$d.UDID}}',this.value)" class="iosbk-in" style="width:100%;margin-bottom:9px">
-              <div id="list-{{$d.UDID}}" style="border:1px solid #E7EDF2;border-radius:var(--iosbk-radius);overflow:auto;max-height:300px;font-family:'IBM Plex Mono',monospace;font-size:12px;color:#607181;padding:10px 12px;white-space:pre;line-height:1.7"><span data-i18n="bmgmt.loadHint" style="color:#96A3AE;font-family:'IBM Plex Sans','Noto Sans SC',sans-serif;font-size:12.5px;white-space:normal;display:block;line-height:1.55"></span></div>
+              <input type="text" data-i18n-ph="bmgmt.search" oninput="filterBackupList('{{$d.UDID}}',this.value)" class="iosbk-in" style="width:100%;margin-bottom:9px" placeholder="{{t $.Locale "bmgmt.search"}}">
+              <div id="list-{{$d.UDID}}" style="border:1px solid #E7EDF2;border-radius:var(--iosbk-radius);overflow:auto;max-height:300px;font-family:'IBM Plex Mono',monospace;font-size:12px;color:#607181;padding:10px 12px;white-space:pre;line-height:1.7"><span data-i18n="bmgmt.loadHint" style="color:#96A3AE;font-family:'IBM Plex Sans','Noto Sans SC',sans-serif;font-size:12.5px;white-space:normal;display:block;line-height:1.55">{{t $.Locale "bmgmt.loadHint"}}</span></div>
               <div style="display:flex;align-items:center;justify-content:space-between;margin-top:10px;font-size:12.5px;color:#6F7E8C">
                 <span id="listMeta-{{$d.UDID}}"></span>
-                <span style="display:inline-flex;gap:6px;align-items:center"><button onclick="pageBackupList('{{$d.UDID}}',-1)" style="padding:5px 11px;border:1px solid #D8E2EA;background:#fff;border-radius:var(--iosbk-radius);font-size:12px;cursor:pointer;font-family:inherit;color:#6F7E8C" data-i18n="bmgmt.prev"></button><span id="listPage-{{$d.UDID}}" style="font-family:'IBM Plex Mono',monospace">—</span><button onclick="pageBackupList('{{$d.UDID}}',1)" style="padding:5px 11px;border:1px solid #D8E2EA;background:#fff;border-radius:var(--iosbk-radius);font-size:12px;cursor:pointer;font-family:inherit" data-i18n="bmgmt.next"></button></span>
+                <span style="display:inline-flex;gap:6px;align-items:center"><button onclick="pageBackupList('{{$d.UDID}}',-1)" style="padding:5px 11px;border:1px solid #D8E2EA;background:#fff;border-radius:var(--iosbk-radius);font-size:12px;cursor:pointer;font-family:inherit;color:#6F7E8C" data-i18n="bmgmt.prev">{{t $.Locale "bmgmt.prev"}}</button><span id="listPage-{{$d.UDID}}" style="font-family:'IBM Plex Mono',monospace">—</span><button onclick="pageBackupList('{{$d.UDID}}',1)" style="padding:5px 11px;border:1px solid #D8E2EA;background:#fff;border-radius:var(--iosbk-radius);font-size:12px;cursor:pointer;font-family:inherit" data-i18n="bmgmt.next">{{t $.Locale "bmgmt.next"}}</button></span>
               </div>
               {{if $.ExperimentalOperationsEnabled}}
               <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;margin-top:20px;padding-top:16px;border-top:1px solid #F3F7FA">
-                <div style="flex:1;min-width:200px"><div style="font-size:13px;font-weight:600" data-i18n="bmgmt.deleteTitle"></div><div style="font-size:12px;color:#718090;margin-top:3px;line-height:1.4" data-i18n="bmgmt.deleteNote"></div></div>
-                <button id="unbackBtn-{{$d.UDID}}" onclick="doUnback('{{$d.UDID}}')" style="display:inline-flex;align-items:center;justify-content:center;min-width:128px;gap:8px;padding:9px 15px;background:#fff;color:#27384A;border:1px solid #D8E2EA;border-radius:var(--iosbk-radius);font-size:13px;font-weight:500;cursor:pointer;font-family:inherit"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-unpack"></use></svg><span data-i18n="bmgmt.deleteBtn"></span></button>
+                <div style="flex:1;min-width:200px"><div style="font-size:13px;font-weight:600" data-i18n="bmgmt.deleteTitle">{{t $.Locale "bmgmt.deleteTitle"}}</div><div style="font-size:12px;color:#718090;margin-top:3px;line-height:1.4" data-i18n="bmgmt.deleteNote">{{t $.Locale "bmgmt.deleteNote"}}</div></div>
+                <button id="unbackBtn-{{$d.UDID}}" onclick="doUnback('{{$d.UDID}}')" style="display:inline-flex;align-items:center;justify-content:center;min-width:128px;gap:8px;padding:9px 15px;background:#fff;color:#27384A;border:1px solid #D8E2EA;border-radius:var(--iosbk-radius);font-size:13px;font-weight:500;cursor:pointer;font-family:inherit"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-unpack"></use></svg><span data-i18n="bmgmt.deleteBtn">{{t $.Locale "bmgmt.deleteBtn"}}</span></button>
               </div>
               <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;margin-top:16px;padding-top:16px;border-top:1px solid #F3F7FA">
-                <div style="flex:1;min-width:200px"><div style="font-size:13px;font-weight:600;color:#9F231C" data-i18n="bmgmt.delDataTitle"></div><div style="font-size:12px;color:#718090;margin-top:3px;line-height:1.4" data-i18n="bmgmt.delDataNote"></div></div>
-                <button id="delBtn-{{$d.UDID}}" onclick="confirmDeleteBackup('{{$d.UDID}}','{{$d.Name}}')" style="display:inline-flex;align-items:center;justify-content:center;min-width:128px;gap:8px;padding:9px 15px;background:#fff;color:#BD2C24;border:1px solid #F1C9C5;border-radius:var(--iosbk-radius);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-trash"></use></svg><span data-i18n="bmgmt.delDataBtn"></span></button>
+                <div style="flex:1;min-width:200px"><div style="font-size:13px;font-weight:600;color:#9F231C" data-i18n="bmgmt.delDataTitle">{{t $.Locale "bmgmt.delDataTitle"}}</div><div style="font-size:12px;color:#718090;margin-top:3px;line-height:1.4" data-i18n="bmgmt.delDataNote">{{t $.Locale "bmgmt.delDataNote"}}</div></div>
+                <button id="delBtn-{{$d.UDID}}" onclick="confirmDeleteBackup('{{$d.UDID}}','{{$d.Name}}')" style="display:inline-flex;align-items:center;justify-content:center;min-width:128px;gap:8px;padding:9px 15px;background:#fff;color:#BD2C24;border:1px solid #F1C9C5;border-radius:var(--iosbk-radius);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-trash"></use></svg><span data-i18n="bmgmt.delDataBtn">{{t $.Locale "bmgmt.delDataBtn"}}</span></button>
               </div>
               {{end}}
             </div>
@@ -374,31 +377,31 @@
           <div data-sec-panel="enc" data-udid="{{$d.UDID}}" class="hidden" style="padding:20px">
             {{if not $.EncryptionAvailable}}
             <div style="background:#FBF1E2;border:1px solid #F0DBB6;border-radius:var(--iosbk-radius);padding:15px 16px;margin-bottom:16px">
-              <div style="font-size:14px;font-weight:700;color:#8A5A12;display:flex;align-items:center;gap:8px"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-key"></use></svg><span data-i18n="enc.unavailTitle"></span></div>
-              <div style="font-size:12.5px;color:#8A5A12;margin-top:7px;line-height:1.55" data-i18n="enc.unavailBody"></div>
-              <div style="font-size:12px;color:#8A5A12;margin-top:9px" data-i18n="enc.unavailCmd"></div>
+              <div style="font-size:14px;font-weight:700;color:#8A5A12;display:flex;align-items:center;gap:8px"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-key"></use></svg><span data-i18n="enc.unavailTitle">{{t $.Locale "enc.unavailTitle"}}</span></div>
+              <div style="font-size:12.5px;color:#8A5A12;margin-top:7px;line-height:1.55" data-i18n="enc.unavailBody">{{t $.Locale "enc.unavailBody"}}</div>
+              <div style="font-size:12px;color:#8A5A12;margin-top:9px" data-i18n="enc.unavailCmd">{{t $.Locale "enc.unavailCmd"}}</div>
             </div>
             {{end}}
-            <div id="encState-{{$d.UDID}}" style="margin-bottom:15px;display:inline-flex;align-items:center;gap:8px;padding:7px 13px;border-radius:var(--iosbk-radius);font-size:12.5px;font-weight:600;background:#F3F7FA;color:#718090"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-help"></use></svg><span data-i18n="enc.stateUnknown"></span></div>
+            <div id="encState-{{$d.UDID}}" style="margin-bottom:15px;display:inline-flex;align-items:center;gap:8px;padding:7px 13px;border-radius:var(--iosbk-radius);font-size:12.5px;font-weight:600;background:#F3F7FA;color:#718090"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-help"></use></svg><span data-i18n="enc.stateUnknown">{{t $.Locale "enc.stateUnknown"}}</span></div>
             <div style="{{if not $.EncryptionAvailable}}opacity:.45;pointer-events:none;{{else if not $d.IsOnline}}opacity:.55;pointer-events:none;{{end}}">
-              {{if $d.IsOnline}}{{else}}<div style="font-size:12.5px;color:#6F7E8C;margin-bottom:14px;display:flex;align-items:center;gap:6px"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-power"></use></svg><span data-i18n="enc.offlineNote"></span></div>{{end}}
-              <div style="background:#FBF1E2;border:1px solid #F0DBB6;border-radius:var(--iosbk-radius);padding:12px 14px;font-size:12.5px;color:#8A5A12;line-height:1.55;display:flex;gap:9px"><svg class="ui-icon" style="margin-top:2px" aria-hidden="true"><use href="/static/ui-icons.svg#icon-alert"></use></svg><span data-i18n="enc.warn"></span></div>
+              {{if $d.IsOnline}}{{else}}<div style="font-size:12.5px;color:#6F7E8C;margin-bottom:14px;display:flex;align-items:center;gap:6px"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-power"></use></svg><span data-i18n="enc.offlineNote">{{t $.Locale "enc.offlineNote"}}</span></div>{{end}}
+              <div style="background:#FBF1E2;border:1px solid #F0DBB6;border-radius:var(--iosbk-radius);padding:12px 14px;font-size:12.5px;color:#8A5A12;line-height:1.55;display:flex;gap:9px"><svg class="ui-icon" style="margin-top:2px" aria-hidden="true"><use href="/static/ui-icons.svg#icon-alert"></use></svg><span data-i18n="enc.warn">{{t $.Locale "enc.warn"}}</span></div>
               <div style="margin-top:16px">
-                <div style="display:flex;align-items:center;gap:9px;margin-bottom:9px"><span style="font-size:13.5px;font-weight:600" data-i18n="enc.toggleTitle"></span></div>
+                <div style="display:flex;align-items:center;gap:9px;margin-bottom:9px"><span style="font-size:13.5px;font-weight:600" data-i18n="enc.toggleTitle">{{t $.Locale "enc.toggleTitle"}}</span></div>
                 <div style="display:flex;flex-wrap:wrap;gap:9px;align-items:center">
-                  <input type="password" id="encPw-{{$d.UDID}}" data-i18n-ph="enc.pwPlaceholder" class="iosbk-in" style="min-width:200px">
-                  <button data-connection-action="{{$d.UDID}}" onclick="setEncryption('{{$d.UDID}}',true)" style="display:inline-flex;align-items:center;gap:7px;padding:9px 15px;background:#B45309;color:#fff;border:none;border-radius:var(--iosbk-radius);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-lock"></use></svg><span data-i18n="enc.enable"></span></button>
-                  <button data-connection-action="{{$d.UDID}}" onclick="setEncryption('{{$d.UDID}}',false)" style="padding:9px 15px;background:#fff;color:#607181;border:1px solid #D8E2EA;border-radius:var(--iosbk-radius);font-size:13px;font-weight:500;cursor:pointer;font-family:inherit" data-i18n="enc.disable"></button>
+                  <input type="password" id="encPw-{{$d.UDID}}" data-i18n-ph="enc.pwPlaceholder" class="iosbk-in" style="min-width:200px" placeholder="{{t $.Locale "enc.pwPlaceholder"}}">
+                  <button data-connection-action="{{$d.UDID}}" onclick="setEncryption('{{$d.UDID}}',true)" style="display:inline-flex;align-items:center;gap:7px;padding:9px 15px;background:#B45309;color:#fff;border:none;border-radius:var(--iosbk-radius);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-lock"></use></svg><span data-i18n="enc.enable">{{t $.Locale "enc.enable"}}</span></button>
+                  <button data-connection-action="{{$d.UDID}}" onclick="setEncryption('{{$d.UDID}}',false)" style="padding:9px 15px;background:#fff;color:#607181;border:1px solid #D8E2EA;border-radius:var(--iosbk-radius);font-size:13px;font-weight:500;cursor:pointer;font-family:inherit" data-i18n="enc.disable">{{t $.Locale "enc.disable"}}</button>
                 </div>
-                <div style="font-size:11.5px;color:#96A3AE;margin-top:6px" data-i18n="enc.disableHint"></div>
-                <a data-i18n-href="enc.forgotUrl" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:6px;margin-top:9px;font-size:12px;color:#2C62C6;text-decoration:none;font-weight:500"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-help"></use></svg><span data-i18n="enc.forgot"></span></a>
+                <div style="font-size:11.5px;color:#96A3AE;margin-top:6px" data-i18n="enc.disableHint">{{t $.Locale "enc.disableHint"}}</div>
+                <a data-i18n-href="enc.forgotUrl" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:6px;margin-top:9px;font-size:12px;color:#2C62C6;text-decoration:none;font-weight:500" href="{{t $.Locale "enc.forgotUrl"}}"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-help"></use></svg><span data-i18n="enc.forgot">{{t $.Locale "enc.forgot"}}</span></a>
               </div>
               <div style="margin-top:18px;padding-top:16px;border-top:1px solid #F3F7FA">
-                <div style="font-size:13.5px;font-weight:600;margin-bottom:9px" data-i18n="enc.changeTitle"></div>
+                <div style="font-size:13.5px;font-weight:600;margin-bottom:9px" data-i18n="enc.changeTitle">{{t $.Locale "enc.changeTitle"}}</div>
                 <div style="display:flex;flex-wrap:wrap;gap:9px;align-items:center">
-                  <input type="password" id="oldPw-{{$d.UDID}}" data-i18n-ph="enc.oldPw" class="iosbk-in" style="min-width:150px">
-                  <input type="password" id="newPw-{{$d.UDID}}" data-i18n-ph="enc.newPw" class="iosbk-in" style="min-width:150px">
-                  <button onclick="changeBackupPw('{{$d.UDID}}')" style="padding:9px 15px;background:#2C62C6;color:#fff;border:none;border-radius:var(--iosbk-radius);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit" data-i18n="enc.changeBtn"></button>
+                  <input type="password" id="oldPw-{{$d.UDID}}" data-i18n-ph="enc.oldPw" class="iosbk-in" style="min-width:150px" placeholder="{{t $.Locale "enc.oldPw"}}">
+                  <input type="password" id="newPw-{{$d.UDID}}" data-i18n-ph="enc.newPw" class="iosbk-in" style="min-width:150px" placeholder="{{t $.Locale "enc.newPw"}}">
+                  <button onclick="changeBackupPw('{{$d.UDID}}')" style="padding:9px 15px;background:#2C62C6;color:#fff;border:none;border-radius:var(--iosbk-radius);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit" data-i18n="enc.changeBtn">{{t $.Locale "enc.changeBtn"}}</button>
                 </div>
               </div>
             </div>
@@ -407,23 +410,23 @@
           <!-- ===== DANGER ZONE ===== -->
           <div data-sec-panel="danger" data-udid="{{$d.UDID}}" class="hidden" style="padding:20px">
             <div style="border:1px solid #F1C9C5;border-radius:var(--iosbk-radius);overflow:hidden">
-              <div style="background:#FBEBE9;padding:13px 16px;display:flex;align-items:center;gap:9px;border-bottom:1px solid #F1C9C5"><span style="width:28px;height:28px;border-radius:var(--iosbk-radius);background:#BD2C24;color:#fff;display:flex;align-items:center;justify-content:center"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-alert"></use></svg></span><div style="font-size:14px;font-weight:700;color:#9F231C" data-i18n="danger.title"></div></div>
+              <div style="background:#FBEBE9;padding:13px 16px;display:flex;align-items:center;gap:9px;border-bottom:1px solid #F1C9C5"><span style="width:28px;height:28px;border-radius:var(--iosbk-radius);background:#BD2C24;color:#fff;display:flex;align-items:center;justify-content:center"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-alert"></use></svg></span><div style="font-size:14px;font-weight:700;color:#9F231C" data-i18n="danger.title">{{t $.Locale "danger.title"}}</div></div>
               <div style="padding:16px">
-                <div style="font-size:13px;color:#9F231C;line-height:1.55;margin-bottom:13px" data-i18n="danger.intro"></div>
+                <div style="font-size:13px;color:#9F231C;line-height:1.55;margin-bottom:13px" data-i18n="danger.intro">{{t $.Locale "danger.intro"}}</div>
                 <div style="display:flex;flex-direction:column;gap:9px;margin-bottom:16px">
-                  <div style="display:flex;gap:9px;font-size:12.5px;color:#7A4A14;background:#FBF1E2;border:1px solid #F0DBB6;border-radius:var(--iosbk-radius);padding:10px 12px;line-height:1.5"><svg class="ui-icon" style="margin-top:2px;color:#B45309" aria-hidden="true"><use href="/static/ui-icons.svg#icon-locate"></use></svg><span data-i18n="danger.findMy"></span></div>
-                  <div style="display:flex;gap:9px;font-size:12.5px;color:#405162;background:#F3F7FA;border:1px solid #E7EDF2;border-radius:var(--iosbk-radius);padding:10px 12px;line-height:1.5"><svg class="ui-icon" style="margin-top:2px;color:#6F7E8C" aria-hidden="true"><use href="/static/ui-icons.svg#icon-refresh"></use></svg><span data-i18n="danger.reboot"></span></div>
-                  <div style="display:flex;gap:9px;font-size:12.5px;color:#2356B8;background:#EAF1FC;border:1px solid #C5DAF6;border-radius:var(--iosbk-radius);padding:10px 12px;line-height:1.5"><svg class="ui-icon" style="margin-top:2px" aria-hidden="true"><use href="/static/ui-icons.svg#icon-usb"></use></svg><span data-i18n="danger.usb"></span></div>
+                  <div style="display:flex;gap:9px;font-size:12.5px;color:#7A4A14;background:#FBF1E2;border:1px solid #F0DBB6;border-radius:var(--iosbk-radius);padding:10px 12px;line-height:1.5"><svg class="ui-icon" style="margin-top:2px;color:#B45309" aria-hidden="true"><use href="/static/ui-icons.svg#icon-locate"></use></svg><span data-i18n="danger.findMy">{{t $.Locale "danger.findMy"}}</span></div>
+                  <div style="display:flex;gap:9px;font-size:12.5px;color:#405162;background:#F3F7FA;border:1px solid #E7EDF2;border-radius:var(--iosbk-radius);padding:10px 12px;line-height:1.5"><svg class="ui-icon" style="margin-top:2px;color:#6F7E8C" aria-hidden="true"><use href="/static/ui-icons.svg#icon-refresh"></use></svg><span data-i18n="danger.reboot">{{t $.Locale "danger.reboot"}}</span></div>
+                  <div style="display:flex;gap:9px;font-size:12.5px;color:#2356B8;background:#EAF1FC;border:1px solid #C5DAF6;border-radius:var(--iosbk-radius);padding:10px 12px;line-height:1.5"><svg class="ui-icon" style="margin-top:2px" aria-hidden="true"><use href="/static/ui-icons.svg#icon-usb"></use></svg><span data-i18n="danger.usb">{{t $.Locale "danger.usb"}}</span></div>
                 </div>
                 {{if $cfg.RestoreEnabled}}
                 <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center">
-                  <button data-connection-action="{{$d.UDID}}" onclick="openRestoreModal('{{$d.UDID}}',this.dataset.name)" data-name="{{$d.Name}}" {{if not $d.IsOnline}}disabled{{end}} style="display:inline-flex;align-items:center;gap:8px;padding:10px 17px;border-radius:var(--iosbk-radius);font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit;border:none;{{if $d.IsOnline}}background:#BD2C24;color:#fff;{{else}}background:#F3F7FA;color:#ADB9C2;cursor:not-allowed;{{end}}"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-restore"></use></svg><span data-i18n="danger.restoreBtn"></span></button>
-                  <button onclick="setRestoreEnabled('{{$d.UDID}}',false)" style="background:none;border:none;color:#6F7E8C;font-size:12.5px;text-decoration:underline;cursor:pointer;font-family:inherit" data-i18n="danger.disable"></button>
+                  <button data-connection-action="{{$d.UDID}}" onclick="openRestoreModal('{{$d.UDID}}',this.dataset.name)" data-name="{{$d.Name}}" {{if not $d.IsOnline}}disabled{{end}} style="display:inline-flex;align-items:center;gap:8px;padding:10px 17px;border-radius:var(--iosbk-radius);font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit;border:none;{{if $d.IsOnline}}background:#BD2C24;color:#fff;{{else}}background:#F3F7FA;color:#ADB9C2;cursor:not-allowed;{{end}}"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-restore"></use></svg><span data-i18n="danger.restoreBtn">{{t $.Locale "danger.restoreBtn"}}</span></button>
+                  <button onclick="setRestoreEnabled('{{$d.UDID}}',false)" style="background:none;border:none;color:#6F7E8C;font-size:12.5px;text-decoration:underline;cursor:pointer;font-family:inherit" data-i18n="danger.disable">{{t $.Locale "danger.disable"}}</button>
                 </div>
                 {{else}}
                 <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between">
-                  <div style="font-size:12.5px;color:#6F7E8C;flex:1;min-width:200px;display:flex;align-items:flex-start;gap:6px"><svg class="ui-icon" style="color:#718090;margin-top:1px" aria-hidden="true"><use href="/static/ui-icons.svg#icon-shield"></use></svg><span><span data-i18n="danger.latch"></span> <span data-i18n="danger.disabled"></span></span></div>
-                  <button onclick="setRestoreEnabled('{{$d.UDID}}',true)" style="display:inline-flex;align-items:center;gap:7px;padding:9px 15px;background:#fff;color:#BD2C24;border:1px solid #F1C9C5;border-radius:var(--iosbk-radius);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-shield-unlock"></use></svg><span data-i18n="danger.allow"></span></button>
+                  <div style="font-size:12.5px;color:#6F7E8C;flex:1;min-width:200px;display:flex;align-items:flex-start;gap:6px"><svg class="ui-icon" style="color:#718090;margin-top:1px" aria-hidden="true"><use href="/static/ui-icons.svg#icon-shield"></use></svg><span><span data-i18n="danger.latch">{{t $.Locale "danger.latch"}}</span> <span data-i18n="danger.disabled">{{t $.Locale "danger.disabled"}}</span></span></div>
+                  <button onclick="setRestoreEnabled('{{$d.UDID}}',true)" style="display:inline-flex;align-items:center;gap:7px;padding:9px 15px;background:#fff;color:#BD2C24;border:1px solid #F1C9C5;border-radius:var(--iosbk-radius);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-shield-unlock"></use></svg><span data-i18n="danger.allow">{{t $.Locale "danger.allow"}}</span></button>
                 </div>
                 {{end}}
               </div>
@@ -433,17 +436,17 @@
           <!-- ===== REMOVE DEVICE ===== -->
           <div data-sec-panel="remove" data-udid="{{$d.UDID}}" class="hidden" style="padding:20px">
             <div class="remove-panel-head">
-              <div><div style="font-size:16px;font-weight:700" data-i18n="remove.title"></div><div style="font-size:12.5px;color:#718090;line-height:1.55;margin-top:5px" data-i18n="remove.intro"></div></div>
-              <span class="reversible-tag"><svg class="removal-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-undo"></use></svg><span data-i18n="remove.reversible"></span></span>
+              <div><div style="font-size:16px;font-weight:700" data-i18n="remove.title">{{t $.Locale "remove.title"}}</div><div style="font-size:12.5px;color:#718090;line-height:1.55;margin-top:5px" data-i18n="remove.intro">{{t $.Locale "remove.intro"}}</div></div>
+              <span class="reversible-tag"><svg class="removal-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-undo"></use></svg><span data-i18n="remove.reversible">{{t $.Locale "remove.reversible"}}</span></span>
             </div>
             <div class="removal-impact-grid">
-              <div class="removal-impact-item"><span class="removal-impact-icon"><svg class="removal-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-pause-circle"></use></svg></span><div><h3 data-i18n="remove.stopTitle"></h3><p data-i18n="remove.stopBody"></p></div></div>
-              <div class="removal-impact-item"><span class="removal-impact-icon"><svg class="removal-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-eye-off"></use></svg></span><div><h3 data-i18n="remove.hideTitle"></h3><p data-i18n="remove.hideBody"></p></div></div>
-              <div class="removal-impact-item safe"><span class="removal-impact-icon"><svg class="removal-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-archive"></use></svg></span><div><h3 data-i18n="remove.keepTitle"></h3><p data-i18n="remove.keepBody"></p></div></div>
+              <div class="removal-impact-item"><span class="removal-impact-icon"><svg class="removal-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-pause-circle"></use></svg></span><div><h3 data-i18n="remove.stopTitle">{{t $.Locale "remove.stopTitle"}}</h3><p data-i18n="remove.stopBody">{{t $.Locale "remove.stopBody"}}</p></div></div>
+              <div class="removal-impact-item"><span class="removal-impact-icon"><svg class="removal-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-eye-off"></use></svg></span><div><h3 data-i18n="remove.hideTitle">{{t $.Locale "remove.hideTitle"}}</h3><p data-i18n="remove.hideBody">{{t $.Locale "remove.hideBody"}}</p></div></div>
+              <div class="removal-impact-item safe"><span class="removal-impact-icon"><svg class="removal-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-archive"></use></svg></span><div><h3 data-i18n="remove.keepTitle">{{t $.Locale "remove.keepTitle"}}</h3><p data-i18n="remove.keepBody">{{t $.Locale "remove.keepBody"}}</p></div></div>
             </div>
             <div class="remove-panel-actions">
-              <div class="remove-panel-note"><svg class="removal-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-info"></use></svg><span data-i18n="remove.restoreHint"></span></div>
-              <button class="remove-device-button" type="button" data-name="{{$d.Name}}" data-model="{{$d.DeviceType}}" onclick="openRemoveDeviceModal('{{$d.UDID}}',this.dataset.name,this.dataset.model)"><svg class="removal-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-device-remove"></use></svg><span data-i18n="remove.action"></span></button>
+              <div class="remove-panel-note"><svg class="removal-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-info"></use></svg><span data-i18n="remove.restoreHint">{{t $.Locale "remove.restoreHint"}}</span></div>
+              <button class="remove-device-button" type="button" data-name="{{$d.Name}}" data-model="{{$d.DeviceType}}" onclick="openRemoveDeviceModal('{{$d.UDID}}',this.dataset.name,this.dataset.model)"><svg class="removal-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-device-remove"></use></svg><span data-i18n="remove.action">{{t $.Locale "remove.action"}}</span></button>
             </div>
           </div>
         </div>
@@ -458,37 +461,37 @@
       <div class="empty-device-icon" data-empty-device-icon aria-hidden="true">
         <img src="/static/empty-device.png" alt="">
       </div>
-      <div style="font-size:21px;font-weight:700;letter-spacing:-.01em" data-i18n="empty.title"></div>
-      <div style="font-size:14px;color:#6F7E8C;margin-top:7px;line-height:1.5" data-i18n="empty.subtitle"></div>
+      <div style="font-size:21px;font-weight:700;letter-spacing:-.01em" data-i18n="empty.title">{{t $.Locale "empty.title"}}</div>
+      <div style="font-size:14px;color:#6F7E8C;margin-top:7px;line-height:1.5" data-i18n="empty.subtitle">{{t $.Locale "empty.subtitle"}}</div>
     </div>
     <div style="display:flex;flex-wrap:wrap;gap:14px;margin-top:26px">
       <div style="flex:1;min-width:210px;background:#F3F7FA;border:1px solid #E7EDF2;border-radius:var(--iosbk-radius);padding:18px">
         <div style="width:30px;height:30px;border-radius:var(--iosbk-radius);background:#fff;border:1px solid #D8E2EA;display:flex;align-items:center;justify-content:center;color:#2C62C6;margin-bottom:11px"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-cable"></use></svg></div>
-        <div style="font-size:14px;font-weight:600" data-i18n="empty.s1t"></div>
-        <div style="font-size:13px;color:#6F7E8C;margin-top:5px;line-height:1.5" data-i18n="empty.s1b"></div>
+        <div style="font-size:14px;font-weight:600" data-i18n="empty.s1t">{{t $.Locale "empty.s1t"}}</div>
+        <div style="font-size:13px;color:#6F7E8C;margin-top:5px;line-height:1.5" data-i18n="empty.s1b">{{t $.Locale "empty.s1b"}}</div>
       </div>
       <div style="flex:1;min-width:210px;background:#F3F7FA;border:1px solid #E7EDF2;border-radius:var(--iosbk-radius);padding:18px">
         <div style="width:30px;height:30px;border-radius:var(--iosbk-radius);background:#fff;border:1px solid #D8E2EA;display:flex;align-items:center;justify-content:center;color:#2C62C6;margin-bottom:11px"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-trust"></use></svg></div>
-        <div style="font-size:14px;font-weight:600" data-i18n="empty.s2t"></div>
-        <div style="font-size:13px;color:#6F7E8C;margin-top:5px;line-height:1.5" data-i18n="empty.s2b"></div>
+        <div style="font-size:14px;font-weight:600" data-i18n="empty.s2t">{{t $.Locale "empty.s2t"}}</div>
+        <div style="font-size:13px;color:#6F7E8C;margin-top:5px;line-height:1.5" data-i18n="empty.s2b">{{t $.Locale "empty.s2b"}}</div>
       </div>
       <div style="flex:1;min-width:210px;background:#F3F7FA;border:1px solid #E7EDF2;border-radius:var(--iosbk-radius);padding:18px">
         <div style="width:30px;height:30px;border-radius:var(--iosbk-radius);background:#fff;border:1px solid #D8E2EA;display:flex;align-items:center;justify-content:center;color:#2C62C6;margin-bottom:11px"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-backup"></use></svg></div>
-        <div style="font-size:14px;font-weight:600" data-i18n="empty.s3t"></div>
-        <div style="font-size:13px;color:#6F7E8C;margin-top:5px;line-height:1.5" data-i18n="empty.s3b"></div>
+        <div style="font-size:14px;font-weight:600" data-i18n="empty.s3t">{{t $.Locale "empty.s3t"}}</div>
+        <div style="font-size:13px;color:#6F7E8C;margin-top:5px;line-height:1.5" data-i18n="empty.s3b">{{t $.Locale "empty.s3b"}}</div>
       </div>
     </div>
     <div style="text-align:center;margin-top:24px">
       </div>
-      <button onclick="refreshDevices()" style="display:inline-flex;align-items:center;gap:8px;padding:11px 22px;background:#2C62C6;color:#fff;border:none;border-radius:var(--iosbk-radius);font-size:14px;font-weight:600;cursor:pointer;font-family:inherit"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-refresh"></use></svg><span data-i18n="empty.refresh"></span></button>
-      <button id="emptyRemovedDevicesButton" type="button" class="hidden" onclick="openRemovedDevicesDrawer()" style="display:inline-flex;align-items:center;gap:8px;margin-left:8px;padding:11px 18px;background:#fff;color:#2356B8;border:1px solid #C5DAF6;border-radius:var(--iosbk-radius);font-size:14px;font-weight:600;cursor:pointer;font-family:inherit"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-archive"></use></svg><span data-i18n="empty.removed"></span></button>
+      <button onclick="refreshDevices()" style="display:inline-flex;align-items:center;gap:8px;padding:11px 22px;background:#2C62C6;color:#fff;border:none;border-radius:var(--iosbk-radius);font-size:14px;font-weight:600;cursor:pointer;font-family:inherit"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-refresh"></use></svg><span data-i18n="empty.refresh">{{t $.Locale "empty.refresh"}}</span></button>
+      <button id="emptyRemovedDevicesButton" type="button" class="hidden" onclick="openRemovedDevicesDrawer()" style="display:inline-flex;align-items:center;gap:8px;margin-left:8px;padding:11px 18px;background:#fff;color:#2356B8;border:1px solid #C5DAF6;border-radius:var(--iosbk-radius);font-size:14px;font-weight:600;cursor:pointer;font-family:inherit"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-archive"></use></svg><span data-i18n="empty.removed">{{t $.Locale "empty.removed"}}</span></button>
     </div>
   </div>
   {{end}}
 
 </div>
 <footer style="max-width:940px;margin:22px auto 0;text-align:center;color:#718090;font-size:12px">
-  iOS Backup {{.Version}} · <a href="{{.SourceURL}}/tree/{{.Commit}}" rel="noreferrer" style="color:#5B6F91">Source {{.Commit}}</a> · AGPL-3.0-only
+  iOS Backup {{.Version}} · <a href="{{.SourceURL}}/tree/{{.Commit}}" rel="noreferrer" style="color:#5B6F91"><span data-i18n="common.source">{{t $.Locale "common.source"}}</span> {{.Commit}}</a> · AGPL-3.0-only
 </footer>
 </div>
 
@@ -496,8 +499,8 @@
 <div id="removedDevicesDrawer" class="hidden removed-devices-overlay" onclick="closeRemovedDevicesDrawer(event)">
   <aside class="removed-devices-sheet" role="dialog" aria-modal="true" aria-labelledby="removedDevicesTitle" onclick="event.stopPropagation()">
     <div class="removed-devices-head">
-      <div class="removed-devices-title"><span class="removed-devices-title-icon"><svg class="removal-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-archive"></use></svg></span><div><h2 id="removedDevicesTitle" style="font-size:18px;margin:0" data-i18n="removed.title"></h2><div style="font-size:12px;color:#718090;line-height:1.5;margin-top:5px" data-i18n="removed.subtitle"></div></div></div>
-      <button id="removedDevicesClose" type="button" class="removed-devices-close" onclick="closeRemovedDevicesDrawer(event)" data-i18n-title="removed.close"><svg class="removal-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-x-circle"></use></svg></button>
+      <div class="removed-devices-title"><span class="removed-devices-title-icon"><svg class="removal-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-archive"></use></svg></span><div><h2 id="removedDevicesTitle" style="font-size:18px;margin:0" data-i18n="removed.title">{{t $.Locale "removed.title"}}</h2><div style="font-size:12px;color:#718090;line-height:1.5;margin-top:5px" data-i18n="removed.subtitle">{{t $.Locale "removed.subtitle"}}</div></div></div>
+      <button id="removedDevicesClose" type="button" class="removed-devices-close" onclick="closeRemovedDevicesDrawer(event)" data-i18n-title="removed.close" title="{{t $.Locale "removed.close"}}"><svg class="removal-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-x-circle"></use></svg></button>
     </div>
     <div id="removedDevicesList" class="removed-devices-body" aria-live="polite"></div>
   </aside>
@@ -507,20 +510,20 @@
 <div id="removeDeviceModal" class="hidden remove-device-overlay" onclick="closeRemoveDeviceModal(event)">
   <section class="remove-device-dialog" role="dialog" aria-modal="true" aria-labelledby="removeDeviceTitle" onclick="event.stopPropagation()">
     <div class="remove-dialog-head">
-      <div class="remove-dialog-title"><span class="remove-dialog-title-icon"><svg class="removal-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-device-remove"></use></svg></span><div><h2 id="removeDeviceTitle" style="font-size:18px;margin:0" data-i18n="remove.dialogTitle"></h2><div style="font-size:12px;color:#718090;line-height:1.5;margin-top:5px" data-i18n="remove.dialogSubtitle"></div></div></div>
-      <button id="removeDeviceClose" type="button" class="remove-dialog-close" onclick="closeRemoveDeviceModal(event)" data-i18n-title="remove.close"><svg class="removal-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-x-circle"></use></svg></button>
+      <div class="remove-dialog-title"><span class="remove-dialog-title-icon"><svg class="removal-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-device-remove"></use></svg></span><div><h2 id="removeDeviceTitle" style="font-size:18px;margin:0" data-i18n="remove.dialogTitle">{{t $.Locale "remove.dialogTitle"}}</h2><div style="font-size:12px;color:#718090;line-height:1.5;margin-top:5px" data-i18n="remove.dialogSubtitle">{{t $.Locale "remove.dialogSubtitle"}}</div></div></div>
+      <button id="removeDeviceClose" type="button" class="remove-dialog-close" onclick="closeRemoveDeviceModal(event)" data-i18n-title="remove.close" title="{{t $.Locale "remove.close"}}"><svg class="removal-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-x-circle"></use></svg></button>
     </div>
     <div class="remove-dialog-body">
       <div class="remove-device-summary"><span class="remove-device-summary-icon"><svg class="removal-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-phone"></use></svg></span><div style="min-width:0"><strong id="removeDeviceName" style="display:block;font-size:13.5px"></strong><span id="removeDeviceModel" style="display:block;color:#718090;font-size:11.5px;margin-top:3px"></span></div></div>
       <ul class="remove-impact-list">
-        <li><span><svg class="removal-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-pause-circle"></use></svg></span><span><span data-i18n="remove.dialogStop"></span><small data-i18n="remove.stopBody"></small></span></li>
-        <li><span><svg class="removal-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-eye-off"></use></svg></span><span><span data-i18n="remove.dialogHide"></span><small data-i18n="remove.hideBody"></small></span></li>
-        <li class="safe"><span><svg class="removal-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-archive"></use></svg></span><span><span data-i18n="remove.dialogKeep"></span><small data-i18n="remove.keepBody"></small></span></li>
-        <li class="safe"><span><svg class="removal-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-check-circle"></use></svg></span><span><span data-i18n="remove.dialogPairing"></span><small data-i18n="remove.dialogPairingBody"></small></span></li>
+        <li><span><svg class="removal-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-pause-circle"></use></svg></span><span><span data-i18n="remove.dialogStop">{{t $.Locale "remove.dialogStop"}}</span><small data-i18n="remove.stopBody">{{t $.Locale "remove.stopBody"}}</small></span></li>
+        <li><span><svg class="removal-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-eye-off"></use></svg></span><span><span data-i18n="remove.dialogHide">{{t $.Locale "remove.dialogHide"}}</span><small data-i18n="remove.hideBody">{{t $.Locale "remove.hideBody"}}</small></span></li>
+        <li class="safe"><span><svg class="removal-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-archive"></use></svg></span><span><span data-i18n="remove.dialogKeep">{{t $.Locale "remove.dialogKeep"}}</span><small data-i18n="remove.keepBody">{{t $.Locale "remove.keepBody"}}</small></span></li>
+        <li class="safe"><span><svg class="removal-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-check-circle"></use></svg></span><span><span data-i18n="remove.dialogPairing">{{t $.Locale "remove.dialogPairing"}}</span><small data-i18n="remove.dialogPairingBody">{{t $.Locale "remove.dialogPairingBody"}}</small></span></li>
       </ul>
-      <div class="remove-recovery-note" data-i18n="remove.restoreHint"></div>
+      <div class="remove-recovery-note" data-i18n="remove.restoreHint">{{t $.Locale "remove.restoreHint"}}</div>
     </div>
-    <div class="remove-dialog-actions"><button type="button" class="remove-dialog-cancel" onclick="closeRemoveDeviceModal(event)" data-i18n="remove.cancel"></button><button id="removeDeviceConfirm" type="button" class="remove-dialog-confirm" onclick="submitRemoveDevice()" data-i18n="remove.confirm"></button></div>
+    <div class="remove-dialog-actions"><button type="button" class="remove-dialog-cancel" onclick="closeRemoveDeviceModal(event)" data-i18n="remove.cancel">{{t $.Locale "remove.cancel"}}</button><button id="removeDeviceConfirm" type="button" class="remove-dialog-confirm" onclick="submitRemoveDevice()" data-i18n="remove.confirm">{{t $.Locale "remove.confirm"}}</button></div>
   </section>
 </div>
 
@@ -529,42 +532,42 @@
   <div onclick="event.stopPropagation()" style="background:#fff;border-radius:var(--iosbk-radius);max-width:520px;width:100%;max-height:92vh;overflow:auto;box-shadow:0 30px 60px -20px rgba(35,52,68,.5)">
     <div style="padding:18px 20px;border-bottom:1px solid #F1C9C5;background:#FBEBE9;border-radius:var(--iosbk-radius) var(--iosbk-radius) 0 0;display:flex;align-items:center;gap:11px">
       <span style="width:34px;height:34px;border-radius:var(--iosbk-radius);background:#BD2C24;color:#fff;display:flex;align-items:center;justify-content:center"><svg class="ui-icon" style="width:18px;height:18px" aria-hidden="true"><use href="/static/ui-icons.svg#icon-restore"></use></svg></span>
-      <div><div style="font-size:16px;font-weight:700;color:#9F231C" data-i18n="restore.title"></div><div id="rmDevName" style="font-size:12.5px;color:#9F231C;margin-top:1px"></div></div>
+      <div><div style="font-size:16px;font-weight:700;color:#9F231C" data-i18n="restore.title">{{t $.Locale "restore.title"}}</div><div id="rmDevName" style="font-size:12.5px;color:#9F231C;margin-top:1px"></div></div>
     </div>
     <div style="padding:20px">
-      <div style="font-size:13px;color:#9F231C;background:#FBEBE9;border:1px solid #F1C9C5;border-radius:var(--iosbk-radius);padding:11px 13px;line-height:1.5;font-weight:500" data-i18n="restore.lead"></div>
+      <div style="font-size:13px;color:#9F231C;background:#FBEBE9;border:1px solid #F1C9C5;border-radius:var(--iosbk-radius);padding:11px 13px;line-height:1.5;font-weight:500" data-i18n="restore.lead">{{t $.Locale "restore.lead"}}</div>
       <label style="display:flex;gap:10px;align-items:flex-start;margin-top:15px;cursor:pointer">
         <input type="checkbox" id="rmFindMy" onchange="validateRestore()" style="margin-top:2px;width:17px;height:17px;accent-color:#BD2C24;flex:none">
-        <span style="font-size:13px;color:#405162;line-height:1.45"><span data-i18n="restore.findMy"></span><span style="display:block;font-size:11.5px;color:#96A3AE;margin-top:2px" data-i18n="restore.findMyHint"></span></span>
+        <span style="font-size:13px;color:#405162;line-height:1.45"><span data-i18n="restore.findMy">{{t $.Locale "restore.findMy"}}</span><span style="display:block;font-size:11.5px;color:#96A3AE;margin-top:2px" data-i18n="restore.findMyHint">{{t $.Locale "restore.findMyHint"}}</span></span>
       </label>
       <label style="display:flex;gap:10px;align-items:flex-start;margin-top:13px;cursor:pointer">
         <input type="checkbox" id="rmUnderstand" onchange="validateRestore()" style="margin-top:2px;width:17px;height:17px;accent-color:#BD2C24;flex:none">
-        <span style="font-size:13px;color:#405162;line-height:1.45" data-i18n="restore.understand"></span>
+        <span style="font-size:13px;color:#405162;line-height:1.45" data-i18n="restore.understand">{{t $.Locale "restore.understand"}}</span>
       </label>
       <div style="margin-top:15px">
-        <div style="font-size:12.5px;color:#405162;font-weight:600" data-i18n="restore.typeName"></div>
-        <div style="font-size:11.5px;color:#718090;margin:3px 0 6px"><span data-i18n="restore.typeHint"></span> <span id="rmExpect" style="font-family:'IBM Plex Mono',monospace;background:#F3F7FA;padding:1px 6px;border-radius:var(--iosbk-radius);color:#213041"></span></div>
+        <div style="font-size:12.5px;color:#405162;font-weight:600" data-i18n="restore.typeName">{{t $.Locale "restore.typeName"}}</div>
+        <div style="font-size:11.5px;color:#718090;margin:3px 0 6px"><span data-i18n="restore.typeHint">{{t $.Locale "restore.typeHint"}}</span> <span id="rmExpect" style="font-family:'IBM Plex Mono',monospace;background:#F3F7FA;padding:1px 6px;border-radius:var(--iosbk-radius);color:#213041"></span></div>
         <input type="text" id="rmName" oninput="validateRestore()" class="iosbk-in" style="width:100%">
       </div>
       <div style="margin-top:13px">
-        <div style="font-size:12.5px;color:#405162;font-weight:600"><span data-i18n="restore.pwLabel"></span> <span style="font-weight:400;color:#96A3AE;font-size:11.5px">— <span data-i18n="restore.pwOptional"></span></span></div>
+        <div style="font-size:12.5px;color:#405162;font-weight:600"><span data-i18n="restore.pwLabel">{{t $.Locale "restore.pwLabel"}}</span> <span style="font-weight:400;color:#96A3AE;font-size:11.5px">— <span data-i18n="restore.pwOptional">{{t $.Locale "restore.pwOptional"}}</span></span></div>
         <input type="password" id="rmPw" class="iosbk-in" style="width:100%;margin-top:6px">
       </div>
       <div style="display:flex;flex-wrap:wrap;gap:14px;margin-top:14px;font-size:12.5px;color:#405162">
-        <label style="display:inline-flex;gap:7px;align-items:center;cursor:pointer"><input type="checkbox" id="rmReboot" checked style="width:15px;height:15px;accent-color:#2C62C6"><span data-i18n="restore.optReboot"></span></label>
-        <label style="display:inline-flex;gap:7px;align-items:center;cursor:pointer"><input type="checkbox" id="rmSettings" style="width:15px;height:15px;accent-color:#2C62C6"><span data-i18n="restore.optSettings"></span></label>
-        <label style="display:inline-flex;gap:7px;align-items:center;cursor:pointer"><input type="checkbox" id="rmSystem" style="width:15px;height:15px;accent-color:#2C62C6"><span data-i18n="restore.optSystem"></span></label>
+        <label style="display:inline-flex;gap:7px;align-items:center;cursor:pointer"><input type="checkbox" id="rmReboot" checked style="width:15px;height:15px;accent-color:#2C62C6"><span data-i18n="restore.optReboot">{{t $.Locale "restore.optReboot"}}</span></label>
+        <label style="display:inline-flex;gap:7px;align-items:center;cursor:pointer"><input type="checkbox" id="rmSettings" style="width:15px;height:15px;accent-color:#2C62C6"><span data-i18n="restore.optSettings">{{t $.Locale "restore.optSettings"}}</span></label>
+        <label style="display:inline-flex;gap:7px;align-items:center;cursor:pointer"><input type="checkbox" id="rmSystem" style="width:15px;height:15px;accent-color:#2C62C6"><span data-i18n="restore.optSystem">{{t $.Locale "restore.optSystem"}}</span></label>
       </div>
     </div>
     <div style="display:flex;gap:10px;justify-content:flex-end;padding:14px 20px;border-top:1px solid #F3F7FA;background:#FBFCFD;border-radius:0 0 var(--iosbk-radius) var(--iosbk-radius)">
-      <button onclick="closeRestoreModal()" style="padding:10px 18px;background:#fff;color:#607181;border:1px solid #D8E2EA;border-radius:var(--iosbk-radius);font-size:13.5px;font-weight:500;cursor:pointer;font-family:inherit" data-i18n="restore.cancel"></button>
-      <button id="rmSubmit" onclick="submitRestore()" disabled style="display:inline-flex;align-items:center;gap:8px;padding:10px 18px;border-radius:var(--iosbk-radius);font-size:13.5px;font-weight:700;cursor:not-allowed;font-family:inherit;border:none;background:#F3F7FA;color:#ADB9C2"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-restore"></use></svg><span data-i18n="restore.confirm"></span></button>
+      <button onclick="closeRestoreModal()" style="padding:10px 18px;background:#fff;color:#607181;border:1px solid #D8E2EA;border-radius:var(--iosbk-radius);font-size:13.5px;font-weight:500;cursor:pointer;font-family:inherit" data-i18n="restore.cancel">{{t $.Locale "restore.cancel"}}</button>
+      <button id="rmSubmit" onclick="submitRestore()" disabled style="display:inline-flex;align-items:center;gap:8px;padding:10px 18px;border-radius:var(--iosbk-radius);font-size:13.5px;font-weight:700;cursor:not-allowed;font-family:inherit;border:none;background:#F3F7FA;color:#ADB9C2"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-restore"></use></svg><span data-i18n="restore.confirm">{{t $.Locale "restore.confirm"}}</span></button>
     </div>
   </div>
 </div>
 
 <!-- ===================== UPDATE BANNER (新版本部署后提示刷新) ===================== -->
-<div id="updateBanner" class="hidden" onclick="location.reload()" style="position:fixed;left:50%;top:14px;transform:translateX(-50%);z-index:80;background:#2C62C6;color:#fff;padding:10px 18px;border-radius:var(--iosbk-radius);font-size:13.5px;font-weight:600;cursor:pointer;box-shadow:0 10px 24px -8px rgba(35,52,68,.45);display:flex;align-items:center;gap:9px"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-refresh"></use></svg><span data-i18n="update.banner"></span></div>
+<div id="updateBanner" class="hidden" onclick="location.reload()" style="position:fixed;left:50%;top:14px;transform:translateX(-50%);z-index:80;background:#2C62C6;color:#fff;padding:10px 18px;border-radius:var(--iosbk-radius);font-size:13.5px;font-weight:600;cursor:pointer;box-shadow:0 10px 24px -8px rgba(35,52,68,.45);display:flex;align-items:center;gap:9px"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-refresh"></use></svg><span data-i18n="update.banner">{{t $.Locale "update.banner"}}</span></div>
 
 <!-- ===================== TOAST ===================== -->
 <div id="toast" class="hidden" style="position:fixed;left:50%;top:14px;transform:translateX(-50%);z-index:75;background:#213041;color:#fff;padding:12px 18px;border-radius:var(--iosbk-radius);font-size:13.5px;font-weight:500;box-shadow:0 14px 30px -10px rgba(35,52,68,.5);display:flex;align-items:center;gap:9px;max-width:90vw">
@@ -572,66 +575,42 @@
 </div>
 
 <script>
-/* ============== bilingual dictionary (ported verbatim from i18n.js) ============== */
-const IOSBK_DICT = {
-  app: { title:{zh:"iOS 设备备份",en:"iOS Device Backup"}, subtitle:{zh:"回到家连上 Wi-Fi，就自动备份你的 iPhone 和 iPad。",en:"Back home on Wi-Fi — your iPhones & iPads back up automatically."}, version:{zh:"版本",en:"Version"} },
-  header: { langName:{zh:"中文",en:"English"}, autoOn:{zh:"实时更新已开启",en:"Live updates on"}, autoOff:{zh:"实时更新已暂停",en:"Live updates paused"}, autoBusy:{zh:"实时更新 · {n} 台备份中",en:"Live · {n} backing up"}, pauseAuto:{zh:"暂停",en:"Pause"}, resumeAuto:{zh:"开启",en:"Resume"}, refresh:{zh:"刷新设备",en:"Refresh devices"}, restart:{zh:"重启连接服务",en:"Restart connection"}, restartHint:{zh:"没找到设备时点这里：重启底层的 USB 与 Wi-Fi 连接服务，不影响你的备份文件。",en:"Tap this if a device isn't detected: restarts the underlying USB & Wi-Fi connection service. Your backups are not affected."}, notifications:{zh:"通知设置",en:"Notifications"}, tz:{zh:"时间为北京时间 (UTC+8)",en:"Times shown in Beijing time (UTC+8)"} },
-  empty: { title:{zh:"还没有连接任何设备",en:"No devices yet"}, subtitle:{zh:"三步即可完成第一次备份，全程不需要懂任何专业名词。",en:"Three steps to your first backup — no technical terms required."}, s1t:{zh:"1 · 接上设备",en:"1 · Connect the device"}, s1b:{zh:"用数据线把 iPhone / iPad 插到本机，或让它和本机连同一个 Wi-Fi。",en:"Plug the iPhone / iPad into this machine with a cable, or put it on the same Wi-Fi."}, s2t:{zh:"2 · 在设备上点「信任」",en:"2 · Tap “Trust” on the device"}, s2b:{zh:"设备会弹出「要信任此电脑吗？」，点「信任」并输入锁屏密码。",en:"The device asks “Trust this computer?” — tap Trust and enter its passcode."}, s3t:{zh:"3 · 回到这里点「立即备份」",en:"3 · Come back and tap “Back up now”"}, s3b:{zh:"设备会出现在下面，点一下就开始备份；之后可设为自动。",en:"The device appears below — one tap starts the backup. You can make it automatic afterwards."}, refresh:{zh:"我已接好，刷新看看",en:"I've connected it — refresh"}, removed:{zh:"查看已移除设备",en:"View removed devices"} },
-  device: { model:{zh:"型号",en:"Model"}, lastBackup:{zh:"上次备份",en:"Last backup"}, never:{zh:"从未备份",en:"Never backed up"}, backupNow:{zh:"立即备份",en:"Back up now"}, backingUp:{zh:"备份中",en:"Backing up"} },
-  progress: { waitingAuthorizationTitle:{zh:"等待手机授权",en:"Waiting for device authorization"}, waitingAuthorizationHint:{zh:"请查看 iPhone，并按提示输入锁屏密码。超过等待期限后本次备份会停止。",en:"Check your iPhone and enter its passcode when prompted. This backup stops if the wait times out."}, waitingDeviceTitle:{zh:"等待手机处理",en:"Waiting for the device"}, waitingDeviceHint:{zh:"正在等待手机的下一步响应。较大的加密备份在准备阶段可能需要几分钟，总体进度暂时不变。",en:"Waiting for the device response. Preparing a large encrypted backup can take several minutes without changing the overall percentage."}, sendingTitle:{zh:"正在向手机发送数据",en:"Sending data to the device"}, sendingHint:{zh:"正在发送备份所需的数据；增量备份会先发送已有清单。",en:"Sending data needed by the backup. Incremental backups first send the existing manifest."}, stalledHint:{zh:"长时间未检测到备份活动，本次任务已停止。请检查手机授权和网络后重新备份。",en:"No backup activity was detected within the time limit, so this job stopped. Check device authorization and the network, then retry."}, lastActivity:{zh:"最后备份活动（北京时间）：",en:"Last backup activity (Beijing): "}, noActivity:{zh:"尚未检测到备份活动",en:"No backup activity detected yet"}, preparingTitle:{zh:"正在建立备份会话",en:"Preparing the backup session"}, preparingSubtitle:{zh:"正在取得可计算的总体进度",en:"Waiting for measurable overall progress"}, preparingHint:{zh:"请在 iPhone 上留意授权提示，并保持设备可解锁。",en:"Watch the iPhone for an authorization prompt and keep it ready to unlock."}, runningTitle:{zh:"正在备份",en:"Backup in progress"}, overallSubtitle:{zh:"整次备份的总体进度",en:"Overall progress for this backup"}, runningHint:{zh:"正在接收备份数据，请保持设备连接稳定。",en:"Receiving backup data. Keep the device connection stable."}, overallOnlyHint:{zh:"当前没有可靠的文件字节信息，页面只展示总体进度。",en:"Reliable per-file byte counts are unavailable, so only overall progress is shown."}, currentFile:{zh:"当前文件",en:"Current file"}, currentFileHint:{zh:"当前正在传输的文件进度",en:"Progress of the file currently being transferred"}, separator:{zh:"。 ",en:". "}, reconnectingTitle:{zh:"等待设备重新连接",en:"Waiting for the device to reconnect"}, reconnectingHint:{zh:"Wi-Fi 连接暂时中断，正在保留最后进度并等待设备重新上线。",en:"Wi-Fi was interrupted. The last progress is preserved while waiting for the device."}, interruptedTitle:{zh:"备份已中断",en:"Backup interrupted"}, interruptedHint:{zh:"设备持续离线，本次备份已安全停止。重新连接后可再次开始备份。",en:"The device stayed offline, so this backup stopped safely. Reconnect it to start a new backup."}, completedTitle:{zh:"备份已完成",en:"Backup completed"}, completedHint:{zh:"本次备份已正常结束。",en:"This backup finished successfully."}, failedTitle:{zh:"备份失败",en:"Backup failed"}, failedHint:{zh:"请保持设备在线并重新尝试。",en:"Keep the device online and try again."}, storageHint:{zh:"请检查保存位置的剩余空间和写入权限。",en:"Check free space and write access for the backup location."}, lockedHint:{zh:"请解锁设备，并按提示输入设备锁屏密码。",en:"Unlock the device and enter its passcode when prompted."}, retry:{zh:"重新备份",en:"Back up again"}, overallAria:{zh:"总体备份进度",en:"Overall backup progress"} },
-  status: { usb:{zh:"USB 已连接",en:"USB connected"}, wifi:{zh:"Wi-Fi 已连接",en:"Wi-Fi connected"}, offline:{zh:"离线",en:"Offline"}, backingUp:{zh:"备份中",en:"Backing up"}, success:{zh:"成功",en:"Success"}, failed:{zh:"失败",en:"Failed"} },
-  gate: { offline:{zh:"设备离线，无法备份",en:"Device is offline — can't back up"}, busy:{zh:"设备正忙（已有备份或操作进行中）",en:"Device is busy (a backup or operation is already running)"}, notCharging:{zh:"该设备开了「仅充电时备份」，请充电后再试",en:"This device has “Only while charging” on — please plug it in and try again."}, lowBattery:{zh:"电量 {b}% 低于设定的最低 {m}%，已跳过",en:"Battery {b}% is below the set minimum {m}% — skipped"}, missing:{zh:"设备不存在",en:"Device not found"}, backupBusy:{zh:"已有其他设备在备份，请稍后再试",en:"Another device is backing up — please try again shortly."}, cant:{zh:"暂时无法备份",en:"Can't back up right now"} },
-  menu: { title:{zh:"菜单",en:"Menu"}, onboarding:{zh:"首次使用向导",en:"First-use guide"}, onboardingHint:{zh:"连接、信任并完成第一次备份",en:"Connect, trust, and complete the first backup"}, notifHint:{zh:"配置备份成功/失败等事件的通知",en:"Set up notifications for backup success, failure, and more"}, refreshHint:{zh:"立即重扫 USB / Wi-Fi 设备",en:"Re-scan USB / Wi-Fi devices now"}, logout:{zh:"退出登录",en:"Sign out"}, logoutHint:{zh:"结束当前浏览器会话",en:"End this browser session"} },
-  update: { banner:{zh:"已部署新版本，点此刷新页面",en:"A new version is available — click to refresh"} },
-  battery: { charging:{zh:"充电中",en:"Charging"} },
-  migration: { text:{zh:"这台设备以前是用 Wi-Fi 备份的，现在离线了。如果它换了网络（本机自动发现不到），在「备份设置」里填上它的 IP 就能继续无线备份。",en:"This device used to back up over Wi-Fi and is now offline. If it changed networks (and can't be auto-discovered), add its IP under Backup settings to keep backing up wirelessly."}, action:{zh:"去填写 IP",en:"Add its IP"} },
-  sec: { backup:{zh:"备份设置",en:"Backup settings"}, backups:{zh:"备份管理",en:"Backups"}, encryption:{zh:"加密",en:"Encryption"}, danger:{zh:"备份恢复",en:"Restore"}, remove:{zh:"移除设备",en:"Remove device"} },
-  bset: { unsaved:{zh:"有未保存的修改",en:"Unsaved changes"}, window:{zh:"备份时间段",en:"Backup window"}, windowHint:{zh:"只在这个时间段内自动备份（例如夜里）。",en:"Auto-backups run only inside this window (e.g. overnight)."}, to:{zh:"至",en:"to"}, interval:{zh:"备份间隔",en:"Backup interval"}, h6:{zh:"每 6 小时",en:"Every 6 hours"}, h12:{zh:"每 12 小时",en:"Every 12 hours"}, h24:{zh:"每 24 小时",en:"Every 24 hours"}, h48:{zh:"每 48 小时",en:"Every 48 hours"}, minBattery:{zh:"最低电量",en:"Minimum battery"}, minBatteryHint:{zh:"电量低于这个值就不自动备份，避免耗光电。",en:"Skip auto-backups below this level so the device never runs flat."}, onlyCharging:{zh:"仅在充电时备份",en:"Only back up while charging"}, autoBackup:{zh:"自动备份",en:"Automatic backup"}, autoBackupHint:{zh:"关闭后只能手动点「立即备份」。",en:"When off, you back up manually with “Back up now”."}, dir:{zh:"保存位置",en:"Save location"}, dirHint:{zh:"备份文件存放的文件夹。",en:"The folder where backups are stored."}, ip:{zh:"设备 IP",en:"Device IP"}, ipOptional:{zh:"可选",en:"optional"}, ipPlaceholder:{zh:"留空即可 — 同一 Wi-Fi 会自动找到",en:"Leave blank — auto-found on the same Wi-Fi"}, ipHint:{zh:"同一个 Wi-Fi 下会自动发现，留空就好。只有跨网段或用 Tailscale 时才需要手动填。",en:"Auto-discovered on the same Wi-Fi, so leave it blank. Only fill it in for a different subnet or Tailscale."}, testConn:{zh:"测试连接",en:"Test connection"}, passcodeNote:{zh:"由于 iOS 安全机制，每次备份开始时都需要在设备上输入锁屏密码。请在备份时段保持手机可解锁、留意提示并及时输入，超过等待期限后本次备份会停止。",en:"Due to iOS security, every backup asks for the device passcode when it starts. Keep the device unlockable during the backup window and enter it promptly, or this backup will stop after the waiting period."}, testing:{zh:"测试中…",en:"Testing…"}, testOk:{zh:"设备已连接，保存设置可保留此 IP",en:"Device connected. Save settings to keep this IP."}, checkDir:{zh:"检查",en:"Check"}, dirChecking:{zh:"检查中…",en:"Checking…"}, dirOk:{zh:"保存位置可用，保存设置后生效",en:"Save location is usable — it takes effect after you save"}, dirBad:{zh:"保存位置不可用，请重新填写",en:"Save location isn't usable — please enter another path"}, offlineHelp:{zh:"设备显示离线？① 确认它亮屏、和本机在同一个 Wi-Fi；② 在设备上断开重连 Wi-Fi（或到「设置 → Wi-Fi → ⓘ → 私有 Wi-Fi 地址」切换一下）来刷新连接；③ 知道 IP 就填到上面点「测试连接」。",en:"Device shows offline? ① Make sure it's awake and on the same Wi-Fi as this server. ② On the device, toggle Wi-Fi off/on (or switch Settings → Wi-Fi → ⓘ → Private Wi-Fi Address) to refresh its connection. ③ If you know its IP, enter it above and tap “Test connection”."}, discovered:{zh:"已自动发现",en:"Auto-discovered"}, save:{zh:"保存设置",en:"Save settings"}, saved:{zh:"设置已保存",en:"Settings saved"}, pair:{zh:"配对设备",en:"Pair device"}, repair:{zh:"重新配对",en:"Re-pair"}, pairHint:{zh:"第一次连接需要在设备上点「信任此电脑」。",en:"Needed on first connection: tap “Trust this computer” on the device."} },
-  bmgmt: { infoTitle:{zh:"备份概况",en:"Backup overview"}, infoRefresh:{zh:"刷新",en:"Refresh"}, size:{zh:"占用空间",en:"Size on disk"}, count:{zh:"备份文件数",en:"File count"}, encrypted:{zh:"是否加密",en:"Encrypted"}, latest:{zh:"最新备份",en:"Latest backup"}, filesTitle:{zh:"备份文件",en:"Backup files"}, filesNote:{zh:"仅本机 / 内网可见，请勿外传。",en:"Visible on your LAN only — don't share."}, search:{zh:"搜索文件…",en:"Search files…"}, prev:{zh:"上一页",en:"Prev"}, next:{zh:"下一页",en:"Next"}, page:{zh:"第 {a} / {b} 页",en:"Page {a} of {b}"}, total:{zh:"共 {n} 项",en:"{n} items"}, downloadCsv:{zh:"下载 CSV",en:"Download CSV"}, deleteTitle:{zh:"解包成可浏览的文件",en:"Unpack into browsable files"}, deleteNote:{zh:"备份里的文件是哈希命名的，没法直接翻看。解包会按原始路径还原成一份可浏览的文件夹副本（额外占磁盘、较耗时；不会改动原备份）。",en:"Files inside a backup have hashed names and aren't directly browsable. Unpacking rebuilds them into a browsable folder copy by original path (extra disk, takes a while; the original backup is untouched)."}, deleteBtn:{zh:"解包…",en:"Unpack…"}, delDataTitle:{zh:"删除此设备的备份",en:"Delete this device's backup"}, delDataNote:{zh:"把这台设备在本机的备份整份删除以释放空间。不可恢复；不影响设备本身，下次会重新做一次完整备份。",en:"Permanently delete this device's local backup to free space. Irreversible; the device itself is unaffected, and the next backup will be a full one."}, delDataBtn:{zh:"删除备份…",en:"Delete backup…"}, deleting:{zh:"删除中…",en:"Deleting…"}, offlineNote:{zh:"设备离线，备份管理暂不可用。",en:"Device offline — backup management is unavailable."}, loadHint:{zh:"点上方「刷新」加载备份文件清单。清单要从设备下载，备份文件越大、加载越久（小则几秒，大备份可能要十几秒到几分钟）。",en:"Click “Refresh” above to load the backup file list. It's fetched from the device, so the larger the backup, the longer it takes (seconds for small ones, up to minutes for large backups)."}, noBackup:{zh:"这台设备还没有备份。点右上角「立即备份」做第一次备份吧。",en:"No backup yet for this device. Tap “Back up now” at the top to make the first one."} },
-  enc: { unavailTitle:{zh:"加密存储不可用",en:"Encrypted storage is unavailable"}, unavailBody:{zh:"服务未加载有效的主密钥，无法安全保存备份密码。请检查启动日志和配置目录权限；已有加密数据必须使用原主密钥。",en:"The service has not loaded a valid master key and cannot safely store backup passwords. Check the startup logs and configuration directory permissions; existing encrypted data requires its original master key."}, unavailCmd:{zh:"新实例默认自动生成并保存主密钥；如使用 IOSBK_SECRET_KEY 或 IOSBK_SECRET_KEY_FILE 自定义，请核对启动配置，不要直接替换原密钥。",en:"New instances generate and save a master key automatically. If you customize it with IOSBK_SECRET_KEY or IOSBK_SECRET_KEY_FILE, check the startup configuration without replacing the original key."}, explainTitle:{zh:"两个「密码」别搞混",en:"Two “passwords” — don't mix them up"}, explainIntro:{zh:"界面里出现两样东西，作用完全不同：",en:"Two different things show up here, with completely different jobs:"}, k1Tag:{zh:"① 设备备份密码",en:"① Device backup password"}, k1Sub:{zh:"每台设备各一个",en:"One per device"}, k1What:{zh:"你给这台 iPad 的备份设的密码，加密的是备份数据本身。",en:"The password you set for THIS iPad's backup — it encrypts the backup data itself."}, k1Like:{zh:"等同 iTunes / 访达里的「加密本地备份」。",en:"Same as “Encrypt local backup” in iTunes / Finder."}, k1Scope:{zh:"只影响这一台设备。",en:"Affects this one device only."}, k1Lost:{zh:"丢了 = 这台设备的加密备份永久无法恢复。",en:"Lost = this device's encrypted backups can never be restored."}, k2Tag:{zh:"② 服务主密钥",en:"② Service master key"}, k2Sub:{zh:"整个服务共用一个",en:"One for the whole service"}, k2What:{zh:"服务用它把上面①的密码加密后安全存档，方便日后改密 / 关加密 / 恢复时取用。",en:"The service uses it to securely store password ① so it can be retrieved later for change-password, turn-off-encryption, or restore."}, k2Like:{zh:"它不加密 iPad 的备份。",en:"It does NOT encrypt the iPad's backup."}, k2Scope:{zh:"新实例默认自动生成并持久保存；自动生成的主密钥需与配置目录一起备份。",en:"New instances generate and persist it automatically; back up the generated master key together with the configuration directory."}, k2Lost:{zh:"一旦用过就不能更换或丢失，否则已存的密码再也读不出。",en:"Once used it must not change or be lost, or stored passwords become unreadable."}, vs:{zh:"简单说：① 锁的是备份；② 只是帮你把①的钥匙安全收好。",en:"In short: ① locks the backup; ② just keeps ①'s key safe for you."}, warn:{zh:"开启后，这台设备之后每次备份都会加密。健康、钥匙串、Wi-Fi 密码等只在加密备份里。密码丢失 = 永久无法恢复。",en:"Once on, every future backup of this device is encrypted. Health, Keychain and Wi-Fi passwords are only in encrypted backups. A lost password means they can never be recovered."}, toggleTitle:{zh:"备份加密",en:"Backup encryption"}, pwPlaceholder:{zh:"设备备份密码",en:"Device backup password"}, enable:{zh:"开启加密",en:"Turn on"}, disable:{zh:"关闭加密",en:"Turn off"}, disableHint:{zh:"关闭需要输入当前密码。",en:"Turning off requires the current password."}, forgot:{zh:"忘记备份密码？",en:"Forgot the backup password?"}, forgotUrl:{zh:"https://support.apple.com/zh-cn/108313",en:"https://support.apple.com/en-us/108313"}, changeTitle:{zh:"修改备份密码",en:"Change backup password"}, oldPw:{zh:"当前密码",en:"Current password"}, newPw:{zh:"新密码",en:"New password"}, changeBtn:{zh:"修改密码",en:"Change password"}, offlineNote:{zh:"加密操作需要设备在线。",en:"The device must be online to change encryption."}, on:{zh:"已开启",en:"On"}, off:{zh:"已关闭",en:"Off"}, stateOn:{zh:"当前：已开启备份加密",en:"Currently: backup encryption ON"}, stateOff:{zh:"当前：未加密备份",en:"Currently: backups not encrypted"}, stateOffline:{zh:"设备离线，无法读取加密状态",en:"Device offline — can't read encryption state"}, stateUnknown:{zh:"加密状态读取中…",en:"Reading encryption state…"}, stateErr:{zh:"无法读取加密状态",en:"Couldn't read encryption state"} },
-  danger: { title:{zh:"备份恢复（会覆盖设备现有数据）",en:"Restore (overwrites current device data)"}, intro:{zh:"恢复会用备份覆盖设备上的现有数据，不可逆。请逐条确认下面的提示。",en:"Restoring overwrites the data currently on the device and cannot be undone. Read each note below first."}, findMy:{zh:"恢复前，先在设备上关闭「查找我的 iPhone」（设置 → Apple ID → 查找）。否则会被系统拦下。",en:"Before restoring, turn off “Find My iPhone” on the device (Settings → Apple ID → Find My). Otherwise it will be blocked."}, reboot:{zh:"恢复后设备会重启；解锁一次后，约 1–2 分钟会自动经 Wi-Fi 重新上线，配对仍有效。",en:"After restoring the device reboots; unlock it once and it comes back over Wi-Fi on its own in ~1–2 minutes. Pairing stays valid."}, usb:{zh:"备份较大时，建议插 USB 恢复，更快也更稳。",en:"For large backups, restore over USB — it's faster and more reliable."}, latch:{zh:"「允许恢复」是第二道保险，默认关闭。",en:"“Allow restore” is a second safety latch, off by default."}, allow:{zh:"允许恢复（高级）",en:"Allow restore (advanced)"}, disable:{zh:"关闭恢复功能",en:"Turn off restore"}, disabled:{zh:"恢复功能已关闭。确需恢复时，请先打开「允许恢复」。",en:"Restore is turned off. To restore, switch on “Allow restore” first."}, restoreBtn:{zh:"恢复此设备的备份…",en:"Restore this device…"} },
-  restore: { title:{zh:"确认恢复",en:"Confirm restore"}, lead:{zh:"将用备份覆盖此设备的全部数据 —— 此操作不可逆。",en:"This overwrites all data on the device with the backup — it cannot be undone."}, findMy:{zh:"已在设备上关闭「查找我的 iPhone」",en:"“Find My iPhone” is turned off on the device"}, findMyHint:{zh:"没关会被系统拦下（Error 211）。",en:"If it's on, restore is blocked (Error 211)."}, understand:{zh:"我已理解：这会覆盖 / 清除设备上的现有数据",en:"I understand this will overwrite / erase the data on the device"}, typeName:{zh:"输入设备名以确认",en:"Type the device name to confirm"}, typeHint:{zh:"需与下面完全一致：",en:"Must match exactly:"}, pwLabel:{zh:"备份密码",en:"Backup password"}, pwOptional:{zh:"加密备份才需要，可留空",en:"only for encrypted backups; leave blank otherwise"}, optReboot:{zh:"恢复后重启设备",en:"Reboot after restore"}, optSettings:{zh:"一并恢复设备设置",en:"Also restore device settings"}, optSystem:{zh:"一并恢复系统文件",en:"Also restore system files"}, cancel:{zh:"取消",en:"Cancel"}, confirm:{zh:"确认恢复",en:"Restore device"} },
-  remove: { title:{zh:"移除这台设备",en:"Remove this device"}, intro:{zh:"不再使用这台设备时，可将它从控制台隐藏并停止后续任务。",en:"Hide a device you no longer use and stop future tasks."}, reversible:{zh:"可恢复",en:"Reversible"}, stopTitle:{zh:"停止所有备份",en:"Stop all backups"}, stopBody:{zh:"手动和定时任务都不会再为这台设备启动。",en:"Manual and scheduled jobs will no longer start for this device."}, hideTitle:{zh:"从设备列表隐藏",en:"Hide from the device list"}, hideBody:{zh:"即使仍在同一网络，也不会自动重新出现。",en:"It will not reappear automatically, even on the same network."}, keepTitle:{zh:"完整保留已有数据",en:"Keep existing data"}, keepBody:{zh:"不会删除已有备份、配置和配对信息。",en:"Existing backups, settings, and pairing information are not deleted."}, restoreHint:{zh:"之后可在“设置 → 已移除设备”中恢复，不会自动开始备份。",en:"Restore it later from Settings → Removed devices; restoration does not start a backup."}, action:{zh:"移除设备…",en:"Remove device…"}, dialogTitle:{zh:"从控制台移除此设备？",en:"Remove this device from the console?"}, dialogSubtitle:{zh:"这是可恢复操作，不会删除任何备份。",en:"This is reversible and does not delete any backup."}, dialogStop:{zh:"停止这台设备的自动与手动备份",en:"Stop automatic and manual backups for this device"}, dialogHide:{zh:"从当前设备列表隐藏",en:"Hide it from the active device list"}, dialogKeep:{zh:"保留 NAS 上的已有备份与设置",en:"Keep existing backups and settings on the NAS"}, dialogPairing:{zh:"不影响设备数据和配对记录",en:"Keep device data and pairing records unchanged"}, dialogPairingBody:{zh:"以后恢复到列表即可继续使用原有设置。",en:"Restore it to the list later to continue with the existing settings."}, close:{zh:"关闭",en:"Close"}, cancel:{zh:"取消",en:"Cancel"}, confirm:{zh:"从控制台移除",en:"Remove from console"}, removing:{zh:"正在移除…",en:"Removing…"}, busy:{zh:"设备正在执行任务，请完成后再移除",en:"The device is busy. Finish the current task before removing it."}, failed:{zh:"移除失败，请稍后重试",en:"Removal failed. Please try again."}, success:{zh:"设备已从控制台移除，备份和设置均已保留",en:"Device removed from the console; backups and settings are preserved."} },
-  removed: { title:{zh:"已移除设备",en:"Removed devices"}, menuHint:{zh:"恢复以前从控制台隐藏的设备",en:"Restore devices previously hidden from the console"}, subtitle:{zh:"这些设备已停止任务并从首页隐藏，已有备份和设置仍然保留。",en:"These devices are hidden and no longer run tasks. Their backups and settings are preserved."}, close:{zh:"关闭",en:"Close"}, loading:{zh:"正在加载已移除设备…",en:"Loading removed devices…"}, empty:{zh:"还没有已移除设备。",en:"No devices have been removed yet."}, loadFailed:{zh:"无法加载已移除设备，请稍后重试。",en:"Removed devices could not be loaded. Please try again."}, backupKept:{zh:"备份已保留",en:"Backup preserved"}, removedAt:{zh:"移除时间",en:"Removed"}, lastBackup:{zh:"最后备份",en:"Last backup"}, deviceType:{zh:"设备型号",en:"Device model"}, never:{zh:"从未备份",en:"Never backed up"}, unknown:{zh:"未知设备",en:"Unknown device"}, restoreAction:{zh:"恢复到设备列表",en:"Restore to device list"}, restoring:{zh:"正在恢复…",en:"Restoring…"}, restoreSuccess:{zh:"设备已恢复到列表，不会自动开始备份",en:"Device restored to the list. No backup was started."}, restoreFailed:{zh:"恢复失败，请稍后重试。",en:"Restore failed. Please try again."}, busy:{zh:"设备状态正在变化，请稍后重试。",en:"The device state is changing. Please try again."} },
-  notif: { title:{zh:"通知设置",en:"Notifications"} },
-  d: { backingUpNote:{zh:"备份进行中，期间刷新与部分按钮会变灰，结束后自动恢复。",en:"Backup in progress — refresh and some buttons are greyed out until it finishes."} }
-};
-
 /* ============== i18n runtime ============== */
-function dpath(o,p){return p.split('.').reduce(function(a,k){return a&&a[k];},o);}
 const INITIAL_STATUS = {{.InitialStatus}};
-IOSBK_DICT.status.unknown={zh:"设备状态暂时无法确认",en:"Device status is temporarily unknown"};
+
 const PAGE_VERSION = "{{.Version}}"; // 加载时的构建版本；SSE 快照版本与此不同 → 已部署新版本
-let lang;
-try{ lang = localStorage.getItem('iosbk_lang') || ((navigator.language||'en').toLowerCase().indexOf('zh')===0?'zh':'en'); }catch(e){ lang='en'; }
-function tr(key){ var n=dpath(IOSBK_DICT,key); return n?(n[lang]||n.en):key; }
-function L(zh,en){ return lang==='zh'?zh:en; }
+function tr(key, params){ return IOSBKI18n.t(key, params); }
+function apiMessage(payload, fallbackKey){ return IOSBKI18n.message(payload, fallbackKey); }
 function applyI18n(){
-  document.querySelectorAll('[data-i18n]').forEach(function(el){ var n=dpath(IOSBK_DICT,el.getAttribute('data-i18n')); if(n) el.textContent=n[lang]||n.en; });
-  document.querySelectorAll('[data-i18n-ph]').forEach(function(el){ var n=dpath(IOSBK_DICT,el.getAttribute('data-i18n-ph')); if(n) el.placeholder=n[lang]||n.en; });
-  document.querySelectorAll('[data-i18n-title]').forEach(function(el){ var n=dpath(IOSBK_DICT,el.getAttribute('data-i18n-title')); if(n) el.title=n[lang]||n.en; });
-  document.querySelectorAll('[data-i18n-href]').forEach(function(el){ var n=dpath(IOSBK_DICT,el.getAttribute('data-i18n-href')); if(n) el.href=n[lang]||n.en; });
-  document.documentElement.lang = lang==='zh'?'zh-CN':'en';
-  document.querySelectorAll('.lang-btn').forEach(function(b){ b.classList.toggle('active', b.dataset.lang===lang); });
+  IOSBKI18n.apply();
   updateAutoText();
   rerenderBackupProgress();
   renderConnectionHealth();
   Object.keys(latestPairingStatuses).forEach(function(udid){ renderPairingResult(latestPairingStatuses[udid]); });
+  Object.keys(latestEncryptionStatuses).forEach(function(udid){ renderEncStatus(udid, latestEncryptionStatuses[udid]); });
+  Object.keys(backupEncryptionStates).forEach(function(udid){ renderBackupEncryption(udid, backupEncryptionStates[udid]); });
+  Object.keys(listState).forEach(function(udid){ renderBackupList(udid); });
+  Object.keys(inlineResults).forEach(function(id){ var state=inlineResults[id]; var box=document.getElementById(id); if(box) showInlineResult(box,state.ok,state.payload,state.fallbackKey); });
+  document.querySelectorAll('[data-time]').forEach(function(el){ el.textContent=IOSBKI18n.formatDate(el.getAttribute('data-time')); });
   if(removedDevicesCache!==null) renderRemovedDevices(removedDevicesCache,'ready');
   else if(removedDevicesViewState) renderRemovedDevices(null,removedDevicesViewState);
 }
-function setLang(l){ lang=l; try{ localStorage.setItem('iosbk_lang',l); }catch(e){} applyI18n(); }
+function setLang(l){ IOSBKI18n.setLocale(l); }
+window.addEventListener('iosbk:localechange', function(){ applyI18n(); document.getElementById('toast').classList.add('hidden'); });
 
 /* ============== toast ============== */
 let toastTimer;
+const inlineResults={};
 function iconHTML(name, extraClass){ return '<svg class="ui-icon'+(extraClass?' '+extraClass:'')+'" aria-hidden="true"><use href="/static/ui-icons.svg#icon-'+name+'"></use></svg>'; }
 function setSVGIcon(svg, name){ var use=svg&&svg.querySelector('use'); if(use) use.setAttribute('href','/static/ui-icons.svg#icon-'+name); }
-function showInlineResult(box, ok, message){
+function showInlineResult(box, ok, payload, fallbackKey){
+  inlineResults[box.id]={ok:ok,payload:payload,fallbackKey:fallbackKey};
+  var message=typeof payload==='string'?tr(payload):apiMessage(payload,fallbackKey);
   box.textContent='';
   var row=document.createElement('div'); row.style.cssText='display:flex;align-items:center;gap:6px';
-  row.insertAdjacentHTML('afterbegin',iconHTML(ok?'check-circle':'x-circle'));
+  row.insertAdjacentHTML('afterbegin',iconHTML(ok===null?'loader':(ok?'check-circle':'x-circle'),ok===null?'spin':''));
   var text=document.createElement('span'); text.textContent=message; row.appendChild(text); box.appendChild(row);
-  box.style.color=ok?'#2E7D5B':'#BD2C24';
+  box.style.color=ok===null?'#718090':(ok?'#2E7D5B':'#BD2C24');
 }
 function toast(msg, isErr){
   var box=document.getElementById('toast'), icon=document.getElementById('toastIcon');
@@ -644,7 +623,7 @@ function toast(msg, isErr){
 
 /* ============== net helpers (same endpoints/payloads as before) ============== */
 const IOSBK_CSRF=(document.querySelector('meta[name="iosbk-csrf"]')||{}).content||'';
-function csrfFetch(url, opts){ opts=opts||{}; opts.headers=Object.assign({'X-IOSBK-CSRF':IOSBK_CSRF}, opts.headers||{}); return fetch(url, opts); }
+function csrfFetch(url, opts){ opts=opts||{}; opts.headers=Object.assign({'X-IOSBK-CSRF':IOSBK_CSRF}, opts.headers||{}); return IOSBKI18n.fetch(url, opts); }
 function postJSON(url, body){ return csrfFetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined}).then(function(r){return r.json();}); }
 
 /* ============== expand / section nav ============== */
@@ -701,7 +680,7 @@ function submitRemoveDevice(){
     return response.json().then(function(data){ return {ok:response.ok,status:response.status,data:data}; });
   }).then(function(result){
     if(!result.ok){
-      toast(result.status===409 && result.data.code==='busy' ? tr('remove.busy') : (result.data.error||tr('remove.failed')),true);
+      toast(result.status===409 && (result.data.code==='busy' || result.data.code==='api.busy') ? tr('remove.busy') : (apiMessage(result.data,'remove.failed')),true);
       button.disabled=false; button.textContent=tr('remove.confirm'); return;
     }
     closeRemoveDeviceModal(); toast(tr('remove.success')); location.reload();
@@ -718,8 +697,7 @@ function updateRemovedDeviceCount(count){
 }
 function removedDeviceTimeText(value){
   if(!value) return tr('removed.never');
-  var date=new Date(value); if(Number.isNaN(date.getTime())) return value;
-  try{return new Intl.DateTimeFormat(lang==='zh'?'zh-CN':'en',{timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).format(date);}catch(_){return value;}
+  return IOSBKI18n.formatDate(value);
 }
 function removedState(message){
   var state=document.createElement('div'); state.className='removed-devices-state'; state.textContent=message; return state;
@@ -765,7 +743,7 @@ function openRemovedDevicesDrawer(){
   var drawer=document.getElementById('removedDevicesDrawer'); drawer.classList.remove('hidden'); modalOpen=true;
   renderRemovedDevices(null,'loading'); setTimeout(function(){document.getElementById('removedDevicesClose').focus();},0);
   var requestSerial=++removedDevicesRequestSerial;
-  fetch('/api/removed-devices',{headers:{'Accept':'application/json'}}).then(function(response){
+  IOSBKI18n.fetch('/api/removed-devices',{headers:{'Accept':'application/json'}}).then(function(response){
     if(!response.ok) throw new Error('HTTP '+response.status); return response.json();
   }).then(function(data){
     if(requestSerial!==removedDevicesRequestSerial) return;
@@ -788,7 +766,7 @@ function restoreRemovedDeviceFromDrawer(udid, button){
     return response.json().then(function(data){return {ok:response.ok,status:response.status,data:data};});
   }).then(function(result){
     if(!result.ok){
-      toast(result.status===409?tr('removed.busy'):(result.data.error||tr('removed.restoreFailed')),true);
+      toast(result.status===409?tr('removed.busy'):(apiMessage(result.data,'removed.restoreFailed')),true);
       button.disabled=false; if(label) label.textContent=tr('removed.restoreAction'); return;
     }
     removedDevicesCache=(removedDevicesCache||[]).filter(function(device){return device.udid!==udid;});
@@ -796,17 +774,22 @@ function restoreRemovedDeviceFromDrawer(udid, button){
     toast(tr('removed.restoreSuccess')); setTimeout(function(){location.reload();},450);
   }).catch(function(){ toast(tr('removed.restoreFailed'),true); button.disabled=false; if(label) label.textContent=tr('removed.restoreAction'); });
 }
-function loadEncStatus(udid){
+const latestEncryptionStatuses={}, backupEncryptionStates={};
+function renderEncStatus(udid,d){
   var el=document.getElementById('encState-'+udid); if(!el) return;
-  function set(icon,text,bg,col,spin){ el.style.background=bg; el.style.color=col; el.innerHTML=iconHTML(icon,spin?'spin':'')+'<span></span>'; el.querySelector('span').textContent=text; }
-  set('loader', tr('enc.stateUnknown'), '#F3F7FA', '#718090', true);
-  fetch('/api/encryption-status/'+udid).then(function(r){return r.json();}).then(function(d){
-    if(!d.online){ set('power', tr('enc.stateOffline'), '#F3F7FA', '#718090'); }
-    else if(d.unknown){ set('alert', tr('enc.stateErr'), '#F3F7FA', '#718090'); }
-    else if(d.will_encrypt){ set('lock', tr('enc.stateOn'), '#E2F3EF', '#0B7565'); }
-    else { set('lock-open', tr('enc.stateOff'), '#F3F7FA', '#718090'); }
-  }).catch(function(){ set('alert', tr('enc.stateErr'), '#F3F7FA', '#718090'); });
+  var state=d.loading?['loader','enc.stateUnknown','#F3F7FA','#718090']:!d.online?['power','enc.stateOffline','#F3F7FA','#718090']:d.unknown?['alert','enc.stateErr','#F3F7FA','#718090']:d.will_encrypt?['lock','enc.stateOn','#E2F3EF','#0B7565']:['lock-open','enc.stateOff','#F3F7FA','#718090'];
+  el.style.background=state[2]; el.style.color=state[3]; el.innerHTML=iconHTML(state[0],d.loading?'spin':'')+'<span></span>'; el.querySelector('span').textContent=tr(state[1]);
 }
+function loadEncStatus(udid){
+  function show(d){ latestEncryptionStatuses[udid]=d; renderEncStatus(udid,d); }
+  show({loading:true});
+  IOSBKI18n.fetch('/api/encryption-status/'+udid).then(function(r){return r.json();}).then(show).catch(function(){show({online:true,unknown:true});});
+}
+function renderBackupEncryption(udid,yes){
+  var el=document.getElementById('bkEnc-'+udid); if(!el)return;
+  el.textContent=tr(yes?'enc.on':'enc.off'); el.style.color=yes?'#2E7D5B':'#718090';
+}
+
 function gotoFillIP(udid){
   var panel=document.getElementById('panel-'+udid);
   if(panel && panel.classList.contains('hidden')) toggleCard(udid);
@@ -865,7 +848,7 @@ function updateAutoText(){
   var t=document.getElementById('autoText'), tog=document.getElementById('autoToggle'), dot=document.getElementById('autoDot');
   if(!t) return;
   if(autoRefreshEnabled){
-    t.textContent = backingCount>0 ? tr('header.autoBusy').replace('{n}', backingCount) : tr('header.autoOn');
+    t.textContent = backingCount>0 ? tr('header.autoBusy',{n:backingCount}) : tr('header.autoOn');
     tog.textContent = tr('header.pauseAuto');
     dot.style.background='#2E7D5B'; dot.style.animation='iosbkpulse 1.6s ease-in-out infinite';
   } else {
@@ -878,13 +861,13 @@ function updateAutoText(){
 let latestConnectionSnapshot=null;
 function connectionServiceMessage(service){
   var name=service.connection==='usb'?'USB':'Wi-Fi';
-  if(service.recovery==='restarting') return L('正在恢复 '+name+' 连接服务，请稍候。','Restoring the '+name+' connection service. Please wait.');
-  if(service.recovery==='waiting_busy') return L(name+' 连接服务等待当前设备任务结束后恢复。',name+' connection service will recover after current device tasks finish.');
-  if(service.recovery==='manual_required') return service.error_code==='tool_unavailable' ? L(name+' 连接工具不可用，请检查安装和权限。',name+' connection tools are unavailable. Check installation and permissions.') : L(name+' 连接服务自动恢复失败，请查看排障说明或手动重试。',name+' connection service could not recover automatically. Check troubleshooting or retry manually.');
-  if(service.recovery==='backoff') return L(name+' 连接服务恢复失败，稍后自动重试。',name+' connection service recovery failed. Another attempt is scheduled.');
-  if(service.health==='unhealthy') return L(name+' 连接服务异常，正在准备恢复。',name+' connection service is unavailable. Preparing recovery.');
-  if(service.health==='suspect') return L(name+' 连接服务查询异常，正在重新检查。',name+' connection service query failed. Checking again.');
-  if(service.health==='unknown') return L('正在检查 '+name+' 连接服务…','Checking the '+name+' connection service…');
+  if(service.recovery==='restarting') return tr('action.connectionServiceMessage.restoringTheConnectionServicePlease', {name:name});
+  if(service.recovery==='waiting_busy') return tr('action.connectionServiceMessage.connectionServiceWillRecoverAfter', {name:name});
+  if(service.recovery==='manual_required') return service.error_code==='tool_unavailable' ? tr('action.connectionServiceMessage.connectionToolsAreUnavailableCheck', {name:name}) : tr('action.connectionServiceMessage.connectionServiceCouldNotRecover', {name:name});
+  if(service.recovery==='backoff') return tr('action.connectionServiceMessage.connectionServiceRecoveryFailedAnother', {name:name});
+  if(service.health==='unhealthy') return tr('action.connectionServiceMessage.connectionServiceIsUnavailablePreparing', {name:name});
+  if(service.health==='suspect') return tr('action.connectionServiceMessage.connectionServiceQueryFailedChecking', {name:name});
+  if(service.health==='unknown') return tr('action.connectionServiceMessage.checkingTheConnectionService', {name:name});
   return '';
 }
 function renderConnectionHealth(){
@@ -893,7 +876,7 @@ function renderConnectionHealth(){
   var services=latestConnectionSnapshot.connection_services||[];
   var messages=services.map(connectionServiceMessage).filter(Boolean);
   var uncertain=messages.length>0;
-  if(!messages.length && services.length && !(latestConnectionSnapshot.devices||[]).some(function(d){return d.online && d.presence_known!==false;})) messages.push(L('未发现已连接设备，请连接设备。','No connected devices found. Connect a device to continue.'));
+  if(!messages.length && services.length && !(latestConnectionSnapshot.devices||[]).some(function(d){return d.online && d.presence_known!==false;})) messages.push(tr('action.renderConnectionHealth.noConnectedDevicesFoundConnect'));
   banner.classList.toggle('hidden',messages.length===0);
   banner.textContent=messages.join(' ');
   var guide=document.getElementById('emptyConnectionGuide');
@@ -966,14 +949,14 @@ function backupProgressMode(progress){
 }
 function formatBackupPercent(value){
   if(!isBackupProgressNumber(value)) return '';
-  return (Math.round(value*10)/10).toLocaleString(lang==='zh'?'zh-CN':'en',{maximumFractionDigits:1})+'%';
+  return (Math.round(value*10)/10).toLocaleString(IOSBKI18n.getLocale(),{maximumFractionDigits:1})+'%';
 }
 function formatBackupBytes(value){
   if(!isBackupProgressNumber(value)) return '';
   var units=['B','kB','MB','GB','TB'], size=value, unit=0;
   while(size>=1000 && unit<units.length-1){ size/=1000; unit++; }
   var digits=unit===0?0:(size>=100?0:1);
-  return size.toLocaleString(lang==='zh'?'zh-CN':'en',{minimumFractionDigits:0,maximumFractionDigits:digits})+' '+units[unit];
+  return size.toLocaleString(IOSBKI18n.getLocale(),{minimumFractionDigits:0,maximumFractionDigits:digits})+' '+units[unit];
 }
 function backupProgressCopy(mode,d){
   if(mode==='waiting-authorization') return {title:'progress.waitingAuthorizationTitle',subtitle:'progress.overallSubtitle',hint:'progress.waitingAuthorizationHint',tone:'warning',icon:'info'};
@@ -1020,7 +1003,7 @@ function renderBackupProgress(d){
   statusTitle.textContent=tr(copy.title); statusHint.textContent=tr(copy.hint);
   var activity=document.getElementById('bkprogress-activity-'+u);
   var lastActivity=progress.last_activity_at ? new Date(progress.last_activity_at) : null;
-  activity.textContent=lastActivity && !isNaN(lastActivity.getTime()) ? tr('progress.lastActivity')+lastActivity.toLocaleString(lang==='zh'?'zh-CN':'en',{timeZone:'Asia/Shanghai',hour12:false}) : tr('progress.noActivity');
+  activity.textContent=lastActivity && !isNaN(lastActivity.getTime()) ? tr('progress.lastActivity')+IOSBKI18n.formatDate(progress.last_activity_at) : tr('progress.noActivity');
   statusIcon.setAttribute('href','/static/ui-icons.svg#icon-'+copy.icon);
 }
 function rerenderBackupProgress(){ Object.keys(latestDeviceStatuses).forEach(function(udid){ renderBackupProgress(latestDeviceStatuses[udid]); }); }
@@ -1034,7 +1017,7 @@ function patchDevice(d){
   var battery=document.getElementById('battery-'+u); if(battery) battery.innerHTML=batteryHTML(d);
   var box=document.getElementById('connbox-'+u); if(box) box.innerHTML = badgeHTML(d.conn);
   var offlineHelp=document.getElementById('offlineHelp-'+u); if(offlineHelp) offlineHelp.classList.toggle('hidden',d.conn!=='offline');
-  var lb=document.getElementById('lastbackup-'+u); if(lb){ if(d.last_backup){ lb.textContent=d.last_backup; } else { lb.innerHTML='<span data-i18n="device.never"></span>'; } }
+  var lb=document.getElementById('lastbackup-'+u); if(lb){ if(d.last_backup_at||d.last_backup){ lb.setAttribute('data-time',d.last_backup_at||d.last_backup); lb.textContent=IOSBKI18n.formatDate(d.last_backup_at||d.last_backup); } else { lb.removeAttribute('data-time'); lb.innerHTML='<span data-i18n="device.never"></span>'; } }
   renderBackupProgress(d);
   var btn=document.getElementById('backupBtn-'+u);
   if(btn){
@@ -1047,14 +1030,14 @@ function patchDevice(d){
 }
 
 /* ============== header actions ============== */
-function refreshDevices(){ csrfFetch('/api/refresh',{method:'POST'}).then(function(r){return r.json();}).then(function(data){ if(data.error) toast(L('刷新失败：','Refresh failed: ')+data.error,true); else location.reload(); }).catch(function(e){ toast(L('刷新失败：','Refresh failed: ')+e,true); }); }
-function restartConnection(){ toast(L('连接服务重启中…','Restarting connection service…')); csrfFetch('/api/restart-usbmuxd',{method:'POST'}).then(function(r){return r.json();}).then(function(data){ toast(data.error?(L('重启失败：','Restart failed: ')+data.error):(L('连接服务重启已开始','Connection restart started')), !!data.error); }).catch(function(e){ toast(L('重启失败：','Restart failed: ')+e,true); }); }
+function refreshDevices(){ csrfFetch('/api/refresh',{method:'POST'}).then(function(r){return r.json();}).then(function(data){ if(data.error) toast(apiMessage(data),true); else location.reload(); }).catch(function(e){ toast(tr('common.operationFailed'),true); }); }
+function restartConnection(){ toast(tr('action.restartConnection.restartingConnectionService')); csrfFetch('/api/restart-usbmuxd',{method:'POST'}).then(function(r){return r.json();}).then(function(data){ toast(data.error?(apiMessage(data)):(tr('action.restartConnection.connectionRestartStarted')), !!data.error); }).catch(function(e){ toast(tr('common.operationFailed'),true); }); }
 function logoutSession(){
-  fetch('/logout',{method:'POST',headers:{'X-IOSBK-CSRF':IOSBK_CSRF}}).then(function(r){
+  IOSBKI18n.fetch('/logout',{method:'POST',headers:{'X-IOSBK-CSRF':IOSBK_CSRF}}).then(function(r){
     if(r.redirected){ window.location.assign(r.url); return; }
     if(r.ok){ window.location.assign('/login'); return; }
-    toast(L('退出登录失败，请重试','Sign out failed — please try again'),true);
-  }).catch(function(){ toast(L('退出登录失败，请重试','Sign out failed — please try again'),true); });
+    toast(tr('action.logoutSession.signOutFailedPleaseTry'),true);
+  }).catch(function(){ toast(tr('action.logoutSession.signOutFailedPleaseTry'),true); });
 }
 
 /* ============== top-bar 菜单(⚙) ============== */
@@ -1077,49 +1060,38 @@ function saveConfig(udid){
     auto_backup_enabled: document.getElementById('autoBackupToggle-'+udid).classList.contains('on'),
     network_address: document.getElementById('networkAddress-'+udid).value.trim()
   };
-  postJSON('/api/save-config/'+udid, cfg).then(function(data){ if(data.error){ toast(L('保存失败：','Save failed: ')+data.error,true); } else { clearDirty(udid); toast(tr('bset.saved')); } }).catch(function(e){ toast(L('保存失败：','Save failed: ')+e,true); });
+  postJSON('/api/save-config/'+udid, cfg).then(function(data){ if(data.error){ toast(apiMessage(data),true); } else { clearDirty(udid); toast(tr('bset.saved')); } }).catch(function(e){ toast(tr('common.operationFailed'),true); });
 }
 function checkBackupDir(udid){
   var path=(document.getElementById('backupDir-'+udid).value||'').trim();
   var box=document.getElementById('dirResult-'+udid);
-  box.classList.remove('hidden'); box.style.color='#718090'; box.textContent=tr('bset.dirChecking');
+  box.classList.remove('hidden'); showInlineResult(box,null,'bset.dirChecking');
   postJSON('/api/check-dir',{path:path}).then(function(d){
     box.textContent='';
-    if(d.ok){ showInlineResult(box,true,tr('bset.dirOk')); return; }
-    showInlineResult(box,false,tr('bset.dirBad'));
-    if(d.reason){ var why=document.createElement('div'); why.style.cssText='margin-top:3px;font-weight:400;color:#9A6B66'; why.textContent=d.reason; box.appendChild(why); }
-  }).catch(function(e){ showInlineResult(box,false,String(e)); });
+    if(d.ok){ showInlineResult(box,true,'bset.dirOk'); return; }
+    showInlineResult(box,false,d,'bset.dirBad');
+  }).catch(function(e){ showInlineResult(box,false,{},'common.operationFailed'); });
 }
 function testDeviceIP(udid){
   var btn=document.getElementById('testIPBtn-'+udid);
   if(btn.disabled) return;
   var ip=(document.getElementById('networkAddress-'+udid).value||'').trim();
   var box=document.getElementById('ipResult-'+udid);
-  box.classList.remove('hidden'); box.style.color='#718090'; box.textContent=tr('bset.testing');
-  if(!ip){ showInlineResult(box,false,L('请先填写设备 IP','Enter the device IP first')); return; }
+  box.classList.remove('hidden'); showInlineResult(box,null,'bset.testing');
+  if(!ip){ showInlineResult(box,false,'action.testDeviceIP.enterTheDeviceIpFirst'); return; }
   btn.disabled=true; btn.style.opacity='.6';
   postJSON('/api/test-ip/'+udid, {ip:ip}).then(function(d){
     if(d.status) applyStatus(d.status);
-    if(d.ok){ showInlineResult(box,true,tr('bset.testOk')); }
-    else { showInlineResult(box,false,d.reason||d.error||L('连不上','Unreachable')); }
-  }).catch(function(e){ showInlineResult(box,false,String(e)); }).finally(function(){ btn.disabled=false; btn.style.opacity=''; });
+    if(d.ok){ showInlineResult(box,true,'bset.testOk'); }
+    else { showInlineResult(box,false,d,'action.testDeviceIP.unreachable'); }
+  }).catch(function(e){ showInlineResult(box,false,{},'common.operationFailed'); }).finally(function(){ btn.disabled=false; btn.style.opacity=''; });
 }
 function pairingStatusText(d){
-  if(d.pairing_state==='checking') return L('正在检查设备配对状态…','Checking device pairing…');
-  if(d.pairing_state==='paired') return L('设备配对正常。','Device pairing is valid.');
-  if(d.pairing_state==='waiting_for_trust') return L('请在设备上点击“信任此电脑”并输入锁屏密码。','Tap “Trust This Computer” and enter the device passcode.');
+  if(d.pairing_state==='checking') return tr('action.pairingStatusText.checkingDevicePairing');
+  if(d.pairing_state==='paired') return tr('action.pairingStatusText.devicePairingIsValid');
+  if(d.pairing_state==='waiting_for_trust') return tr('action.pairingStatusText.tapTrustThisComputerAnd');
   if(d.pairing_state!=='failed') return '';
-  var messages={
-    device_unavailable:'Device not found on this connection. Reconnect it and retry.',
-    connection_timeout:'The device connection timed out. Please retry later.',
-    connection_unavailable:'Cannot connect to the device. Check the connection and retry.',
-    device_locked:'Unlock the device and enter its passcode, then retry.',
-    pairing_required:'Connect the device using USB, unlock it and confirm “Trust This Computer”.',
-    pairing_not_supported:'Pairing is unavailable on this connection. Use USB if pairing is needed.',
-    trust_denied:'The trust request was declined. Reconnect using USB and confirm trust.',
-    pair_timeout:'Timed out waiting for trust. Confirm on the device and retry.'
-  };
-  return L(d.pairing_error||'配对检查未完成，请稍后重试。',messages[d.pairing_error_code]||'Pairing could not be verified. Please retry or check the logs.');
+  return apiMessage({code:'api.'+(d.pairing_error_code||'')},'guide.pairingFailed');
 }
 function renderPairingResult(d){
   latestPairingStatuses[d.udid]=d;
@@ -1140,44 +1112,45 @@ async function trackPairingResult(udid){
     var controller=new AbortController();
     var timeout=setTimeout(function(){controller.abort();},5000);
     try{
-      var response=await fetch('/api/status',{signal:controller.signal,cache:'no-store'});
-      if(!response.ok) throw new Error(L('无法读取配对结果，请刷新页面查看。','Cannot read the pairing result. Refresh the page to check.'));
+      var response=await IOSBKI18n.fetch('/api/status',{signal:controller.signal,cache:'no-store'});
+      if(!response.ok) throw new Error(tr('action.trackPairingResult.cannotReadThePairingResult'));
       var status=await response.json();
       var device=(status.devices||[]).find(function(d){return d.udid===udid;});
-      if(!device) throw new Error(L('设备已不在列表中，请刷新页面查看。','The device is no longer listed. Refresh the page to check.'));
+      if(!device) throw new Error(tr('action.trackPairingResult.theDeviceIsNoLonger'));
       renderPairingResult(device);
       if(device.pairing_state==='paired'||device.pairing_state==='failed') return;
     }finally{ clearTimeout(timeout); }
     await new Promise(function(resolve){setTimeout(resolve,1000);});
   }
-  throw new Error(L('配对检查尚未完成，请稍后刷新查看结果。','Pairing has not finished. Refresh later to check the result.'));
+  throw new Error(tr('action.trackPairingResult.pairingHasNotFinishedRefresh'));
 }
 function pairDevice(udid){
   renderPairingResult({udid:udid,pairing_state:'checking'});
   function failed(message){
     renderPairingResult({udid:udid,pairing_state:'failed',pairing_error:message});
-    toast(L('配对检查失败：','Pairing check failed: ')+message,true);
+    toast(tr('action.failed.pairingCheckFailed')+message,true);
   }
   return csrfFetch('/api/pair/'+udid,{method:'POST'}).then(function(r){return r.json();}).then(function(data){
-    if(data.error){ failed(data.error); return; }
-    toast(L('配对检查已开始，结果会显示在下方。','Pairing check started. The result will appear below.'));
+    if(data.error){ failed(apiMessage(data)); return; }
+    toast(tr('action.failed.pairingCheckStartedTheResult'));
     return trackPairingResult(udid);
-  }).catch(function(e){ failed(String(e)); });
+  }).catch(function(e){ failed(tr('common.operationFailed')); });
 }
 function gateMsg(d){
-  if(d.error_code==='connection_unavailable') return L('连接服务暂时不可用，请等待服务恢复。','The connection service is unavailable. Please wait for recovery.');
+  if(d.code) return apiMessage(d,'gate.cant');
+  if(d.error_code==='connection_unavailable') return tr('action.gateMsg.theConnectionServiceIsUnavailable');
   var key={offline:'gate.offline',busy:'gate.busy',not_charging:'gate.notCharging',low_battery:'gate.lowBattery',missing:'gate.missing',backup_busy:'gate.backupBusy'}[d.error_code];
   if(!key) return tr('gate.cant');
-  return tr(key).replace('{b}', d.battery).replace('{m}', d.min_battery);
+  return tr(key,{b:d.battery,m:d.min_battery});
 }
 function startBackup(udid, btn){
   btn.disabled=true; btn.style.opacity='.6';
   function fail(msg){ toast(msg,true); btn.disabled=false; btn.style.opacity=''; }
   csrfFetch('/api/backup/'+udid,{method:'POST'}).then(function(r){return r.json();}).then(function(data){
-    if(data.error_code){ fail(gateMsg(data)); }          // 被限制（未充电/电量低/离线/正忙）→ 说明原因
-    else if(data.error){ fail(L('备份失败：','Backup failed: ')+data.error); }
-    else toast(L('已开始备份。设备上会要求输入锁屏密码，请解锁手机并及时输入。','Backup started — your device will ask for its passcode; unlock it and enter promptly.'));
-  }).catch(function(e){ fail(L('备份失败：','Backup failed: ')+e); });
+    if(data.error_code || (data.error && data.code)){ fail(gateMsg(data)); }          // 被限制（未充电/电量低/离线/正忙）→ 说明原因
+    else if(data.error){ fail(apiMessage(data)); }
+    else toast(tr('action.fail.backupStartedYourDeviceWill'));
+  }).catch(function(e){ fail(tr('common.operationFailed')); });
 }
 
 /* ============== backup management ============== */
@@ -1186,88 +1159,97 @@ const listState={};
 function loadBackups(udid){
   loadedBackups[udid]=true;
   var box=document.getElementById('list-'+udid);
-  box.textContent=L('加载中…（要从设备下载清单，备份越大越久，请耐心等待）','Loading… (downloading the manifest from the device; larger backups take longer, please wait)');
+  listState[udid]={messageKey:'action.loadBackups.loadingDownloadingTheManifestFrom'}; renderBackupList(udid);
   // 串行：先取 info（占用空间/加密），完成后再取文件清单。
   // 两个 idevicebackup2 命令不能并发连同一台设备，否则 lockdown 冲突 → exit status 255。
-  fetch('/api/backup-info/'+udid).then(function(r){return r.json();}).then(function(data){
+  IOSBKI18n.fetch('/api/backup-info/'+udid).then(function(r){return r.json();}).then(function(data){
     if(data.size_human){ var se=document.getElementById('bkSize-'+udid); if(se) se.textContent=data.size_human; }
     if(data.error||!data.info) return;
     // idevicebackup2 info 的加密标志形如 "<MBDriveProperties: … encrypted=0, …>"（值为 0/1）；
     // 个别格式可能写成 "IsEncrypted: No"。两者都认：可选 Is 前缀、值可为数字或单词，且必须有 = / : 分隔避免误匹配。
     var m=data.info.match(/(?:\bis)?encrypted[^\S\r\n]*[:=][^\S\r\n]*([A-Za-z0-9]+)/i);
-    if(m){ var yes=/^(yes|true|1)$/i.test(m[1]); var el=document.getElementById('bkEnc-'+udid); el.textContent=yes?tr('enc.on'):tr('enc.off'); el.style.color=yes?'#2E7D5B':'#718090'; }
+    if(m){ var yes=/^(yes|true|1)$/i.test(m[1]); backupEncryptionStates[udid]=yes; renderBackupEncryption(udid,yes); }
   }).catch(function(){}).then(function(){ loadBackupFileList(udid, box); });
 }
 function loadBackupFileList(udid, box){
-  fetch('/api/backup-list/'+udid).then(function(r){return r.json();}).then(function(data){
-    if(data.error){ box.textContent=L('失败：','Failed: ')+data.error; return; }
+  IOSBKI18n.fetch('/api/backup-list/'+udid).then(function(r){return r.json();}).then(function(data){
+    if(data.error){ listState[udid]={error:data}; renderBackupList(udid); return; }
     if(data.empty){
       box.textContent=tr('bmgmt.noBackup');
       var c0=document.getElementById('bkCount-'+udid); if(c0) c0.textContent='0';
       var mt=document.getElementById('listMeta-'+udid); if(mt) mt.textContent='';
       var pg=document.getElementById('listPage-'+udid); if(pg) pg.textContent='';
-      listState[udid]={all:[], filtered:[], page:0, pageSize:200, total:0, truncated:false};
+      listState[udid]={all:[], filtered:[], page:0, pageSize:200, total:0, truncated:false,empty:true};
       return;
     }
     var rows=(data.entries||[]).map(function(e){ return (e.fields||[]).join(',  '); });
     listState[udid]={all:rows, filtered:rows, page:0, pageSize:200, total:data.count, truncated:data.truncated};
     document.getElementById('bkCount-'+udid).textContent = (data.count!=null?data.count:rows.length);
     renderBackupList(udid);
-  }).catch(function(e){ box.textContent=L('失败：','Failed: ')+e; });
+  }).catch(function(){ listState[udid]={error:{}}; renderBackupList(udid); });
 }
-function filterBackupList(udid,q){ var st=listState[udid]; if(!st) return; q=(q||'').trim().toLowerCase(); st.filtered=q?st.all.filter(function(r){return r.toLowerCase().indexOf(q)>=0;}):st.all; st.page=0; renderBackupList(udid); }
-function pageBackupList(udid,delta){ var st=listState[udid]; if(!st) return; var maxPage=Math.max(0,Math.ceil(st.filtered.length/st.pageSize)-1); st.page=Math.min(maxPage,Math.max(0,st.page+delta)); renderBackupList(udid); }
+function filterBackupList(udid,q){ var st=listState[udid]; if(!st||!st.all) return; q=(q||'').trim().toLowerCase(); st.filtered=q?st.all.filter(function(r){return r.toLowerCase().indexOf(q)>=0;}):st.all; st.page=0; renderBackupList(udid); }
+function pageBackupList(udid,delta){ var st=listState[udid]; if(!st||!st.filtered) return; var maxPage=Math.max(0,Math.ceil(st.filtered.length/st.pageSize)-1); st.page=Math.min(maxPage,Math.max(0,st.page+delta)); renderBackupList(udid); }
 function renderBackupList(udid){
   var st=listState[udid]; if(!st) return;
+  var box=document.getElementById('list-'+udid);
+  if(st.messageKey){box.textContent=tr(st.messageKey);return;}
+  if(st.error){box.textContent=apiMessage(st.error);return;}
+  if(st.empty){box.textContent=tr('bmgmt.noBackup');return;}
   var start=st.page*st.pageSize, slice=st.filtered.slice(start,start+st.pageSize);
-  document.getElementById('list-'+udid).textContent = slice.join('\n') || L('(无匹配)','(no matches)');
+  document.getElementById('list-'+udid).textContent = slice.join('\n') || tr('action.renderBackupList.noMatches');
   var maxPage=Math.max(1,Math.ceil(st.filtered.length/st.pageSize));
   document.getElementById('listPage-'+udid).textContent=(st.page+1)+' / '+maxPage;
-  var meta=tr('bmgmt.total').replace('{n}', st.filtered.length);
-  if(st.truncated) meta+=L('（已截断，完整请下载 CSV）',' (truncated — download CSV for all)');
+  var meta=tr('bmgmt.total',{n:new Intl.NumberFormat(IOSBKI18n.getLocale()).format(st.filtered.length)});
+  if(st.truncated) meta+=tr('action.renderBackupList.truncatedDownloadCsvForAll');
   document.getElementById('listMeta-'+udid).textContent=meta;
 }
 function confirmDeleteBackup(udid, name){
-  var typed=prompt(L('删除后该设备的本地备份将永久消失、不可恢复。\n请输入设备名「'+name+'」确认删除：','This permanently deletes this device\'s local backup and cannot be undone.\nType the device name "'+name+'" to confirm:'));
+  var typed=prompt(tr('action.confirmDeleteBackup.thisPermanentlyDeletesThisDevice', {name:name}));
   if(typed===null) return;
-  if(typed.trim()!==name){ toast(L('设备名不匹配，已取消','Name doesn\'t match — cancelled'),true); return; }
+  if(typed.trim()!==name){ toast(tr('action.confirmDeleteBackup.nameDoesnTMatchCancelled'),true); return; }
   // 删除大备份要删上千个文件、可能耗时；删除期间按钮转为 loading 并禁用，直到成功/失败。
   var btn=document.getElementById('delBtn-'+udid), orig=btn?btn.innerHTML:'';
   if(btn){ btn.disabled=true; btn.style.opacity='.7'; btn.style.cursor='default'; btn.innerHTML=iconHTML('loader','spin')+'<span>'+tr('bmgmt.deleting')+'</span>'; }
   postJSON('/api/delete-backup/'+udid,{confirm_name:typed.trim()}).then(function(d){
-    if(d.error){ toast(L('删除失败：','Delete failed: ')+d.error,true); return; }
-    toast(L('备份已删除','Backup deleted'));
+    if(d.error){ toast(apiMessage(d),true); return; }
+    toast(tr('action.confirmDeleteBackup.backupDeleted'));
     var s=document.getElementById('bkSize-'+udid); if(s) s.textContent='—';
     var c=document.getElementById('bkCount-'+udid); if(c) c.textContent='—';
-    var box=document.getElementById('list-'+udid); if(box) box.innerHTML='';
-  }).catch(function(e){ toast(L('删除失败：','Delete failed: ')+e,true); }).finally(function(){
+    delete backupEncryptionStates[udid];
+    var encryption=document.getElementById('bkEnc-'+udid); if(encryption) encryption.textContent='—';
+    listState[udid]={all:[],filtered:[],page:0,pageSize:200,total:0,truncated:false,empty:true};
+    var meta=document.getElementById('listMeta-'+udid); if(meta) meta.textContent='';
+    var page=document.getElementById('listPage-'+udid); if(page) page.textContent='';
+    renderBackupList(udid);
+  }).catch(function(e){ toast(tr('common.operationFailed'),true); }).finally(function(){
     if(btn){ btn.disabled=false; btn.style.opacity=''; btn.style.cursor=''; btn.innerHTML=orig; }
   });
 }
 function doUnback(udid){
-  if(!confirm(L('解包会生成一份完整副本，占用额外磁盘空间且耗时较长。确定继续？','Unpacking creates a full browsable copy — extra disk and time. Continue?'))) return;
+  if(!confirm(tr('action.doUnback.unpackingCreatesAFullBrowsable'))) return;
   var btn=document.getElementById('unbackBtn-'+udid); btn.disabled=true; btn.style.opacity='.6';
-  postJSON('/api/backup-unback/'+udid).then(function(data){ toast(data.error?(L('解包失败：','Unpack failed: ')+data.error):(data.message||L('解包已开始，请查看日志','Unpack started — see logs')), !!data.error); }).catch(function(e){ toast(L('解包失败：','Unpack failed: ')+e,true); }).finally(function(){ setTimeout(function(){ btn.disabled=false; btn.style.opacity=''; }, 3000); });
+  postJSON('/api/backup-unback/'+udid).then(function(data){ toast(data.error?(apiMessage(data)):apiMessage(data,'action.doUnback.unpackStartedSeeLogs'), !!data.error); }).catch(function(e){ toast(tr('common.operationFailed'),true); }).finally(function(){ setTimeout(function(){ btn.disabled=false; btn.style.opacity=''; }, 3000); });
 }
 
 /* ============== encryption ============== */
 function setEncryption(udid, enable){
   var pw=document.getElementById('encPw-'+udid).value;
-  if(!pw){ toast(L('请输入备份密码','Enter the backup password'),true); return; }
-  if(enable && !confirm(L('开启加密后，密码丢失将导致备份永久无法恢复。确定开启？','Once encryption is on, a lost password means backups can never be restored. Continue?'))) return;
-  postJSON('/api/encryption/'+udid,{enable:enable,password:pw}).then(function(data){ toast(data.error?(L('失败：','Failed: ')+data.error):(data.message||L('已提交','Submitted')), !!data.error); document.getElementById('encPw-'+udid).value=''; if(!data.error) setTimeout(function(){ loadEncStatus(udid); }, 1500); }).catch(function(e){ toast(L('失败：','Failed: ')+e,true); });
+  if(!pw){ toast(tr('action.setEncryption.enterTheBackupPassword'),true); return; }
+  if(enable && !confirm(tr('action.setEncryption.onceEncryptionIsOnA'))) return;
+  postJSON('/api/encryption/'+udid,{enable:enable,password:pw}).then(function(data){ toast(data.error?(apiMessage(data)):apiMessage(data,'action.setEncryption.submitted'), !!data.error); document.getElementById('encPw-'+udid).value=''; if(!data.error) setTimeout(function(){ loadEncStatus(udid); }, 1500); }).catch(function(e){ toast(tr('common.operationFailed'),true); });
 }
 function changeBackupPw(udid){
   var o=document.getElementById('oldPw-'+udid).value, n=document.getElementById('newPw-'+udid).value;
-  if(!o||!n){ toast(L('请输入当前密码和新密码','Enter both current and new password'),true); return; }
-  postJSON('/api/backup-changepw/'+udid,{old:o,new:n}).then(function(data){ toast(data.error?(L('失败：','Failed: ')+data.error):(data.message||L('已提交','Submitted')), !!data.error); document.getElementById('oldPw-'+udid).value=''; document.getElementById('newPw-'+udid).value=''; }).catch(function(e){ toast(L('失败：','Failed: ')+e,true); });
+  if(!o||!n){ toast(tr('action.changeBackupPw.enterBothCurrentAndNew'),true); return; }
+  postJSON('/api/backup-changepw/'+udid,{old:o,new:n}).then(function(data){ toast(data.error?(apiMessage(data)):apiMessage(data,'action.changeBackupPw.submitted'), !!data.error); document.getElementById('oldPw-'+udid).value=''; document.getElementById('newPw-'+udid).value=''; }).catch(function(e){ toast(tr('common.operationFailed'),true); });
 }
 
 /* ============== restore ============== */
 function setRestoreEnabled(udid, enable){
-  var msg=enable?L('确定开启该设备的「允许恢复」？恢复是破坏性操作。','Allow restore for this device? Restore is destructive.'):L('关闭该设备的恢复功能？','Turn off restore for this device?');
+  var msg=enable?tr('action.setRestoreEnabled.allowRestoreForThisDevice'):tr('action.setRestoreEnabled.turnOffRestoreForThis');
   if(!confirm(msg)) return;
-  postJSON('/api/save-config/'+udid,{restore_enabled:enable}).then(function(data){ if(data.error) toast(L('失败：','Failed: ')+data.error,true); else location.reload(); }).catch(function(e){ toast(L('失败：','Failed: ')+e,true); });
+  postJSON('/api/save-config/'+udid,{restore_enabled:enable}).then(function(data){ if(data.error) toast(apiMessage(data),true); else location.reload(); }).catch(function(e){ toast(tr('common.operationFailed'),true); });
 }
 let restoreUdid=null, restoreExpect='';
 function openRestoreModal(udid, devName){
@@ -1297,7 +1279,7 @@ function validateRestore(){
 function submitRestore(){
   if(!restoreUdid) return;
   var body={ confirmations:{understand:true, device_name:document.getElementById('rmName').value.trim()}, password:document.getElementById('rmPw').value, options:{ reboot:document.getElementById('rmReboot').checked, settings:document.getElementById('rmSettings').checked, system:document.getElementById('rmSystem').checked } };
-  postJSON('/api/restore/'+restoreUdid, body).then(function(data){ toast(data.error?(L('恢复失败：','Restore failed: ')+data.error):(data.message||L('恢复已开始','Restore started')), !!data.error); if(!data.error) closeRestoreModal(); }).catch(function(e){ toast(L('恢复失败：','Restore failed: ')+e,true); });
+  postJSON('/api/restore/'+restoreUdid, body).then(function(data){ toast(data.error?(apiMessage(data)):apiMessage(data,'action.submitRestore.restoreStarted'), !!data.error); if(!data.error) closeRestoreModal(); }).catch(function(e){ toast(tr('common.operationFailed'),true); });
 }
 
 /* ============== boot ============== */

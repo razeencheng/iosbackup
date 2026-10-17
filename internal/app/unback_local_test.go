@@ -114,7 +114,7 @@ func TestUnbackRejectsEncryptedOrInvalidManifestDatabase(t *testing.T) {
 		called = true
 		return nil
 	}
-	if err := app.Unback(context.Background(), "U-ENC"); err == nil || !strings.Contains(err.Error(), "未加密") {
+	if err := app.Unback(context.Background(), "U-ENC"); err == nil || !strings.Contains(err.Error(), "unencrypted") {
 		t.Fatalf("应明确拒绝加密/非 SQLite Manifest，得 %v", err)
 	}
 	if called {

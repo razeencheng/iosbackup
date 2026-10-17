@@ -263,8 +263,8 @@ func TestSendBackupFailed(t *testing.T) {
 		t.Errorf("失败消息应为错误级别")
 	}
 
-	if !strings.Contains(lastMessage.Content, "磁盘空间不足") {
-		t.Errorf("失败原因未包含在消息中")
+	if !strings.Contains(lastMessage.Content, "备份未能完成，请查看诊断日志。") || lastMessage.ExtraFields["diagnostics"] != "磁盘空间不足" {
+		t.Errorf("未知失败应显示本地化解释并保留原始诊断: %+v", lastMessage)
 	}
 }
 
@@ -279,14 +279,14 @@ func TestNotificationTemplateRendersMessageVariables(t *testing.T) {
 		string(notificationBackupFailed): {"template_notifier"},
 	})
 	if err := manager.SetNotificationTemplates(map[string]string{
-		string(notificationBackupFailed): "${title} | ${type} | ${level} | ${device_name} | ${device_udid} | ${reason} | ${content}",
+		string(notificationBackupFailed): "${title} | ${type} | ${level} | ${device_name} | ${device_udid} | ${reason} | ${diagnostics} | ${content}",
 	}); err != nil {
 		t.Fatal(err)
 	}
 
 	manager.SendBackupFailed("iPhone 15", "12345-abcde", "磁盘空间不足")
 	message := notifier.WaitForSends(t, 1)
-	want := "❌ 设备备份失败 | backup_failed | error | iPhone 15 | 12345-abcde | 磁盘空间不足 | 设备 iPhone 15 备份失败\n原因: 磁盘空间不足"
+	want := "❌ 设备备份失败 | backup_failed | error | iPhone 15 | 12345-abcde | 备份未能完成，请查看诊断日志。 | 磁盘空间不足 | 设备 iPhone 15 备份失败\n原因: 备份未能完成，请查看诊断日志。"
 	if message.Content != want {
 		t.Fatalf("模板渲染结果不匹配，得到 %q，期望 %q", message.Content, want)
 	}

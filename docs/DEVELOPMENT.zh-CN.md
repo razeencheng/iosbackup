@@ -27,6 +27,7 @@ go list -m all
 | `cmd/iosbackup` | 可执行入口、进程信号及应用启动 |
 | `internal/app` | 应用编排、HTTP/API、设备状态、备份、调度、模板与静态资源 |
 | `internal/config` | 启动参数和路径解析、校验 |
+| `internal/i18n` | 共用语言解析与 API 消息资源 |
 | `internal/notification` | 通知管理器、消息类型与渠道适配器 |
 | `internal/persistence` | 原子文件写入与秘密存储支持 |
 | `internal/boundedio` | 有界输出、行读取等工具 |
@@ -70,6 +71,40 @@ go test -count=1 ./internal/config ./internal/persistence
 ```
 
 完整的默认测试、覆盖率、基准测试和真实通知测试的启用条件见[测试指南](TESTING_GUIDE.md)。真实通知测试需要 `integration` 标签、明确发送确认变量、独立配置路径，日常开发不要启用。
+
+## 国际化
+
+应用目前支持 `en`、`zh-CN`。界面语言属于浏览器偏好，由登录、控制台、首次设置和通知设置共享；手动选择优先于浏览器语言，不支持的值回退到可用的浏览器偏好或英文。旧 `zh` 与向导语言偏好会迁移，语言 cookie 使登录前的服务端页面和错误也能使用同一选择。初始 HTML 与客户端切语使用同一份词典，首屏无需等待 JavaScript 替换中文后备文案。
+
+资源随二进制嵌入，不访问远程翻译服务：
+
+- `internal/app/static/ui-messages.json`：Go 模板与浏览器共用的界面词典，包含标题、占位符、无障碍标签和图片替代文本。`/static/ui-messages.js` 将此词典作为注册脚本返回。
+- `internal/app/static/i18n.js`：语言选择、命名参数、属性、日期和请求语言。
+- `internal/i18n/messages.json`：Go 与浏览器共用的 API 消息，浏览器通过 `/static/api-messages.js` 加载。
+- `internal/notification/messages.json`：系统通知标题、默认正文和渠道标签。
+
+`internal/i18n/messages.json` 中的 API 消息键同时用于生成 `internal/i18n/codes.go`。Go 调用处引用 `i18n.EncryptionPasswordRequired` 等常量，不直接写 `"api.encryption_password_required"`。增删消息键后运行 `go generate ./internal/i18n`，将生成文件与词典修改一起提交。不要手改 `codes.go`，也不要在常量重构时改变既有对外消息键的值。CI 以只读方式检查生成结果是否同步；Go 源码检查会拒绝业务代码中的完整 API 消息键字面量。协议测试可保留字面量，以发现意外的兼容性变化。
+
+```bash
+go generate ./internal/i18n
+go run ./internal/i18n/cmd/gencodes -dir internal/i18n -check
+```
+
+使用语义明确的 key 和完整句子，参数使用名称（UI/API 为 `{name}`，通知模板为 `${name}`），各语言的参数名须一致。不拼接句子片段、不从译文生成 key、不按展示标签分支。设备名、路径、自定义模板保持原值。已知失败返回稳定的 `message_code` 与 `params`；`code` 保留端点既有的机器分类，新端点默认与消息键相同。保留可读的兼容 `error`/`message` 字段；工具原始输出放在诊断 `detail` 中。界面优先翻译 `message_code`，兼容回退到 `code`，并支持操作完成后切换语言。SSE 广播机器状态和标准时间点，不保存某个浏览器的最终译文。
+
+界面语言、通知语言和备份调度相互独立。通知 `language` 按部署实例持久化，缺省仍为 `zh-CN`，兼容旧配置。正文覆盖为空时，发送时按通知语言选择默认模板。已有非空模板视为用户内容，即使它恰好等于旧中文默认值，也要保留，直到管理员主动清空。切换界面语言不改变通知或备份时刻。计划和时间显示继续使用 `Asia/Shanghai`；新增 `last_backup_at` 携带时区偏移，同时为旧客户端保留 `last_backup`。
+
+安装 Node.js 20 或更新版本运行离线 JavaScript 行为测试，无需 npm 依赖。CI 显式执行 Node 测试，避免因缺少 Node 而静默跳过国际化检查：
+
+```bash
+node internal/app/testdata/i18n.test.js
+go test -count=1 ./internal/i18n ./internal/notification
+go test -count=1 -run 'TestSharedI18n|TestI18n|TestDeviceConnectionsAreLanguageIndependent' ./internal/app
+```
+
+新增用户文案时更新双语资源，并验证对应成功和失败路径。新增语言时补齐资源、更新支持语言解析及选择入口、说明回退规则并审校术语。检查实时切换、未保存表单、存储失败、未知错误回退、窄屏和较长译文；资源完整性检查不能替代浏览器验收。
+
+应用自身生成的运维诊断使用固定英文和 `event=backup.scheduled` 等稳定事件标记，范围包括启动失败及日志中嵌入的底层错误，不能只修改外层日志格式。不新增日志翻译词典或日志语言设置；界面或通知语言变化不影响日志。共用消息错误可以复用英文词条生成诊断文本。界面、API 用户提示和系统通知仍在展示边界进行本地化。外部工具与操作系统的原始诊断、设备名、路径及其他用户数据保留原文，允许包含中文。测试须覆盖完整错误链和原文保留，不能只检查事件标记。
 
 ## 需要镜像时
 

@@ -19,7 +19,6 @@ func TestIndexTemplateUnsavedIndicator(t *testing.T) {
 		`data-i18n="bset.unsaved"`, // 提示文案走 i18n
 		"function markDirty",       // 改动 -> 标脏
 		"function clearDirty",      // 保存/重载 -> 清除
-		"unsaved:{zh:",             // 字典含未保存文案
 	} {
 		if !strings.Contains(html, want) {
 			t.Errorf("index.html 应包含 %q", want)
@@ -40,10 +39,20 @@ func TestNotificationsTemplateUnsavedIndicator(t *testing.T) {
 		`data-i18n="notif.unsaved"`,
 		"function markNotifDirty",
 		"function clearNotifDirty",
-		"unsaved:{zh:",
 	} {
 		if !strings.Contains(html, want) {
 			t.Errorf("notifications.html 应包含 %q", want)
+		}
+	}
+}
+
+func TestUnsavedIndicatorsHaveSharedTranslations(t *testing.T) {
+	catalog := uiMessageCatalog(t)
+	for _, key := range []string{"bset.unsaved", "notif.unsaved"} {
+		for _, locale := range []string{"en", "zh-CN"} {
+			if catalog[locale][key] == "" {
+				t.Errorf("missing unsaved text %s: %s", locale, key)
+			}
 		}
 	}
 }

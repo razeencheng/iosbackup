@@ -44,7 +44,7 @@ func newWebhookNotifierWithAllowlist(config webhookConfig, allowPrivate []netip.
 func initNotificationManager() (*notificationManager, error) {
 	config, err := loadNotificationConfig()
 	if err != nil {
-		return nil, fmt.Errorf("加载通知配置失败: %v", err)
+		return nil, fmt.Errorf("load notification configuration: %w", err)
 	}
 	return newNotificationManagerFromConfig(config, nil)
 }
@@ -52,7 +52,7 @@ func initNotificationManager() (*notificationManager, error) {
 func initNotificationManagerFromStore(store *notificationConfigStore, allowPrivate []netip.Prefix) (*notificationManager, error) {
 	config, err := store.Load()
 	if err != nil {
-		return nil, fmt.Errorf("加载通知配置失败: %v", err)
+		return nil, fmt.Errorf("load notification configuration: %w", err)
 	}
 	return newNotificationManagerFromConfig(config, allowPrivate)
 }

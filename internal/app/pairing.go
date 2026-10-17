@@ -44,16 +44,12 @@ func (app *application) pairingNotificationUnsafe(d *device, state *deviceOperat
 	}
 	alert.notified = true
 	name := d.Name
-	if name == "" || name == "Unknown Device" {
+	if name == "" {
 		name = config.Name
-	}
-	if name == "" || name == "Unknown Device" {
-		name = "iOS 设备"
 	}
 	return &notificationMessage{
 		Type: notificationSystemError, Level: notificationLevelWarning,
-		Title:      fmt.Sprintf("⚠️ 设备需要重新配对: %s", name),
-		Content:    fmt.Sprintf("设备 %s 的自动备份检查持续无法通过配对校验。请通过 USB 连接设备，解锁并确认“信任此电脑”，然后重试。", name),
+		EventCode:  "pairing_required",
 		DeviceName: name, DeviceUDID: d.UDID,
 	}
 }
@@ -143,7 +139,7 @@ func (app *application) attemptPairingInTask(device *device, setState func(strin
 		return app.publishPairingFailure(device, setState, failure, output, err)
 	}
 
-	app.addInfoLog(device.UDID, "设备尚未配对，开始 USB 配对...")
+	app.addInfoLog(device.UDID, "event=pairing.started transport=usb")
 	output, err = app.runIdeviceCmd(app.rootCtx, cmdKindShort, device, cmdIdevicePair, "pair")
 	if errors.Is(err, context.Canceled) || app.rootCtx.Err() != nil {
 		return ""
@@ -160,7 +156,7 @@ func (app *application) attemptPairingInTask(device *device, setState func(strin
 		}
 		return app.publishPairingFailure(device, setState, classifyPairingFailure(output, err, true), output, err)
 	}
-	app.addInfoLog(device.UDID, "设备配对验证成功")
+	app.addInfoLog(device.UDID, "event=pairing.validated")
 	if !setState(device.UDID, pairingStatePaired, "", "") {
 		return ""
 	}
@@ -172,7 +168,7 @@ func (app *application) publishPairingFailure(device *device, setState func(stri
 	if detail == "" && err != nil {
 		detail = err.Error()
 	}
-	app.addWarnLog(device.UDID, fmt.Sprintf("配对检查未完成 (%s): %s", failure.code, detail))
+	app.addWarnLog(device.UDID, fmt.Sprintf("event=pairing.check_failed code=%s detail=%s", failure.code, detail))
 	state := pairingStateFailed
 	if failure.code == "trust_required" {
 		state = pairingStateWaitingForTrust

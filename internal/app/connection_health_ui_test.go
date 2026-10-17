@@ -85,7 +85,7 @@ func TestConnectionPageMessagesAndJavaScript(t *testing.T) {
 	}
 	start = strings.Index(script, "function connectionServiceMessage(")
 	end = strings.Index(script[start:], "\nfunction renderConnectionHealth") + start
-	program := `let lang='zh';function L(zh,en){return lang==='zh'?zh:en;}` + script[start:end] + `
+	program := frontendI18nProgram(t) + script[start:end] + `
 const assert=require('node:assert/strict');
 for(const [phase,fragment] of [['waiting_busy','等待当前设备任务'],['restarting','正在恢复'],['backoff','稍后自动重试'],['manual_required','自动恢复失败']]) {
  const result=connectionServiceMessage({connection:'usb',health:'unhealthy',recovery:phase});
@@ -93,7 +93,7 @@ for(const [phase,fragment] of [['waiting_busy','等待当前设备任务'],['res
  assert.ok(!result.includes('信任')&&!result.includes('解锁'),result);
 }
 assert.equal(connectionServiceMessage({connection:'usb',health:'healthy',recovery:'idle'}),'');
-lang='en';assert.ok(connectionServiceMessage({connection:'wifi',health:'unhealthy',recovery:'waiting_busy'}).includes('current device tasks'));
+IOSBKI18n.setLocale('en');assert.ok(connectionServiceMessage({connection:'wifi',health:'unhealthy',recovery:'waiting_busy'}).includes('current device tasks'));
 `
 	cmd := exec.Command(node)
 	cmd.Stdin = strings.NewReader(program)
@@ -117,7 +117,7 @@ func TestConnectionOnboardingPrioritizesServiceFailure(t *testing.T) {
 		t.Fatal("向导缺少服务异常优先提示")
 	}
 	end := strings.Index(script[start:], "\n  function selectedDevice") + start
-	program := `let lang='zh';let snapshot={connection_services:[{connection:'usb',health:'unhealthy',recovery:'waiting_busy'}]};` + script[start:end] + `
+	program := frontendI18nProgram(t) + `let snapshot={connection_services:[{connection:'usb',health:'unhealthy',recovery:'waiting_busy'}]};` + script[start:end] + `
 const assert=require('node:assert/strict');assert.ok(connectionProblem().includes('等待当前设备任务'));
 snapshot.connection_services[0].recovery='restarting';assert.ok(connectionProblem().includes('正在恢复'));
 snapshot.connection_services[0]={connection:'usb',health:'healthy',recovery:'idle'};assert.equal(connectionProblem(),'');

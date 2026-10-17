@@ -25,6 +25,11 @@ const (
 
 // Message 是发送给通知器的消息。
 type Message struct {
+	Locale      string            `json:"locale,omitempty"`
+	EventCode   string            `json:"event_code,omitempty"`
+	ReasonCode  string            `json:"reason_code,omitempty"`
+	Params      map[string]string `json:"-"`
+	Test        bool              `json:"-"`
 	Type        Type              `json:"type"`
 	Level       Level             `json:"level"`
 	Title       string            `json:"title"`
@@ -118,6 +123,7 @@ type WebhookConfig struct {
 
 // Config 是完整通知配置。文件读写与秘密持久化留在应用层。
 type Config struct {
+	Language              string              `json:"language"`
 	Enabled               bool                `json:"enabled"`
 	TelegramConfigs       []TelegramConfig    `json:"telegram_configs"`
 	EmailConfigs          []EmailConfig       `json:"email_configs"`
@@ -130,6 +136,7 @@ type Config struct {
 
 // CloneMessage 返回不共享 ExtraFields 的消息副本。
 func CloneMessage(message Message) Message {
+	message.Params = CloneStringMap(message.Params)
 	extraFields := message.ExtraFields
 	message.ExtraFields = make(map[string]string, len(extraFields))
 	for key, value := range extraFields {

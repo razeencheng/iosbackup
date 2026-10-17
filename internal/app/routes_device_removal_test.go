@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"iosbackup/internal/i18n"
 )
 
 const removalTestCSRFToken = "device-removal-test-token"
@@ -176,7 +178,8 @@ func TestHandleRemoveDeviceReturnsStableConflictAndRollsBackPersistenceFailure(t
 	app.backupInProgress[udid] = true
 	app.mu.Unlock()
 	rr := deviceRemovalRequest(handler, http.MethodPost, "/api/remove-device/"+udid, true)
-	if rr.Code != http.StatusConflict || decodeRemovalResponse(t, rr)["code"] != "busy" {
+	busyBody := decodeRemovalResponse(t, rr)
+	if rr.Code != http.StatusConflict || busyBody["code"] != "busy" || busyBody["message_code"] != "api.busy" {
 		t.Fatalf("忙碌设备应返回稳定冲突码: %d %s", rr.Code, rr.Body.String())
 	}
 	app.mu.Lock()
@@ -185,7 +188,8 @@ func TestHandleRemoveDeviceReturnsStableConflictAndRollsBackPersistenceFailure(t
 
 	app.configStore.lastGoodPath = t.TempDir()
 	rr = deviceRemovalRequest(handler, http.MethodPost, "/api/remove-device/"+udid, true)
-	if rr.Code != http.StatusInternalServerError || decodeRemovalResponse(t, rr)["code"] != "persistence_failed" {
+	failureBody := decodeRemovalResponse(t, rr)
+	if rr.Code != http.StatusInternalServerError || failureBody["code"] != "persistence_failed" || failureBody["message_code"] != "api.device_state_save_failed" {
 		t.Fatalf("落盘失败应返回稳定服务端错误码: %d %s", rr.Code, rr.Body.String())
 	}
 	app.mu.RLock()
@@ -195,6 +199,30 @@ func TestHandleRemoveDeviceReturnsStableConflictAndRollsBackPersistenceFailure(t
 	app.mu.RUnlock()
 	if !visible || config == nil || config.RemovedAt != nil || pending {
 		t.Fatalf("落盘失败后不得部分发布: visible=%v pending=%v config=%+v", visible, pending, config)
+	}
+}
+
+func TestDeviceRemovalPreservesLegacyCodeWithLocalizedMessage(t *testing.T) {
+	for _, tc := range []struct{ legacy, messageCode string }{
+		{"not_found", "api.device_not_found"},
+		{"busy", "api.busy"},
+		{"removal_pending", "api.removal_pending"},
+		{"persistence_failed", "api.device_state_save_failed"},
+		{"csrf_required", "api.csrf_required"},
+		{"invalid_udid", "api.invalid_udid"},
+	} {
+		for _, locale := range []string{"en", "zh-CN"} {
+			rr := httptest.NewRecorder()
+			rr.Header().Set("Content-Language", locale)
+			writeDeviceRemovalError(rr, http.StatusConflict, tc.legacy)
+			body := decodeRemovalResponse(t, rr)
+			if body["code"] != tc.legacy || body["message_code"] != tc.messageCode || body["error_code"] != tc.legacy {
+				t.Fatalf("%s/%s lost its legacy or localized code: %s", locale, tc.legacy, rr.Body.String())
+			}
+			if body["error"] != i18n.Text(locale, tc.messageCode, nil) {
+				t.Fatalf("%s/%s uses the wrong message: %s", locale, tc.legacy, rr.Body.String())
+			}
+		}
 	}
 }
 

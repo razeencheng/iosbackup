@@ -12,6 +12,7 @@ import (
 
 // homePayload 与 handleHome 渲染用的数据结构一致。
 type homePayload struct {
+	Locale                        string
 	InitialStatus                 statusSnapshot
 	Devices                       []*device
 	Configs                       map[string]*backupConfig
@@ -41,6 +42,7 @@ func renderIndex(t *testing.T, p homePayload) string {
 	}
 	tmpl, err := template.New("index.html").Funcs(template.FuncMap{
 		"contains": strings.Contains,
+		"t":        uiText,
 	}).Parse(string(data))
 	if err != nil {
 		t.Fatalf("index.html 模板解析失败: %v", err)
@@ -66,7 +68,7 @@ func TestIndexTemplateOnlineDevice(t *testing.T) {
 		"openRestoreModal('U-ON'", // 恢复入口（RestoreEnabled=true）
 		"X-IOSBK-CSRF",            // CSRF 头
 		`data-sec-panel="enc"`,    // 加密分区面板
-		"IOSBK_DICT",              // 内嵌双语字典
+		"/static/ui-messages.js",  // 内嵌双语字典
 		"toggleCard('U-ON')",      // 卡片展开
 	} {
 		if !strings.Contains(html, want) {
@@ -86,7 +88,7 @@ func TestIndexTemplateOfflineMigrationBanner(t *testing.T) {
 	if !strings.Contains(html, "gotoFillIP('U-OFF')") {
 		t.Error("离线+曾Wi-Fi备份+无IP 应出现迁移黄条（gotoFillIP 入口）")
 	}
-	if !strings.Contains(html, "IOSBK_SECRET_KEY") {
+	if !strings.Contains(uiMessageCatalog(t)["en"]["enc.unavailBody"]+uiMessageCatalog(t)["en"]["enc.unavailCmd"], "IOSBK_SECRET_KEY") {
 		t.Error("EncryptionAvailable=false 时应提示配置 IOSBK_SECRET_KEY")
 	}
 }

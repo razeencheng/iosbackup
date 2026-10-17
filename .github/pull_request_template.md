@@ -22,3 +22,5 @@ List the exact tests and relevant device/container checks run. Explain any verif
 ## Release impact
 
 State whether `release/manifest.env`, `internal/buildinfo`, `CHANGELOG.md`, image metadata, documentation, or the feature-status matrix must change.
+
+- [ ] UI/API/notification text uses shared language resources; both supported languages and named parameters are covered.

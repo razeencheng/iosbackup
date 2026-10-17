@@ -39,6 +39,8 @@ type device struct {
 	LastSeen        time.Time `json:"last_seen"`
 	BatteryLevel    int       `json:"battery_level"`
 	IsCharging      bool      `json:"is_charging"`
+	// 仅标记显示用的 UDID 兜底，不序列化；不能根据名称文本猜测来源。
+	nameIsFallback bool
 }
 
 // BackupConfig 备份配置结构

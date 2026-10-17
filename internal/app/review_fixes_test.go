@@ -2,9 +2,11 @@ package app
 
 import (
 	"context"
+	"errors"
 	"net/http/httptest"
-	"strings"
 	"testing"
+
+	"iosbackup/internal/i18n"
 )
 
 // codex review [P2]: unback 端点缺 CSRF 校验。无 X-IOSBK-CSRF 头应 403。
@@ -35,7 +37,8 @@ func TestUnbackReentrancyGuard(t *testing.T) {
 	if err == nil {
 		t.Fatal("设备正忙时 Unback 应返回错误")
 	}
-	if !strings.Contains(err.Error(), "正忙") {
+	var message *i18n.Error
+	if !errors.As(err, &message) || message.Code != "api.busy" {
 		t.Errorf("应是「正忙」类错误，得到: %v", err)
 	}
 	if called {

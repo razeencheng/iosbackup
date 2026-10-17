@@ -28,7 +28,7 @@ func TestRunReturnsImmediatelyWhenContextIsAlreadyCancelled(t *testing.T) {
 	}
 }
 
-func TestRunPreservesLegacyRuntimeConfigErrorText(t *testing.T) {
+func TestRunReportsEnglishRuntimeConfigError(t *testing.T) {
 	t.Setenv("PORT", "not-a-port")
 	_, configErr := loadRuntimeConfig(os.Getenv)
 	if configErr == nil {
@@ -36,21 +36,31 @@ func TestRunPreservesLegacyRuntimeConfigErrorText(t *testing.T) {
 	}
 
 	err := Run(context.Background())
-	want := "运行配置无效: " + configErr.Error()
+	want := "event=config.invalid Invalid runtime configuration: " + configErr.Error()
 	if err == nil || err.Error() != want {
 		t.Fatalf("Run() error = %q, want %q", err, want)
 	}
-	if strings.HasPrefix(err.Error(), "应用退出: ") {
+	if strings.HasPrefix(err.Error(), "event=application.failed Application failed: ") {
 		t.Fatalf("runtime config error gained application prefix: %q", err)
 	}
 }
 
-func TestExitErrorsPreserveLegacyPrefixes(t *testing.T) {
+func TestExitErrorsUseStableEnglishEvents(t *testing.T) {
 	cause := errors.New("boom")
-	if got := newRuntimeConfigExitError(cause).Error(); got != "运行配置无效: boom" {
+	if got := newRuntimeConfigExitError(cause).Error(); got != "event=config.invalid Invalid runtime configuration: boom" {
 		t.Fatalf("runtime config exit error = %q", got)
 	}
-	if got := newApplicationExitError(cause).Error(); got != "应用退出: boom" {
+	if got := newApplicationExitError(cause).Error(); got != "event=application.failed Application failed: boom" {
 		t.Fatalf("application exit error = %q", got)
+	}
+}
+
+func TestExitErrorsPreserveOriginalDiagnosticAndCause(t *testing.T) {
+	cause := errors.New("open /备份/我的设备: 原始诊断")
+	for _, wrap := range []func(error) error{newRuntimeConfigExitError, newApplicationExitError} {
+		err := wrap(cause)
+		if !errors.Is(err, cause) || !strings.HasSuffix(err.Error(), cause.Error()) {
+			t.Fatalf("exit error changed the original diagnostic or cause: %v", err)
+		}
 	}
 }

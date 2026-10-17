@@ -41,7 +41,7 @@ Windows use Beijing time (UTC+8), regardless of your browser's timezone. For exa
 
 1. **In the Web UI** , check the last successful backup time. If a manual backup just finished and the interval is 24 hours, another backup will not start immediately even inside the window. Do not delete backups or edit historical timestamps to force a run.
 2. At the next eligible window and interval, keep the device online and powered, and watch for authorization prompts. The app checks the conditions every **30 seconds** by default, so jobs do not start at an exact second.
-3. Wait for the device card to enter a backup state and authorize the operation on the phone if asked. To confirm the trigger, run `docker compose logs --tail=200 iosbackup` in the deployment directory and look for `自动备份触发` at the matching time. Remove device identifiers, addresses, and private paths before sharing logs.
+3. Wait for the device card to enter a backup state and authorize the operation on the phone if asked. To confirm the trigger, run `docker compose logs --tail=200 iosbackup` in the deployment directory and look for `event=backup.scheduled` at the matching time. Remove device identifiers, addresses, and private paths before sharing logs.
 4. Wait for an explicit **Backup completed** or failure state. On success, check the updated backup time and then inspect the read-only information under [View backups](inspection.md).
 
 ![Completed backup status](images/05-iosbk-backup-success.png)

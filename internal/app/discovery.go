@@ -229,7 +229,7 @@ func queryNetworkIPs(ctx context.Context, addr string) (map[string]string, error
 	}
 	total := binary.LittleEndian.Uint32(respHdr[0:])
 	if total < 16 || total > 10*1024*1024 {
-		return nil, fmt.Errorf("无效的 netmuxd 响应长度: %d", total)
+		return nil, fmt.Errorf("invalid netmuxd response length: %d", total)
 	}
 	body := make([]byte, total-16)
 	if _, err := io.ReadFull(conn, body); err != nil {
@@ -241,10 +241,10 @@ func queryNetworkIPs(ctx context.Context, addr string) (map[string]string, error
 	}
 	dict, ok := root.(map[string]interface{})
 	if !ok {
-		return nil, fmt.Errorf("无效的 netmuxd 响应")
+		return nil, fmt.Errorf("invalid netmuxd response")
 	}
 	if _, ok := dict["DeviceList"].([]interface{}); !ok {
-		return nil, fmt.Errorf("netmuxd 响应缺少 DeviceList")
+		return nil, fmt.Errorf("netmuxd response is missing DeviceList")
 	}
 	return parseNetworkIPs(body), nil
 }

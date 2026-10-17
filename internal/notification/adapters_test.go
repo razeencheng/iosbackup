@@ -131,7 +131,7 @@ func TestHTTPAdaptersMethodsHeadersStatusesAndValidation(t *testing.T) {
 				w.WriteHeader(http.StatusBadRequest)
 				return
 			}
-			if got.MsgType != "text" || !strings.Contains(got.Text.Content, message.Title) || !strings.Contains(got.Text.Content, message.Content) || !strings.Contains(got.Text.Content, "2026-08-31 10:20:30") {
+			if got.MsgType != "text" || !strings.Contains(got.Text.Content, message.Title) || !strings.Contains(got.Text.Content, message.Content) || !strings.Contains(got.Text.Content, "2026-08-31T10:20:30+08:00") {
 				recordHandlerError("WeCom body lost fields: %+v", got)
 			}
 			w.WriteHeader(http.StatusOK)
@@ -330,7 +330,7 @@ func TestSMTPTLSMinimumAndNoCredentialDowngrade(t *testing.T) {
 	notifier := NewEmailNotifier(EmailConfig{Name: "mail", SMTPHost: host, SMTPPort: port, Username: "user", Password: "secret", From: "a@example.com", To: "b@example.com", Enabled: true})
 	notifier.timeout = time.Second
 	err = notifier.Send(&Message{Title: "mail"})
-	if err == nil || !strings.Contains(err.Error(), "未提供 STARTTLS") {
+	if err == nil || !strings.Contains(err.Error(), "does not offer STARTTLS") {
 		t.Fatalf("SMTP credential downgrade was not rejected: %v", err)
 	}
 	<-serverDone
@@ -398,7 +398,7 @@ func TestAllowPrivateConstructorsOwnPolicySlice(t *testing.T) {
 			cancel()
 			transport := client.Transport.(*http.Transport)
 			_, err := transport.DialContext(ctx, "tcp", "10.20.30.40:443")
-			if err == nil || !strings.Contains(err.Error(), "未列入 IOSBK_WEBHOOK_ALLOW_CIDRS") {
+			if err == nil || !strings.Contains(err.Error(), "is not in IOSBK_WEBHOOK_ALLOW_CIDRS") {
 				t.Fatalf("constructor retained caller allowlist storage: %v", err)
 			}
 		})

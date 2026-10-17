@@ -44,6 +44,12 @@ func (app *application) notifySystemError(title, content string) {
 	}
 }
 
+func (app *application) notifySystemEvent(code string, params map[string]string) {
+	if manager := app.notificationManagerSnapshot(); manager != nil {
+		manager.SendSystemEvent(code, params)
+	}
+}
+
 func notificationManagerOptions(workerCount, queueSize int) notificationpkg.Options {
 	return notificationpkg.Options{
 		Now:         nowBeijing,
@@ -113,7 +119,7 @@ func notificationStoreFromEnvironment() (*notificationConfigStore, error) {
 	if encoded := os.Getenv(secretsEnvKey); encoded != "" {
 		key, err := base64.StdEncoding.DecodeString(encoded)
 		if err != nil {
-			return nil, fmt.Errorf("%s 不是合法 base64: %w", secretsEnvKey, err)
+			return nil, fmt.Errorf("%s is not valid base64: %w", secretsEnvKey, err)
 		}
 		store, err := newAESSecretStore(key, dirConfigs+"/secrets.enc")
 		if err != nil {
