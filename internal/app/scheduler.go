@@ -102,6 +102,7 @@ func (app *application) checkAndBackup(udid string, config backupConfig, deviceS
 		app.mu.Lock()
 		delete(app.checkInProgress, udid)
 		app.mu.Unlock()
+		app.wakeBackupIndex()
 	}()
 
 	app.mu.RLock()

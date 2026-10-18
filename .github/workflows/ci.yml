@@ -53,6 +53,8 @@ jobs:
         run: go run ./internal/i18n/cmd/gencodes -dir internal/i18n -check
       - name: Internationalization behavior and catalog checks
         run: node internal/app/testdata/i18n.test.js
+      - name: Offline backup browser behavior checks
+        run: node internal/app/testdata/backup-browser.test.js
       - name: Test
         run: go test -count=1 ./...
       - name: Race test

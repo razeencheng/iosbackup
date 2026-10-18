@@ -137,7 +137,17 @@
     "api.notification_template_length": "Keep the {event} notification template at or below {max} bytes.",
     "api.notification_template_variable": "Template {event} uses unsupported variable {variable}. Remove it or choose a supported template variable.",
     "api.notification_rule_target_missing": "Rule {event} references missing or disabled channel {channel}. Enable that channel or remove it from the rule.",
-    "api.notification_rule_target_duplicate": "Rule {event} lists channel {channel} more than once. Keep one entry."
+    "api.notification_rule_target_duplicate": "Rule {event} lists channel {channel} more than once. Keep one entry.",
+    "api.backup_index_unavailable": "Backup storage is unavailable. Previously saved information may be out of date.",
+    "api.backup_index_missing": "No backup was found in this device’s local backup directory.",
+    "api.backup_index_unsafe_source": "The backup source contains an unsupported link or special file. Check the storage directory.",
+    "api.backup_index_limit": "The index exceeded a resource limit. Previous complete information has been kept.",
+    "api.backup_index_corrupt": "Backup metadata could not be read. Check the local backup files.",
+    "api.backup_index_encrypted": "This encrypted manifest cannot be read locally. Only a previously saved list from this source can be shown.",
+    "api.backup_index_cancelled": "Index reading was interrupted. Saved information has been kept.",
+    "api.backup_index_refresh_failed": "The index could not be updated. Previous complete information has been kept; retry when storage is available.",
+    "api.backup_index_cache_invalid": "The saved index could not be read. Refresh to rebuild it from the local backup.",
+    "api.backup_index_csv_unavailable": "This complete list is no longer available for download. Reload the backup information and retry."
   },
   "zh-CN": {
     "api.operation_failed": "操作未能完成，请重试或查看服务日志。",
@@ -277,6 +287,16 @@
     "api.notification_template_length": "{event} 通知模板长度不能超过 {max} 字节。",
     "api.notification_template_variable": "模板 {event} 使用了不支持的变量 {variable}，请删除或改用支持的模板变量。",
     "api.notification_rule_target_missing": "规则 {event} 引用了不存在或未启用的渠道 {channel}，请启用该渠道或从规则中移除。",
-    "api.notification_rule_target_duplicate": "规则 {event} 重复引用了渠道 {channel}，请只保留一项。"
+    "api.notification_rule_target_duplicate": "规则 {event} 重复引用了渠道 {channel}，请只保留一项。",
+    "api.backup_index_unavailable": "备份存储暂时无法访问，已保存的信息可能过期。",
+    "api.backup_index_missing": "该设备的本地目录中尚无备份。",
+    "api.backup_index_unsafe_source": "备份来源包含不支持的链接或特殊文件，请检查存储目录。",
+    "api.backup_index_limit": "索引超过资源上限，已保留先前的完整信息。",
+    "api.backup_index_corrupt": "无法读取备份元数据，请检查本地备份文件。",
+    "api.backup_index_encrypted": "暂不支持本地读取加密清单，仅能显示此前为同一来源保存的清单。",
+    "api.backup_index_cancelled": "索引读取已中断，已保留保存的信息。",
+    "api.backup_index_refresh_failed": "索引更新失败，已保留先前的完整信息；存储可用后可重试。",
+    "api.backup_index_cache_invalid": "无法读取已保存的索引，可刷新以从本地备份重新建立。",
+    "api.backup_index_csv_unavailable": "当前版本的完整清单无法下载，请重新加载备份信息后再试。"
   }
 }

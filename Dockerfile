@@ -289,6 +289,7 @@ RUN cp /usr/local/bin/ideviceassertion /collected/bin/ || true
 RUN cp /usr/local/bin/iproxy /collected/bin/ || true
 RUN cp /usr/local/sbin/usbmuxd /collected/bin/ || true
 RUN cp /usr/bin/sqlite3 /collected/bin/
+RUN cp /usr/local/bin/plistutil /collected/bin/
 # netmuxd(Wi-Fi)及其 helper
 RUN cp /usr/local/bin/netmuxd /collected/bin/ || true
 RUN cp /usr/local/bin/add_device /collected/bin/ || true
@@ -460,7 +461,7 @@ RUN case "${TARGETARCH}" in \
 # -----------------------------------------------------------------------------
 # Stage 6: Final runtime image
 # -----------------------------------------------------------------------------
-FROM scratch
+FROM scratch AS runtime
 
 ARG IOSBK_VERSION
 ARG IOSBK_BUILD_DATE
@@ -499,3 +500,15 @@ VOLUME ["/var/lib/lockdown"]
 
 # Start command
 ENTRYPOINT ["/app/iosbackup"]
+
+# 仅供显式测试目标：在最终 scratch 文件系统中验证动态库闭包和真实工具行为。
+FROM go-builder AS index-test-builder
+RUN GOOS="${TARGETOS}" GOARCH="${TARGETARCH}" go test -c -o /app/index-tools.test ./internal/app
+
+FROM runtime AS index-tools-test
+COPY --from=index-test-builder /app/index-tools.test /index-tools.test
+ENV IOSBK_TEST_SQLITE3="/usr/local/bin/sqlite3" IOSBK_TEST_PLISTUTIL="/usr/local/bin/plistutil"
+RUN ["/index-tools.test", "-test.run", "^TestBackupIndex(SQLiteToolIntegration|PlistToolIntegration|SQLiteRejectsCommittedWAL)$", "-test.v"]
+
+# 默认发布目标仍只包含运行时，不携带测试程序或测试环境变量。
+FROM runtime AS final

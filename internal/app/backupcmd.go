@@ -136,7 +136,7 @@ func (app *application) DeleteDeviceBackup(udid string) error {
 	if udid == "" || strings.ContainsAny(udid, `/\`) || strings.Contains(udid, "..") {
 		return i18n.NewError(i18n.InvalidUDID, nil)
 	}
-	path, release, err := app.acquireLocalBackupOp(udid)
+	path, release, err := app.acquireLocalBackupOp(udid, true)
 	if err != nil {
 		return err
 	}
@@ -150,6 +150,7 @@ func (app *application) DeleteDeviceBackup(udid string) error {
 	if removeErr := os.RemoveAll(path); removeErr != nil {
 		return operationError(i18n.BackupDeleteFailed, removeErr, "")
 	}
+	app.finishBackupIndexWrite(udid, false, true)
 	app.mu.Lock()
 	if d, ok := app.devices[udid]; ok {
 		d.LastBackup = time.Time{}
@@ -414,7 +415,15 @@ func (app *application) streamBackupList(ctx context.Context, udid string, onRow
 		return 0, err
 	}
 	defer release()
-	// 加密备份的 list 需要 BACKUP_PASSWORD 才能解密 manifest
+	audit := &backupListCacheAudit{safe: true}
+	return app.captureOnlineBackupIndex(ctx, udid, dir, func(emit func([]string) error) (int, error) {
+		return app.streamBackupListCommand(ctx, device, dir, emit, audit)
+	}, onRow, audit.complete)
+}
+
+func (app *application) streamBackupListCommand(ctx context.Context, device *device, dir string, onRow func([]string) error, audit ...*backupListCacheAudit) (int, error) {
+	udid := device.UDID
+	// 沿用已保存的查询环境；是否支持该加密清单由工具实际结果决定。
 	pwEnv := app.backupPasswordEnv(udid)
 	cmdCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -428,7 +437,11 @@ func (app *application) streamBackupList(ctx context.Context, udid string, onRow
 	}()
 
 	total := 0
-	parseErr := forEachBackupListRow(stdoutR, func(fields []string) error {
+	var input io.Reader = stdoutR
+	if len(audit) > 0 {
+		input = io.TeeReader(input, audit[0])
+	}
+	parseErr := forEachBackupListRow(input, func(fields []string) error {
 		total++
 		return onRow(fields)
 	})

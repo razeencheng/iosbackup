@@ -77,6 +77,7 @@ func (h *eventHub) clientCount() int {
 // ---- 状态快照 ----
 
 type deviceStatusDTO struct {
+	BackupIndex         *backupIndexBrief  `json:"backup_index,omitempty"`
 	PresenceKnown       bool               `json:"presence_known"`
 	LastSeen            string             `json:"last_seen,omitempty"`
 	OperationsAvailable bool               `json:"operations_available"`
@@ -185,11 +186,17 @@ func (app *application) buildStatusSnapshot() statusSnapshot {
 				UpdatedAt:          updatedAt,
 			}
 		}
+		var indexStatus *backupIndexBrief
+		if brief, ok := app.backupIndexStatuses[udid]; ok {
+			copy := brief
+			indexStatus = &copy
+		}
 		lastSeen := ""
 		if !d.LastSeen.IsZero() {
 			lastSeen = toBeijingTime(d.LastSeen).Format(time.RFC3339)
 		}
 		devs = append(devs, deviceStatusDTO{
+			BackupIndex:   indexStatus,
 			PresenceKnown: !d.PresenceUnknown, LastSeen: lastSeen, OperationsAvailable: d.IsOnline && app.connectionAdmissionUnsafe(d) == nil,
 			UDID:                udid,
 			Name:                d.Name,

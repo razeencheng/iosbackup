@@ -2,7 +2,6 @@ package app
 
 import (
 	"context"
-	"encoding/csv"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,7 +10,6 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
-	"strconv"
 	"strings"
 	"time"
 
@@ -141,7 +139,7 @@ func (app *application) Unback(ctx context.Context, udid string) error {
 	return nil
 }
 
-func (app *application) acquireLocalBackupOp(udid string) (string, func(), error) {
+func (app *application) acquireLocalBackupOp(udid string, mutates ...bool) (string, func(), error) {
 	if !udidPattern.MatchString(udid) {
 		return "", nil, i18n.NewError(i18n.InvalidUDID, nil)
 	}
@@ -165,11 +163,18 @@ func (app *application) acquireLocalBackupOp(udid string) (string, func(), error
 	backupPath := filepath.Join(root, udid)
 	app.backupInProgress[udid] = true
 	app.mu.Unlock()
+	changed := len(mutates) > 0 && mutates[0]
+	app.beginBackupIndexWrite(udid, root, changed)
 	app.broadcastStatus()
 	release := func() {
+		manager := app.lockBackupIndexFinish()
 		app.mu.Lock()
 		delete(app.backupInProgress, udid)
 		app.mu.Unlock()
+		if manager != nil {
+			manager.releaseWriteUnsafe(udid)
+			manager.mu.Unlock()
+		}
 		app.broadcastStatus()
 	}
 	return backupPath, release, nil
@@ -247,10 +252,37 @@ func copyBackupObject(source, target string) error {
 }
 
 func streamBackupManifestRows(ctx context.Context, manifestPath string, onRow func(backupManifestRow) error) error {
+	return streamBackupManifestRowsCommand(ctx, cmdSQLite3, manifestPath, onRow)
+}
+
+func streamBackupManifestRowsCommand(ctx context.Context, binary, manifestPath string, onRow func(backupManifestRow) error) error {
+	root, err := os.OpenRoot(filepath.Dir(manifestPath))
+	if err != nil {
+		return err
+	}
+	defer root.Close()
+	if err := requireStableBackupManifest(root, filepath.Base(manifestPath)); err != nil {
+		return err
+	}
+	file, err := openBackupIndexRegular(root, filepath.Base(manifestPath))
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	if err := streamBackupManifestFileRows(ctx, binary, file, onRow); err != nil {
+		return err
+	}
+	return requireStableBackupManifest(root, filepath.Base(manifestPath))
+}
+
+// streamBackupManifestFileRows 只读取继承的文件描述符，不重新打开可能被替换的来源路径。
+// 调用方必须已排除本应用写入；发布前后仍需比较来源指纹以检测外部修改。
+func streamBackupManifestFileRows(ctx context.Context, binary string, file *os.File, onRow func(backupManifestRow) error) error {
 	query := "SELECT fileID, domain, relativePath, flags FROM Files ORDER BY domain, relativePath;"
 	cmdCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	cmd := newExecCmd(cmdCtx, cmdSQLite3, "-readonly", "-batch", "-noheader", "-csv", manifestPath, query)
+	cmd := newExecCmd(cmdCtx, binary, "-readonly", "-batch", "-noheader", "-csv", "file:/dev/fd/3?mode=ro&immutable=1", query)
+	cmd.cmd.ExtraFiles = []*os.File{file}
 	cmd.SetGracefulCancel(time.Second)
 	stdout, err := cmd.cmd.StdoutPipe()
 	if err != nil {
@@ -262,30 +294,7 @@ func streamBackupManifestRows(ctx context.Context, manifestPath string, onRow fu
 		return fmt.Errorf("start sqlite3: %w", err)
 	}
 
-	reader := csv.NewReader(stdout)
-	reader.FieldsPerRecord = 4
-	reader.ReuseRecord = true
-	var parseErr error
-	for {
-		record, err := reader.Read()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			parseErr = err
-			break
-		}
-		flags, err := strconv.Atoi(record[3])
-		if err != nil {
-			parseErr = fmt.Errorf("invalid Manifest.db flags %q: %w", record[3], err)
-			break
-		}
-		row := backupManifestRow{FileID: record[0], Domain: record[1], RelativePath: record[2], Flags: flags}
-		if err := onRow(row); err != nil {
-			parseErr = err
-			break
-		}
-	}
+	parseErr := readBackupManifestCSV(cmdCtx, stdout, onRow)
 	if parseErr != nil {
 		cancel()
 	}

@@ -44,6 +44,22 @@ jobs:
           driver-opts: |
             image=docker.io/moby/buildkit@sha256:28a898719c18a33f4e8000685287fa36fd0dd9560c6440227d3a732d79bb41d8
 
+      - name: Validate local-reader tools in both runtime architectures
+        # docker/build-push-action v7.4.0
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc
+        with:
+          context: .
+          target: index-tools-test
+          platforms: linux/amd64,linux/arm64
+          push: false
+          provenance: false
+          sbom: false
+          build-args: |
+            IOSBK_VERSION=${{ env.IOSBK_VERSION }}
+            IOSBK_BUILD_DATE=${{ env.IOSBK_BUILD_DATE }}
+            IOSBK_COMMIT=${{ github.sha }}
+            IOSBK_SOURCE_URL=${{ env.IOSBK_SOURCE_URL }}
+
       - name: Build multi-architecture OCI package
         # docker/build-push-action v7.4.0
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc

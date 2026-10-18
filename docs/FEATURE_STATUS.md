@@ -11,7 +11,7 @@ The tiers below distinguish everyday features from those that require experiment
 | USB discovery and pairing | For first pairing, connect over USB and respond on the device: enter its passcode when prompted, or unlock it and accept Trust. Keeping it unlocked or its screen on is not required. |
 | Manual USB backup | Use USB for your first backup. Keep the device connected and verify completed backups. |
 | Scheduled backup | Uses per-device time window, interval, battery, and charging settings. A skipped run is retried on a later scheduler check. |
-| Read-only inspection | Backup information and file-list/CSV views are read-only. They can take minutes for a large backup. |
+| [Local backup information and file lists](manual/backup-browser.md) | The phone can be offline. Reads the local overview and unencrypted manifest; retains completed indexes across restarts and refreshes after successful backups. Preview is limited to 5,000 entries / 16 MiB; full CSV requires a complete saved list. Does not decrypt encrypted manifests or verify restorability. |
 | Local Web UI and single-admin auth | No telemetry or remote frontend assets. Authentication is single-administrator only and does not make public exposure safe. |
 | Optional notifications | Telegram, SMTP, WeCom, Bark, and webhook notifications are sent only after configuration, and delivery is not guaranteed. Notification failure does not fail a backup. |
 | Wi-Fi backup | Requires successful USB pairing first, valid persisted lockdown records, reachable networking, and device support for the required wireless communication. Long transfers can fail after sleep or reconnect events; USB is the fallback. |

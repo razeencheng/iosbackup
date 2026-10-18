@@ -89,6 +89,7 @@ func (app *application) finishBackupState(udid string, err error) {
 
 // finishBackupOperation 原子提交终态并释放占用，下一任务不能被旧终态覆盖。
 func (app *application) finishBackupOperation(udid string, err error, at time.Time) {
+	manager := app.lockBackupIndexFinish()
 	app.mu.Lock()
 	app.finishBackupProgressUnsafe(udid, err, at)
 	state := app.deviceOperationStates[udid]
@@ -102,6 +103,12 @@ func (app *application) finishBackupOperation(udid string, err error, at time.Ti
 	app.deviceOperationStates[udid] = state
 	delete(app.backupInProgress, udid)
 	app.mu.Unlock()
+	var lease *backupIndexWrite
+	if manager != nil {
+		lease = manager.releaseWriteUnsafe(udid)
+		manager.mu.Unlock()
+	}
+	app.afterBackupIndexWrite(manager, lease, err == nil)
 	app.broadcastStatus()
 }
 
@@ -168,6 +175,8 @@ func (app *application) performBackupInTask(udid string) (retErr error) {
 
 	backupLog("event=backup.started")
 
+	// 预留写入后先停止索引扫描，避免把变更中的目录发布为完整清单。
+	app.beginBackupIndexWrite(udid, config.BackupDirectory, true)
 	// 确保备份目录存在
 	os.MkdirAll(config.BackupDirectory, 0755)
 	if manager := app.notificationManagerSnapshot(); manager != nil {
@@ -360,6 +369,7 @@ func (app *application) performBackupWithConnection(udid, connectionType, sessio
 
 	backupLog(fmt.Sprintf("event=backup.started source=scheduler directory=%s", backupDir))
 
+	app.beginBackupIndexWrite(udid, backupDir, true)
 	err := os.MkdirAll(backupDir, 0755)
 	if err != nil {
 		backupLog(fmt.Sprintf("event=backup.directory_create_failed error=%v", err))

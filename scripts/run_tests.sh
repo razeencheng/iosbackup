@@ -15,6 +15,11 @@ if go test -list . ./... | grep '^TestRealNotice$' >/dev/null; then
     exit 1
 fi
 
+# 运行生产页面的国际化及离线备份浏览行为测试（仅使用 Node 内置模块）。
+echo "📋 运行页面行为测试..."
+node internal/app/testdata/i18n.test.js
+node internal/app/testdata/backup-browser.test.js
+
 # 运行所有通知相关的测试
 echo "📋 运行通知管理器测试..."
 go test -count=1 -run "Test.*Notification" ./...

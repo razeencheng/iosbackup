@@ -98,6 +98,7 @@ func (app *application) setupRoutes() http.Handler {
 	mux.HandleFunc("/api/restore-device/", app.handleRestoreDevice)
 
 	// 备份查看类（P3，只读 + unback 长操作）
+	mux.HandleFunc("/api/backup-index/", app.handleBackupIndex)
 	mux.HandleFunc("/api/backup-info/", app.handleBackupInfo)
 	mux.HandleFunc("/api/backup-list/", app.handleBackupList)
 	mux.HandleFunc("/api/backup-unback/", app.handleBackupUnback)
@@ -740,6 +741,7 @@ func (app *application) handleSaveConfig(w http.ResponseWriter, r *http.Request)
 	} else {
 		candidate = *old
 	}
+	oldDirectory := old.BackupDirectory
 	oldIP := old.NetworkAddress // merge 前捕获旧 IP，用于判断 netmuxd 是否需重置
 	deviceName := ""
 	if device, ok := app.devices[udid]; ok {
@@ -772,6 +774,9 @@ func (app *application) handleSaveConfig(w http.ResponseWriter, r *http.Request)
 	app.mu.Lock()
 	app.configs[udid] = &candidate
 	app.mu.Unlock()
+	if oldDirectory != candidate.BackupDirectory {
+		app.invalidateBackupIndexDevice(udid)
+	}
 
 	// netmuxd 同步：IP 改址/清空 → 重启 netmuxd 清掉旧条目再重放当前 IP（netmuxd 不更新已存
 	// UDID 的地址，否则旧 IP 残留）；仅新增/不变 → add_device 重放（幂等）。均异步，不阻塞响应。

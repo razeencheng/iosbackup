@@ -32,6 +32,7 @@ func TestBackupSilentOnlineDeviceStopsAndCanRetry(t *testing.T) {
 			cfg.BackupInactivityTimeout = 150 * time.Millisecond
 			cfg.BackupAuthorizationTimeout = 150 * time.Millisecond
 			app := newApplicationWithRuntime(ctx, cfg)
+			t.Cleanup(app.closeBackupIndex)
 			app.devices["TEST-DEVICE"] = &device{UDID: "TEST-DEVICE", Name: "Test phone", IsOnline: true, Connection: connectionTypeDesc(connectTypeNetwork), BatteryLevel: 90}
 			app.configs["TEST-DEVICE"] = &backupConfig{UDID: "TEST-DEVICE", BackupDirectory: cfg.BackupsRoot}
 			script := filepath.Join(t.TempDir(), "backup-tool.sh")
@@ -81,6 +82,7 @@ func TestBackupRepeatedDisplayDoesNotKeepDeadSessionAlive(t *testing.T) {
 	cfg.BackupInactivityTimeout = 150 * time.Millisecond
 	cfg.BackupAuthorizationTimeout = 150 * time.Millisecond
 	app := newApplicationWithRuntime(ctx, cfg)
+	t.Cleanup(app.closeBackupIndex)
 	app.devices["TEST-DEVICE"] = &device{UDID: "TEST-DEVICE", IsOnline: true, BatteryLevel: 90, Connection: connectionTypeDesc(connectTypeNetwork)}
 	app.configs["TEST-DEVICE"] = &backupConfig{UDID: "TEST-DEVICE", BackupDirectory: cfg.BackupsRoot}
 	script := `trap 'exit 1' INT
@@ -110,6 +112,7 @@ func TestBackupRealActivitySurvivesUnchangedPercentAndDeviceProcessing(t *testin
 	cfg.BackupInactivityTimeout = 150 * time.Millisecond
 	cfg.BackupPreparationTimeout = time.Second
 	app := newApplicationWithRuntime(ctx, cfg)
+	t.Cleanup(app.closeBackupIndex)
 	app.devices["TEST-DEVICE"] = &device{UDID: "TEST-DEVICE", IsOnline: true, BatteryLevel: 90, Connection: connectionTypeDesc(connectTypeNetwork)}
 	app.configs["TEST-DEVICE"] = &backupConfig{UDID: "TEST-DEVICE", BackupDirectory: cfg.BackupsRoot}
 	script := `for i in 1 2 3 4 5 6 7 8; do
@@ -162,6 +165,7 @@ sleep 2`, "backup_stalled"},
 			cfg.BackupPreparationTimeout = 150 * time.Millisecond
 			cfg.BackupAuthorizationTimeout = 150 * time.Millisecond
 			app := newApplicationWithRuntime(ctx, cfg)
+			t.Cleanup(app.closeBackupIndex)
 			old := time.Date(2026, 1, 1, 1, 0, 0, 0, time.UTC)
 			app.devices["TEST-DEVICE"] = &device{UDID: "TEST-DEVICE", IsOnline: true, BatteryLevel: 90, LastBackup: old, Connection: connectionTypeDesc(connectTypeNetwork)}
 			app.configs["TEST-DEVICE"] = &backupConfig{UDID: "TEST-DEVICE", BackupDirectory: cfg.BackupsRoot, LastBackup: old}
@@ -188,6 +192,7 @@ func TestBackupStallKillsUnresponsiveProcessGroup(t *testing.T) {
 	cfg.WiFiPowerAssertion = false
 	cfg.BackupPreparationTimeout = 150 * time.Millisecond
 	app := newApplicationWithRuntime(ctx, cfg)
+	t.Cleanup(app.closeBackupIndex)
 	app.devices["TEST-DEVICE"] = &device{UDID: "TEST-DEVICE", IsOnline: true, BatteryLevel: 90, Connection: connectionTypeDesc(connectTypeNetwork)}
 	app.configs["TEST-DEVICE"] = &backupConfig{UDID: "TEST-DEVICE", BackupDirectory: cfg.BackupsRoot}
 	process := make(chan *execCmd, 1)
@@ -225,6 +230,7 @@ func TestBackupIdleStatusIsAlwaysTerminalDuringConcurrentRetry(t *testing.T) {
 	cfg.BackupsRoot = t.TempDir()
 	cfg.WiFiPowerAssertion = false
 	app := newApplicationWithRuntime(ctx, cfg)
+	t.Cleanup(app.closeBackupIndex)
 	app.devices["TEST-DEVICE"] = &device{UDID: "TEST-DEVICE", IsOnline: true, BatteryLevel: 90, Connection: connectionTypeDesc(connectTypeNetwork)}
 	app.configs["TEST-DEVICE"] = &backupConfig{UDID: "TEST-DEVICE", BackupDirectory: cfg.BackupsRoot}
 	app.backupCommand = func(ctx context.Context, _ string, _ ...string) *execCmd {
