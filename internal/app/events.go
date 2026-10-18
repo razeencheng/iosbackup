@@ -77,26 +77,30 @@ func (h *eventHub) clientCount() int {
 // ---- 状态快照 ----
 
 type deviceStatusDTO struct {
-	PresenceKnown       bool               `json:"presence_known"`
-	LastSeen            string             `json:"last_seen,omitempty"`
-	OperationsAvailable bool               `json:"operations_available"`
-	UDID                string             `json:"udid"`
-	Name                string             `json:"name"`
-	DeviceType          string             `json:"device_type"`
-	Conn                string             `json:"conn"` // usb | wifi | offline
-	Online              bool               `json:"online"`
-	Battery             int                `json:"battery"`
-	Charging            bool               `json:"charging"`
-	LastBackupAt        string             `json:"last_backup_at,omitempty"`
-	LastBackup          string             `json:"last_backup"` // 北京时间 "2006-01-02 15:04" 或空
-	BackingUp           bool               `json:"backing_up"`
-	PairingState        string             `json:"pairing_state"`
-	PairingErrorCode    string             `json:"pairing_error_code"`
-	PairingError        string             `json:"pairing_error"`
-	BackupState         string             `json:"backup_state"`
-	LastBackupErrorCode string             `json:"last_backup_error_code"`
-	LastBackupError     string             `json:"last_backup_error"`
-	BackupProgress      *backupProgressDTO `json:"backup_progress,omitempty"`
+	PresenceKnown             bool               `json:"presence_known"`
+	LastSeen                  string             `json:"last_seen,omitempty"`
+	OperationsAvailable       bool               `json:"operations_available"`
+	UDID                      string             `json:"udid"`
+	Name                      string             `json:"name"`
+	DeviceType                string             `json:"device_type"`
+	Conn                      string             `json:"conn"` // usb | wifi | offline
+	Online                    bool               `json:"online"`
+	Battery                   int                `json:"battery"`
+	Charging                  bool               `json:"charging"`
+	LastBackupAt              string             `json:"last_backup_at,omitempty"`
+	LastBackup                string             `json:"last_backup"` // 北京时间 "2006-01-02 15:04" 或空
+	BackingUp                 bool               `json:"backing_up"`
+	PairingState              string             `json:"pairing_state"`
+	PairingErrorCode          string             `json:"pairing_error_code"`
+	PairingError              string             `json:"pairing_error"`
+	BackupState               string             `json:"backup_state"`
+	BackupJobID               string             `json:"backup_job_id"`
+	AutoBackupHold            bool               `json:"auto_backup_hold"`
+	AutoBackupHoldVersion     string             `json:"auto_backup_hold_version"`
+	AutoBackupHoldPersistence string             `json:"auto_backup_hold_persistence"`
+	LastBackupErrorCode       string             `json:"last_backup_error_code"`
+	LastBackupError           string             `json:"last_backup_error"`
+	BackupProgress            *backupProgressDTO `json:"backup_progress,omitempty"`
 }
 
 type backupProgressDTO struct {
@@ -189,8 +193,17 @@ func (app *application) buildStatusSnapshot() statusSnapshot {
 		if !d.LastSeen.IsZero() {
 			lastSeen = toBeijingTime(d.LastSeen).Format(time.RFC3339)
 		}
+		jobID := ""
+		hold := app.backupHoldUnsafe(udid)
+		if job := app.backupJobs[udid]; job != nil {
+			jobID = job.id
+		}
 		devs = append(devs, deviceStatusDTO{
-			PresenceKnown: !d.PresenceUnknown, LastSeen: lastSeen, OperationsAvailable: d.IsOnline && app.connectionAdmissionUnsafe(d) == nil,
+			BackupJobID:               jobID,
+			AutoBackupHold:            hold.Held,
+			AutoBackupHoldVersion:     hold.Version,
+			AutoBackupHoldPersistence: hold.Persistence,
+			PresenceKnown:             !d.PresenceUnknown, LastSeen: lastSeen, OperationsAvailable: d.IsOnline && app.connectionAdmissionUnsafe(d) == nil,
 			UDID:                udid,
 			Name:                d.Name,
 			DeviceType:          d.DeviceType,

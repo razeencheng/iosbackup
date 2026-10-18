@@ -87,6 +87,9 @@ func (app *application) setupRoutes() http.Handler {
 	mux.HandleFunc("/api/refresh", app.handleRefresh)
 	mux.HandleFunc("/api/restart-usbmuxd", app.handleRestartUSBMuxD)
 	mux.HandleFunc("/api/backup/", app.handleBackup)
+	mux.HandleFunc("/api/backup-stop/", app.handleBackupStop)
+	mux.HandleFunc("/api/backup-resume/", app.handleBackupResume)
+	mux.HandleFunc("/api/backup-hold-retry/", app.handleBackupHoldRetry)
 	mux.HandleFunc("/api/save-config/", app.handleSaveConfig)
 	mux.HandleFunc("/api/test-ip/", app.handleTestDeviceIP)
 	mux.HandleFunc("/api/check-dir", app.handleCheckBackupDir)
@@ -448,7 +451,8 @@ func (app *application) handleHome(w http.ResponseWriter, r *http.Request) {
 		deviceCopy.LastBackup = toBeijingTime(device.LastBackup)
 		devices = append(devices, &deviceCopy)
 		if config, exists := app.configs[udid]; exists {
-			configs[udid] = config
+			configs[udid] = cloneBackupConfig(config)
+			app.overlayBackupHoldUnsafe(configs[udid])
 		} else {
 			// 模板始终需要一份配置（避免 nil 解引用）；用安全默认值兜底
 			configs[udid] = &backupConfig{
@@ -664,33 +668,20 @@ func (app *application) handleBackup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 全局并发上限：已有备份占满则同步拒绝（多设备避免成倍占用 CPU/内存）。
-	if !app.backupSem.tryAcquire() {
-		payload := apiMessage(w, i18n.BackupBusy, nil, true)
-		payload["error_code"] = "backup_busy"
+	job, err := app.beginBackupJob(udid, "", "", false)
+	if err != nil {
+		payload := operationErrorPayload(w, err, i18n.OperationFailed)
+		if translated, ok := err.(*i18n.Error); ok && translated.Code == i18n.BackupBusy {
+			payload["error_code"] = "backup_busy"
+		}
 		writeJSON(w, http.StatusConflict, payload)
 		return
 	}
-	app.mu.RLock()
-	dev := cloneDevice(app.devices[udid])
-	app.mu.RUnlock()
-	release, err := app.beginConnectionTask(dev)
-	if err != nil {
-		app.backupSem.release()
-		writeOperationError(w, http.StatusConflict, err, i18n.OperationFailed)
-		return
-	}
-	app.markBackupStarting(udid)
-
-	go func() {
-		defer app.backupSem.release()
-		defer release()
-		if err := app.performBackupInTask(udid); err != nil {
-			app.addLog(udid, fmt.Sprintf("event=backup.failed error=%v", err))
-		}
-	}()
+	app.broadcastStatus()
+	go app.runBackupJob(job)
 	payload := apiMessage(w, i18n.BackupStarted, nil, false)
 	payload["backup_state"] = backupStateStarting
+	payload["backup_job_id"] = job.id
 	writeJSON(w, http.StatusAccepted, payload)
 }
 
@@ -761,6 +752,9 @@ func (app *application) handleSaveConfig(w http.ResponseWriter, r *http.Request)
 		candidate.Name = deviceName
 	}
 	app.applyBackupConfigDefaults(&candidate)
+	app.mu.RLock()
+	app.overlayBackupHoldUnsafe(&candidate)
+	app.mu.RUnlock()
 	if err := validateBackupConfig(candidate, []string{app.paths.BackupsRoot}); err != nil {
 		writeOperationError(w, http.StatusBadRequest, err, i18n.ConfigInvalid)
 		return
@@ -770,6 +764,7 @@ func (app *application) handleSaveConfig(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	app.mu.Lock()
+	app.overlayBackupHoldUnsafe(&candidate)
 	app.configs[udid] = &candidate
 	app.mu.Unlock()
 

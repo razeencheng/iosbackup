@@ -25,6 +25,7 @@ type backupConfigStore struct {
 	lastGoodPath string
 	allowedRoots []string
 	configs      map[string]backupConfig
+	writeAtomic  func(string, []byte, os.FileMode) error
 }
 
 func newBackupConfigStore(path string, allowedRoots []string) *backupConfigStore {
@@ -158,10 +159,14 @@ func (s *backupConfigStore) saveLocked(configs map[string]backupConfig) error {
 	if err != nil {
 		return err
 	}
-	if err := writeFileAtomic(s.lastGoodPath, data, 0600); err != nil {
+	write := s.writeAtomic
+	if write == nil {
+		write = writeFileAtomic
+	}
+	if err := write(s.lastGoodPath, data, 0600); err != nil {
 		return fmt.Errorf("write last-good configuration: %w", err)
 	}
-	if err := writeFileAtomic(s.path, data, 0600); err != nil {
+	if err := write(s.path, data, 0600); err != nil {
 		return err
 	}
 	return nil
