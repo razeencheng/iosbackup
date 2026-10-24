@@ -134,6 +134,8 @@
     var title = c.ready, detail = c.idle;
     if (state === 'starting') { title = c.starting; detail = c.starting; }
     if (state === 'running') { title = c.running; detail = c.running; }
+    if (state === 'stopping') { title = tr('control.stopping'); detail = tr('control.stoppingHint'); }
+    if (state === 'stopped') { title = tr('control.stopped'); detail = tr('control.stoppedHint'); }
     if (state === 'succeeded' && device && device.last_backup) { title = c.succeeded; detail = IOSBKI18n.formatDate(device.last_backup_at||device.last_backup); }
     if (state === 'failed') { title = c.failedBackup; detail = IOSBKI18n.message({code:'api.'+(device.last_backup_error_code||'')},'guide.failedBackup'); }
     if (state === 'interrupted') { title = c.interrupted; detail = IOSBKI18n.message({code:'api.'+(device.last_backup_error_code||'')},'guide.failedBackup'); }
@@ -145,7 +147,7 @@
     error.hidden = state !== 'failed' && state !== 'interrupted';
     error.textContent = detail;
     var button = document.getElementById('startBackup');
-    button.disabled = state === 'starting' || state === 'running' || !device || device.presence_known===false || device.operations_available===false || device.pairing_state !== 'paired';
+    button.disabled = state === 'starting' || state === 'running' || state === 'stopping' || !device || !!device.backing_up || device.presence_known===false || device.operations_available===false || device.pairing_state !== 'paired';
     button.textContent = state === 'succeeded' && device && device.last_backup ? c.finish : ((state === 'failed' || state === 'interrupted') ? c.retryBackup : c.start);
   }
 

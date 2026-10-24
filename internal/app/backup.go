@@ -58,6 +58,9 @@ func (app *application) markBackupRunning(udid string) {
 }
 
 func backupFailureState(err error) (stateCode, errorCode string) {
+	if errors.Is(err, errBackupStoppedByUser) {
+		return backupStateStopped, "backup_stopped_by_user"
+	}
 	if errors.Is(err, errBackupStalled) {
 		return backupStateFailed, "backup_stalled"
 	}
@@ -87,166 +90,106 @@ func (app *application) finishBackupState(udid string, err error) {
 	app.setBackupOperationState(udid, stateCode, errorCode, err.Error())
 }
 
-// finishBackupOperation 原子提交终态并释放占用，下一任务不能被旧终态覆盖。
-func (app *application) finishBackupOperation(udid string, err error, at time.Time) {
-	app.mu.Lock()
-	app.finishBackupProgressUnsafe(udid, err, at)
-	state := app.deviceOperationStates[udid]
-	state.BackupState = backupStateSucceeded
-	state.BackupErrorCode = ""
-	state.LastBackupError = ""
-	if err != nil {
-		state.BackupState, state.BackupErrorCode = backupFailureState(err)
-		state.LastBackupError = err.Error()
-	}
-	app.deviceOperationStates[udid] = state
-	delete(app.backupInProgress, udid)
-	app.mu.Unlock()
-	app.broadcastStatus()
-}
-
+// PerformBackup 执行一次手动备份，暂缓自动计划不限制此入口。
 func (app *application) PerformBackup(udid string) error {
-	app.mu.RLock()
-	d := cloneDevice(app.devices[udid])
-	app.mu.RUnlock()
-	release, err := app.beginConnectionTask(d)
+	job, err := app.beginBackupJob(udid, "", "", false)
 	if err != nil {
 		return err
 	}
-	defer release()
-	return app.performBackupInTask(udid)
+	return app.runBackupJob(job)
 }
 
-func (app *application) performBackupInTask(udid string) (retErr error) {
-	app.mu.Lock()
-	if err := app.deviceRemovalBlockedUnsafe(udid); err != nil {
-		app.mu.Unlock()
+// runBackupJob 共用执行、通知和收束，所有资源在终态发布前释放。
+func (app *application) runBackupJob(job *backupJob) (retErr error) {
+	defer func() { app.finishBackupJob(job, retErr) }()
+	udid, cfg, device := job.udid, job.config, job.device
+	backupLog := func(message string) { app.addLog(udid, backupSessionLog(job.id, message)) }
+	defer func() {
+		app.recordBackupResult(job, retErr)
+		if retErr == nil {
+			return
+		}
+		if errors.Is(retErr, errBackupStoppedByUser) {
+			backupLog("event=backup.stopped")
+			return
+		}
+		backupLog(fmt.Sprintf("event=backup.failed error=%v", retErr))
+		if manager := app.notificationManagerSnapshot(); manager != nil {
+			_, code := backupFailureState(retErr)
+			manager.SendBackupFailure(device.Name, udid, code, retErr.Error())
+		}
+	}()
+	app.broadcastStatus()
+	if err := context.Cause(job.ctx); err != nil {
 		return err
 	}
-	device, exists := app.devices[udid]
-	device = cloneDevice(device)
-	config, configExists := app.configs[udid]
-	config = cloneBackupConfig(config)
-
-	// 检查设备是否已经在备份中
-	if app.backupInProgress[udid] {
-		app.mu.Unlock()
-		return i18n.NewError(i18n.Busy, nil)
+	if !job.automatic {
+		if cfg.OnlyWhenCharging && !device.IsCharging {
+			return i18n.NewError(i18n.NotCharging, nil)
+		}
+		if device.BatteryLevel < cfg.MinBatteryLevel {
+			return i18n.NewError(i18n.LowBattery, map[string]any{"battery": device.BatteryLevel, "min_battery": cfg.MinBatteryLevel})
+		}
 	}
-
-	// 标记设备为备份中状态
-	app.backupInProgress[udid] = true
-	app.mu.Unlock()
-	app.startBackupProgress(udid, nowBeijing())
-	app.markBackupRunning(udid) // 备份开始：即时推送（不必等下一轮询）
-	sessionID := newBackupSessionID()
-	backupLog := func(message string) {
-		app.addLog(udid, backupSessionLog(sessionID, message))
+	backupDir := cfg.BackupDirectory
+	if backupDir == "" {
+		backupDir = app.paths.BackupsRoot
 	}
-
-	// 确保在函数退出时清理备份状态
-	defer func() {
-		app.finishBackupOperation(udid, retErr, nowBeijing())
-	}()
-
-	if !exists {
-		return i18n.NewError(i18n.DeviceNotFound, nil)
+	if err := os.MkdirAll(backupDir, 0755); err != nil {
+		return err
 	}
-
-	if !configExists {
-		return i18n.NewError(i18n.ConfigInvalid, nil)
+	if err := context.Cause(job.ctx); err != nil {
+		return err
 	}
-
-	// 检查备份条件
-	if config.OnlyWhenCharging && !device.IsCharging {
-		return i18n.NewError(i18n.NotCharging, nil)
-	}
-
-	if device.BatteryLevel < config.MinBatteryLevel {
-		return i18n.NewError(i18n.LowBattery, map[string]any{"battery": device.BatteryLevel, "min_battery": config.MinBatteryLevel})
-	}
-
-	backupLog("event=backup.started")
-
-	// 确保备份目录存在
-	os.MkdirAll(config.BackupDirectory, 0755)
+	backupLog(fmt.Sprintf("event=backup.started automatic=%t", job.automatic))
 	if manager := app.notificationManagerSnapshot(); manager != nil {
 		manager.SendBackupStart(device.Name, udid)
 	}
-
-	connType := device.Connection
-	if connType == connectionTypeDesc(connectTypeNetwork) {
-		backupLog("event=backup.transport connection=network")
-	} else {
-		backupLog("event=backup.transport connection=usb")
-	}
-
-	// 构建备份命令（通过 runIdeviceCmd 注入 socket 和 -n）
-	// 长命令使用可取消 context，与 backupInProgress 守卫联动
-	backupCtx, backupCancel := context.WithCancelCause(app.rootCtx)
-	defer backupCancel(nil)
-
-	// 直接构建 exec.Cmd（需要 StdoutPipe/StderrPipe），手动注入 socket env
-	isNetwork := device.Connection == connectionTypeDesc(connectTypeNetwork)
-	releasePowerAssertion, err := app.guardWiFiBackupPowerAssertion(backupCtx, backupCancel, udid, isNetwork)
-	if err != nil {
-		backupLog(fmt.Sprintf("event=backup.failed error=%v", err))
-		return err
-	}
-	defer releasePowerAssertion()
-
-	err = app.runBackupCommand(backupCtx, backupCancel, udid, sessionID, config.BackupDirectory, isNetwork)
-	if err != nil {
-		backupLog(fmt.Sprintf("event=backup.failed error=%v", err))
-
-		// 发送备份失败通知
-		if manager := app.notificationManagerSnapshot(); manager != nil {
-			deviceName := udid
-			app.mu.RLock()
-			if device, exists := app.devices[udid]; exists {
-				deviceName = device.Name
-			}
-			app.mu.RUnlock()
-			_, code := backupFailureState(err)
-			manager.SendBackupFailure(deviceName, udid, code, err.Error())
+	network := isNetworkConnection(device.Connection)
+	releasePowerAssertion, err := app.guardWiFiBackupPowerAssertion(job.ctx, job.cancel, udid, network)
+	if err == nil {
+		defer releasePowerAssertion()
+		app.mu.Lock()
+		if app.backupJobs[udid] == job && !job.stopAccepted {
+			state := app.deviceOperationStates[udid]
+			state.BackupState = backupStateRunning
+			app.deviceOperationStates[udid] = state
 		}
-
+		app.mu.Unlock()
+		app.broadcastStatus()
+		err = app.runBackupCommand(job.ctx, job.cancel, udid, job.id, backupDir, network)
+	}
+	app.recordBackupResult(job, err)
+	if err != nil {
 		return err
 	}
-
-	// 更新最后备份时间和连接类型
+	// 与配置编辑串行保存成功时间，避免旧候选覆盖本次结果。
+	app.configPersistMu.Lock()
 	app.mu.Lock()
-	backupTime := nowBeijing()
-	if device, exists := app.devices[udid]; exists {
-		device.LastBackup = backupTime
+	at := nowBeijing()
+	if d := app.devices[udid]; d != nil {
+		d.LastBackup = at
 	}
-	if config, exists := app.configs[udid]; exists {
-		config.LastBackup = backupTime
-		config.LastBackupConnection = connTypeFromDesc(connType)
-		if device, exists := app.devices[udid]; exists {
-			if name := device.knownName(); name != "" {
-				config.Name = name
+	if cfg := app.configs[udid]; cfg != nil {
+		cfg.LastBackup = at
+		cfg.LastBackupConnection = connTypeFromDesc(device.Connection)
+		if current := app.devices[udid]; current != nil {
+			if name := current.knownName(); name != "" {
+				cfg.Name = name
 			}
 		}
 	}
+	configs := app.backupConfigsSnapshotUnsafe()
 	app.mu.Unlock()
-
-	// 保存配置到文件
-	app.saveConfigs()
-
-	backupLog("event=backup.completed")
-
-	// 发送备份成功通知
-	if manager := app.notificationManagerSnapshot(); manager != nil {
-		deviceName := udid
-		app.mu.RLock()
-		if device, exists := app.devices[udid]; exists {
-			deviceName = device.Name
-		}
-		app.mu.RUnlock()
-		manager.SendBackupSuccess(deviceName, udid)
+	saveErr := app.configStore.Replace(configs)
+	app.configPersistMu.Unlock()
+	if saveErr != nil {
+		backupLog(fmt.Sprintf("event=backup.metadata_save_failed error=%v", saveErr))
 	}
-
+	backupLog("event=backup.completed")
+	if manager := app.notificationManagerSnapshot(); manager != nil {
+		manager.SendBackupSuccess(device.Name, udid)
+	}
 	return nil
 }
 
@@ -279,7 +222,7 @@ func (app *application) readBackupOutput(udid, sessionID string, pipe interface{
 			}
 		} else if logType == "STDOUT" {
 			if update, ok := parseBackupProgressLine(line); ok {
-				app.applyBackupProgressUpdate(udid, update, nowBeijing())
+				app.applyBackupProgressUpdate(udid, update, nowBeijing(), sessionID)
 			}
 		}
 		shouldLog := !carriageReturn
@@ -302,147 +245,19 @@ func (app *application) readBackupOutput(udid, sessionID string, pipe interface{
 	}
 }
 
-// PerformBackupWithConnection 根据连接方式执行备份
-func (app *application) PerformBackupWithConnection(udid string, connectionType string) (retErr error) {
-	return app.performBackupWithConnection(udid, connectionType, newBackupSessionID())
+// PerformBackupWithConnection 显式选择连接执行单次备份，不改变自动计划。
+func (app *application) PerformBackupWithConnection(udid, connectionType string) error {
+	job, err := app.beginBackupJob(udid, connectionType, "", false)
+	if err != nil {
+		return err
+	}
+	return app.runBackupJob(job)
 }
 
-func (app *application) performBackupWithConnection(udid, connectionType, sessionID string) (retErr error) {
-	app.mu.Lock()
-	if err := app.deviceRemovalBlockedUnsafe(udid); err != nil {
-		app.mu.Unlock()
-		return err
-	}
-	device, exists := app.devices[udid]
-	device = cloneDevice(device)
-	if device != nil {
-		device.Connection = connectionType
-	}
-	if err := app.connectionAdmissionUnsafe(device); err != nil {
-		app.mu.Unlock()
-		return err
-	}
-	config, configExists := app.configs[udid]
-	config = cloneBackupConfig(config)
-
-	// 检查设备是否已经在备份中
-	if app.backupInProgress[udid] {
-		app.mu.Unlock()
-		return i18n.NewError(i18n.Busy, nil)
-	}
-
-	// 标记设备为备份中状态
-	app.backupInProgress[udid] = true
-	app.mu.Unlock()
-	app.startBackupProgress(udid, nowBeijing())
-	app.markBackupRunning(udid) // 备份开始：即时推送（不必等下一轮询）
-	backupLog := func(message string) {
-		app.addLog(udid, backupSessionLog(sessionID, message))
-	}
-
-	// 确保在函数退出时清理备份状态
-	defer func() {
-		app.finishBackupOperation(udid, retErr, nowBeijing())
-	}()
-
-	if !exists {
-		return i18n.NewError(i18n.DeviceNotFound, nil)
-	}
-
-	if !configExists {
-		return i18n.NewError(i18n.ConfigInvalid, nil)
-	}
-
-	backupDir := config.BackupDirectory
-	if backupDir == "" {
-		backupDir = dirBackups
-	}
-
-	backupLog(fmt.Sprintf("event=backup.started source=scheduler directory=%s", backupDir))
-
-	err := os.MkdirAll(backupDir, 0755)
+func (app *application) performBackupWithConnection(udid, connectionType, sessionID string) error {
+	job, err := app.beginBackupJob(udid, connectionType, sessionID, true)
 	if err != nil {
-		backupLog(fmt.Sprintf("event=backup.directory_create_failed error=%v", err))
 		return err
 	}
-	if manager := app.notificationManagerSnapshot(); manager != nil {
-		deviceName := udid
-		app.mu.RLock()
-		if device, exists := app.devices[udid]; exists {
-			deviceName = device.Name
-		}
-		app.mu.RUnlock()
-		manager.SendBackupStart(deviceName, udid)
-	}
-
-	// 根据连接方式构建备份命令（手动注入 socket，因为需要 StdoutPipe/StderrPipe）
-	isNetwork := isNetworkConnection(connectionType)
-	if isNetwork {
-		backupLog("event=backup.transport source=scheduler connection=network")
-	} else {
-		backupLog("event=backup.transport source=scheduler connection=usb")
-	}
-
-	backupCtx, backupCancel := context.WithCancelCause(app.rootCtx)
-	defer backupCancel(nil)
-	releasePowerAssertion, err := app.guardWiFiBackupPowerAssertion(backupCtx, backupCancel, udid, isNetwork)
-	if err != nil {
-		backupLog(fmt.Sprintf("event=backup.failed source=scheduler error=%v", err))
-		return err
-	}
-	defer releasePowerAssertion()
-
-	err = app.runBackupCommand(backupCtx, backupCancel, udid, sessionID, backupDir, isNetwork)
-	if err != nil {
-		backupLog(fmt.Sprintf("event=backup.failed source=scheduler error=%v", err))
-
-		if manager := app.notificationManagerSnapshot(); manager != nil {
-			deviceName := udid
-			app.mu.RLock()
-			if device, exists := app.devices[udid]; exists {
-				deviceName = device.Name
-			}
-			app.mu.RUnlock()
-			_, code := backupFailureState(err)
-			manager.SendBackupFailure(deviceName, udid, code, err.Error())
-		}
-
-		return err
-	}
-
-	// 更新最后备份时间和连接类型
-	app.mu.Lock()
-	backupTime := nowBeijing()
-	if device, exists := app.devices[udid]; exists {
-		device.LastBackup = backupTime
-	}
-	if config, exists := app.configs[udid]; exists {
-		config.LastBackup = backupTime
-		if isNetwork {
-			config.LastBackupConnection = connectTypeNetwork
-		} else {
-			config.LastBackupConnection = connectTypeUSB
-		}
-		if device, exists := app.devices[udid]; exists {
-			if name := device.knownName(); name != "" {
-				config.Name = name
-			}
-		}
-	}
-	app.mu.Unlock()
-
-	app.saveConfigs()
-	backupLog("event=backup.completed source=scheduler")
-
-	if manager := app.notificationManagerSnapshot(); manager != nil {
-		deviceName := udid
-		app.mu.RLock()
-		if device, exists := app.devices[udid]; exists {
-			deviceName = device.Name
-		}
-		app.mu.RUnlock()
-		manager.SendBackupSuccess(deviceName, udid)
-	}
-
-	return nil
+	return app.runBackupJob(job)
 }

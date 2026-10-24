@@ -43,7 +43,7 @@ Pairing records live in `data/lockdown` under the deployment directory, mounted 
 3. **On the phone** , enter the device passcode if a white passcode screen appears when the backup wakes it. If a trust prompt appears, unlock the phone and tap **Trust** . After authorization, there is no need to keep the phone unlocked or its screen on. Pairing does not eliminate backup authorization. The default authorization wait is 5 minutes; after timeout, resolve the cause and start a new job.
 4. **In the Web UI** , return from the guide to the console for detailed progress. Keep USB connected and the host running until the page shows that the backup has completed, failed, or been interrupted.
 
-Live-update controls only affect page refresh. Pausing updates or closing the browser does not cancel a background backup. There is currently no user-facing **Cancel backup** button. Do not unplug the cable to simulate cancellation. If maintenance requires interruption, consult [troubleshooting](troubleshooting.md), record the current state and check which data an interruption could affect first.
+Live-update controls only affect page refresh. Pausing updates or closing the browser does not cancel a background backup. Use **Stop backup** on the device card and confirm the risk: incremental updates modify the same files, so interruption may affect the previous backup's recoverability. Wait for **Stopped · backup incomplete** before disconnecting. Stopping also holds automatic backups until explicitly resumed; see [stopping and scheduling](scheduling.md#stop-a-backup-and-hold-automatic-scheduling). Do not unplug the cable to simulate this operation.
 
 ## 4. Interpret progress and wait for completion
 
@@ -57,6 +57,8 @@ Live-update controls only affect page refresh. Pausing updates or closing the br
 | Overall progress only | Reliable file byte counts were unavailable; omitting file progress is expected. |
 | 100% while still running | Transfer percentage does not establish successful tool exit. Wait for protocol handling and finalization; keep the cable connected; the backup is not yet complete. |
 | **Backup completed** | The job ended successfully; check completion time and the latest backup record next. |
+| **Stopping…** | The request was accepted; keep connected while the process and output finish. |
+| **Stopped · backup incomplete** | This attempt ended without completion. Files were retained without rollback; previous backup recoverability is unverified. |
 | **Backup failed** or **Backup interrupted** | This job has ended. Record messages and logs, fix the cause, then start a new job. |
 
 Phases can repeat or alternate; they are not a checklist that must appear in order. Default inactivity limits are 30 minutes during preparation/device processing and 10 minutes while sending or receiving, with a separate 5-minute authorization wait. They are not a total-job duration limit. Do not increase timeouts to conceal missing authorization, disconnection, or storage problems. See the [configuration reference](configuration.md).

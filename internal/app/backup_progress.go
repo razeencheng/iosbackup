@@ -166,8 +166,14 @@ func (app *application) startBackupProgress(udid string, at time.Time) {
 }
 
 // applyBackupProgressUpdate 合并一行输出提供的局部事实。终态不会被迟到的输出协程覆盖。
-func (app *application) applyBackupProgressUpdate(udid string, update backupProgressUpdate, at time.Time) bool {
+func (app *application) applyBackupProgressUpdate(udid string, update backupProgressUpdate, at time.Time, sessionIDs ...string) bool {
 	app.mu.Lock()
+	if len(sessionIDs) > 0 {
+		if job := app.backupJobs[udid]; job != nil && job.id != sessionIDs[0] {
+			app.mu.Unlock()
+			return false
+		}
+	}
 
 	progress, ok := app.backupProgress[udid]
 	if !ok || progress.State == backupProgressCompleted || progress.State == backupProgressFailed || progress.State == backupProgressInterrupted {
@@ -253,7 +259,7 @@ func (app *application) finishBackupProgressUnsafe(udid string, err error, at ti
 		progress.State = backupProgressCompleted
 		progress.Phase = "completed"
 		progress.OverallPercent = &complete
-	} else if errors.Is(err, errDeviceDisconnected) || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+	} else if errors.Is(err, errBackupStoppedByUser) || errors.Is(err, errDeviceDisconnected) || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 		progress.State = backupProgressInterrupted
 		progress.Phase = "interrupted"
 	} else {

@@ -177,7 +177,7 @@ func (app *application) runBackupCommand(ctx context.Context, cancel context.Can
 				at := time.Now()
 				update, internal := activity.observe(line, kind, at)
 				if update.Phase != "" || update.OverallPercent != nil || update.CurrentBytes != nil || !update.LastActivityAt.IsZero() {
-					app.applyBackupProgressUpdate(udid, update, at)
+					app.applyBackupProgressUpdate(udid, update, at, sessionID)
 				}
 				return internal
 			})
@@ -212,18 +212,27 @@ func (app *application) runBackupCommand(ctx context.Context, cancel context.Can
 			}
 		}
 	}()
-	err := cmd.Run()
+	var commandErr error
+	_ = cmd.runWithCompletion(func(err error) {
+		// 与停止准入共用锁。命令退出后只暂缓计划，不让迟到的取消覆盖退出结果。
+		app.mu.Lock()
+		defer app.mu.Unlock()
+		commandErr = err
+		if cause := context.Cause(ctx); cause != nil {
+			commandErr = cause
+		}
+		if job := app.backupJobs[udid]; job != nil && job.id == sessionID {
+			job.commandFinished = true
+		}
+	})
 	close(done)
 	<-stopped
 	for _, w := range writers {
 		_ = w.Close()
 	}
 	readers.Wait() // 旧输出必须在终态与下一任务前全部收束。
-	if cause := context.Cause(ctx); cause != nil {
-		return cause
-	}
-	if err != nil {
-		return err
+	if commandErr != nil {
+		return commandErr
 	}
 	if !activity.success {
 		return errors.New("backup tool exited without confirming backup completion")

@@ -153,6 +153,10 @@ guide.api.setLocale('zh-CN');
 vm.runInContext(`pairingMessage({pairing_state:'failed',pairing_error_code:'device_unavailable'});backupMessage({backup_state:'failed',last_backup_error_code:'unknown_vendor_failure'});`,guide.context);
 assert.equal(guideDOM.get('pairError').textContent,apiCatalog['zh-CN']['api.device_unavailable']);
 assert.equal(guideDOM.get('backupError').textContent,catalogs['zh-CN']['guide.failedBackup']);
+vm.runInContext(`backupMessage({backup_state:'stopping',backing_up:true,pairing_state:'paired'});`,guide.context);
+assert.equal(guideDOM.get('startBackup').disabled,true,'onboarding must remain busy while the task stops');
+vm.runInContext(`backupMessage({backup_state:'stopped',backing_up:false,pairing_state:'paired'});`,guide.context);
+assert.equal(guideDOM.get('backupTitle').textContent,catalogs['zh-CN']['control.stopped']);
 console.log('onboarding errors use translated machine codes and safe unknown fallbacks');
 
 async function verifyOperationStateAcrossLanguageChanges(){
@@ -195,3 +199,47 @@ async function verifyOperationStateAcrossLanguageChanges(){
  console.log('pending checks, deleted backups and notification delivery results survive localization correctly');
 }
 verifyOperationStateAcrossLanguageChanges().catch(error=>{console.error(error);process.exitCode=1;});
+
+async function verifyBackupControlBehavior(){
+ const controls=boot(),nodes=dom(controls);
+ controls.api.register(apiCatalog);
+ vm.runInContext(pageScript('index.html'),controls.context);
+ assert.equal(vm.runInContext('typeof openStopBackup',controls.context),'function','console must expose the approved stop confirmation');
+ vm.runInContext(`patchDevice({udid:'PHONE',name:'Phone',conn:'usb',online:true,backup_job_id:'job-1',backup_state:'running',backing_up:true});openStopBackup('PHONE');`,controls.context);
+ assert.equal(nodes.get('stopBackupModal').classList.contains('hidden'),false);
+ controls.api.setLocale('zh-CN');
+ assert.equal(nodes.get('stopBackupRisk').textContent,catalogs['zh-CN']['control.stopRisk']);
+ vm.runInContext(`patchDevice({udid:'PHONE',conn:'usb',online:true,backup_job_id:'job-2',backup_state:'running',backing_up:true});`,controls.context);
+ const requests=[];
+ let release;
+ controls.window.fetch=(url,opts)=>{
+  requests.push({url,opts});
+  if(url==='/api/status')return Promise.resolve({json:()=>Promise.resolve({devices:[{udid:'PHONE',conn:'usb',online:true,backup_job_id:'job-2',backup_state:'running',backing_up:true}]})});
+  return new Promise(resolve=>{release=resolve;});
+ };
+ const pending=vm.runInContext('submitStopBackup()',controls.context);
+ vm.runInContext('submitStopBackup()',controls.context);
+ assert.equal(requests.length,1,'double confirmation must not send two stops');
+ assert.equal(JSON.parse(requests[0].opts.body).job_id,'job-1','confirmation must keep the originally selected task');
+ release({status:409,json:()=>Promise.resolve({error:'stale',code:'api.backup_job_stale'})});
+ await pending;
+ assert.equal(vm.runInContext('latestDeviceStatuses.PHONE.backup_job_id',controls.context),'job-2');
+ assert.equal(vm.runInContext('latestDeviceStatuses.PHONE.backup_state',controls.context),'running');
+ vm.runInContext(`patchDevice({udid:'PHONE',conn:'usb',online:true,backup_job_id:'job-2',backup_state:'stopping',backing_up:true,auto_backup_hold:true,auto_backup_hold_version:'hold-2',auto_backup_hold_persistence:'saved'});`,controls.context);
+ assert.equal(nodes.get('resumeBackup-PHONE').disabled,true,'cannot resume while stopping');
+ assert.equal(nodes.get('stopBackup-PHONE').disabled,true);
+ assert.equal(nodes.get('bkprogress-status-title-PHONE').textContent,catalogs['zh-CN']['control.stopping']);
+ vm.runInContext(`patchDevice({udid:'PHONE',conn:'usb',online:true,backup_job_id:'job-2',backup_state:'stopped',backing_up:false,auto_backup_hold:true,auto_backup_hold_version:'hold-2',auto_backup_hold_persistence:'error'});`,controls.context);
+ assert.equal(nodes.get('retryHold-PHONE').classList.contains('hidden'),false,'save error needs a retry action');
+ assert.equal(nodes.get('backupBtn-PHONE').disabled,false,'manual once remains available while held');
+ controls.api.setLocale('en');
+ assert.equal(nodes.get('backupHoldMessage-PHONE').textContent,catalogs.en['control.holdSaveFailed']);
+ assert.equal(nodes.get('bkprogress-status-title-PHONE').textContent,catalogs.en['control.stopped']);
+ vm.runInContext(`patchDevice({udid:'PHONE',conn:'usb',online:true,backup_job_id:'job-3',backup_state:'running',backing_up:true});openStopBackup('PHONE');`,controls.context);
+ controls.window.fetch=(url)=>url==='/api/status'?Promise.reject(Error('offline')):Promise.resolve({status:500,json:()=>Promise.resolve({error:'save',code:'api.backup_hold_save_failed',backup_job_id:'job-3',backup_state:'stopping',backing_up:true,auto_backup_hold:true,auto_backup_hold_version:'job-3',auto_backup_hold_persistence:'error'})});
+ await vm.runInContext('submitStopBackup()',controls.context);
+ assert.equal(nodes.get('backupHoldMessage-PHONE').textContent,catalogs.en['control.holdSaveFailed'],'partial result must remain visible even when the follow-up refresh fails');
+ assert.equal(nodes.get('stopBackup-PHONE').disabled,true,'accepted stop must not revert to running after a save error');
+ console.log('backup controls preserve task identity, prevent duplicate requests and distinguish stopping, holding and save failures');
+}
+verifyBackupControlBehavior().catch(error=>{console.error(error);process.exitCode=1;});

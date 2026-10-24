@@ -137,7 +137,14 @@
     "api.notification_template_length": "Keep the {event} notification template at or below {max} bytes.",
     "api.notification_template_variable": "Template {event} uses unsupported variable {variable}. Remove it or choose a supported template variable.",
     "api.notification_rule_target_missing": "Rule {event} references missing or disabled channel {channel}. Enable that channel or remove it from the rule.",
-    "api.notification_rule_target_duplicate": "Rule {event} lists channel {channel} more than once. Keep one entry."
+    "api.notification_rule_target_duplicate": "Rule {event} lists channel {channel} more than once. Keep one entry.",
+    "api.backup_job_stale": "This backup task has changed. Refresh its status before trying again.",
+    "api.backup_hold_stale": "The automatic backup hold has changed. Refresh its status before trying again.",
+    "api.backup_stopping": "Wait for the backup to stop before resuming automatic backups.",
+    "api.backup_auto_held": "Automatic backups are on hold until you resume them.",
+    "api.backup_hold_save_failed": "Automatic backups remain on hold in this session, but the setting could not be saved reliably. Retry saving before restarting.",
+    "api.backup_control_identity_required": "The backup task or hold identifier is missing. Refresh the page and retry.",
+    "api.backup_control_updated": "Backup control updated."
   },
   "zh-CN": {
     "api.operation_failed": "操作未能完成，请重试或查看服务日志。",
@@ -277,6 +284,13 @@
     "api.notification_template_length": "{event} 通知模板长度不能超过 {max} 字节。",
     "api.notification_template_variable": "模板 {event} 使用了不支持的变量 {variable}，请删除或改用支持的模板变量。",
     "api.notification_rule_target_missing": "规则 {event} 引用了不存在或未启用的渠道 {channel}，请启用该渠道或从规则中移除。",
-    "api.notification_rule_target_duplicate": "规则 {event} 重复引用了渠道 {channel}，请只保留一项。"
+    "api.notification_rule_target_duplicate": "规则 {event} 重复引用了渠道 {channel}，请只保留一项。",
+    "api.backup_job_stale": "备份任务已变化，请刷新状态后重试。",
+    "api.backup_hold_stale": "自动备份暂缓状态已变化，请刷新后重试。",
+    "api.backup_stopping": "请等待本次备份停止后，再恢复自动备份。",
+    "api.backup_auto_held": "自动备份已暂缓，直到你主动恢复。",
+    "api.backup_hold_save_failed": "当前进程仍暂缓自动备份，但设置未能可靠保存。请重试保存，重启后的状态尚无保证。",
+    "api.backup_control_identity_required": "缺少备份任务或暂缓状态标识，请刷新页面后重试。",
+    "api.backup_control_updated": "备份控制状态已更新。"
   }
 }

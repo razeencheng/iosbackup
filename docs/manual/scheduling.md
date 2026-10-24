@@ -58,7 +58,18 @@ Windows use Beijing time (UTC+8), regardless of your browser's timezone. For exa
 | Authorization wait ends in failure | Check the phone and [State reference](states.md), address the cause, then retry when the device is available |
 | Repeated failures | Turn automatic backup off and save, preserve the evidence, and follow [Troubleshooting](troubleshooting.md). Failure does not replace the last successful backup timestamp |
 
-To pause future automatic jobs, open **Backup settings** , turn **Automatic backup** off, select **Save settings** , and confirm the save. This does not cancel a running job or a job already undergoing its startup check. The current version has no backup cancel button; closing the browser does not stop the backup. Wait for the job to end before maintaining the device.
+To disable future automatic jobs, turn **Automatic backup** off in **Backup settings** and save. This does not stop an active backup; closing the browser does not stop it either.
+
+## Stop a backup and hold automatic scheduling
+
+1. Select **Stop backup** on the active device card. Confirm once after reading the warning: interrupting this incremental backup may affect the recoverability of the previous backup.
+2. Wait through **Stopping…** until **Stopped · backup incomplete**. The device remains occupied until the process and output finish. The last-success timestamp remains a historical record, not proof that the current files can be restored.
+3. **Automatic backups on hold** persists after a normal restart or upgrade if saving succeeded. Original schedule settings are retained. **Back up once** runs one manual job without clearing the hold and still checks battery and charging requirements.
+4. Select **Resume automatic backups** when ready. This clears the hold without turning on a previously disabled schedule. A due backup may start at the next check if the original conditions are satisfied.
+
+If saving the hold fails, stopping still takes effect and automatic jobs are blocked in the current process. Persistence after restart is uncertain. Resolve the storage problem and select **Retry saving**. A failed resume also retains the hold in memory.
+
+Stopping retains existing files but does not roll back incremental updates or guarantee that the previous backup remains recoverable. Retrying starts a new protocol session. A stop just after completion preserves that result and holds future scheduling; an older request cannot stop a newer job. User stops update the page and logs without a failure notification. Actual failures still follow notification rules.
 
 Re-adding a removed device preserves its settings. If automatic backup was on, a later scheduler check can start another job. To keep it disabled, turn it off and save before removing the device.
 

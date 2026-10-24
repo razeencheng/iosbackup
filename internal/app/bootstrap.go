@@ -42,12 +42,7 @@ func (app *application) saveConfigs() error {
 	app.configPersistMu.Lock()
 	defer app.configPersistMu.Unlock()
 	app.mu.RLock()
-	configs := make(map[string]backupConfig, len(app.configs))
-	for udid, cfg := range app.configs {
-		if cfg != nil {
-			configs[udid] = *cfg
-		}
-	}
+	configs := app.backupConfigsSnapshotUnsafe()
 	app.mu.RUnlock()
 	return app.configStore.Replace(configs)
 }
@@ -221,4 +216,17 @@ func (app *application) initializeSecurity() error {
 		log.Printf("event=auth.enabled Using existing password digest; no replacement password generated")
 	}
 	return nil
+}
+
+// backupConfigsSnapshotUnsafe 调用者必须持有 app.mu。
+func (app *application) backupConfigsSnapshotUnsafe() map[string]backupConfig {
+	configs := make(map[string]backupConfig, len(app.configs))
+	for udid, cfg := range app.configs {
+		if cfg != nil {
+			candidate := *cfg
+			app.overlayBackupHoldUnsafe(&candidate)
+			configs[udid] = candidate
+		}
+	}
+	return configs
 }
