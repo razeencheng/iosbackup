@@ -129,7 +129,8 @@ func originalBackupSizeFS(ctx context.Context, sourceFS fs.FS) (int64, error) {
 		if entry.Type()&os.ModeSymlink != 0 {
 			return indexReadError(i18n.BackupIndexUnsafeSource, errBackupIndexUnsafeSource, nil)
 		}
-		info, err := entry.Info()
+		// 通过根句柄查询，避免旧版 Go 的 DirEntry 在祖先目录重命名后仍使用旧路径。
+		info, err := fs.Stat(sourceFS, p)
 		if err != nil {
 			return err
 		}

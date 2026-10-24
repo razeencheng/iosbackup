@@ -197,36 +197,30 @@ func TestOriginalBackupSizeOverflow(t *testing.T) {
 
 type backupIndexFaultFS struct {
 	fs.FS
-	failInfo bool
+	failStat bool
 	failure  error
 }
 
 func (f backupIndexFaultFS) ReadDir(name string) ([]fs.DirEntry, error) {
-	if !f.failInfo {
+	if !f.failStat {
 		return nil, f.failure
 	}
-	entries, err := fs.ReadDir(f.FS, name)
-	if err != nil {
-		return nil, err
-	}
-	for i, entry := range entries {
-		entries[i] = backupIndexFaultEntry{entry, f.failure}
-	}
-	return entries, nil
+	return fs.ReadDir(f.FS, name)
 }
 
-type backupIndexFaultEntry struct {
-	fs.DirEntry
-	failure error
+func (f backupIndexFaultFS) Stat(name string) (fs.FileInfo, error) {
+	if name != "." && f.failStat {
+		return nil, f.failure
+	}
+	return fs.Stat(f.FS, name)
 }
 
-func (e backupIndexFaultEntry) Info() (fs.FileInfo, error) { return nil, e.failure }
 func TestOriginalBackupSizePropagatesTraversalAndStatFailures(t *testing.T) {
 	failure := errors.New("injected filesystem error")
-	for _, infoFailure := range []bool{false, true} {
-		source := backupIndexFaultFS{FS: fstest.MapFS{"data": &fstest.MapFile{Data: []byte("original")}}, failInfo: infoFailure, failure: failure}
+	for _, statFailure := range []bool{false, true} {
+		source := backupIndexFaultFS{FS: fstest.MapFS{"data": &fstest.MapFile{Data: []byte("original")}}, failStat: statFailure, failure: failure}
 		if _, err := originalBackupSizeFS(context.Background(), source); !errors.Is(err, failure) {
-			t.Fatalf("partial size published after info=%v error: %v", infoFailure, err)
+			t.Fatalf("partial size published after stat=%v error: %v", statFailure, err)
 		}
 	}
 }
