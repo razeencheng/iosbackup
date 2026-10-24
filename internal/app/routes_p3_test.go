@@ -90,6 +90,10 @@ func TestHandleBackupListEndpoint(t *testing.T) {
 		return []byte("a.db,AppDomain,100\nb.plist,HomeDomain,20\n"), nil
 	}
 	addOnlineDevice(app, "EP-LIST", connectionTypeDesc(connectTypeUSB))
+	app.configs["EP-LIST"].BackupDirectory = t.TempDir()
+	if err := os.Mkdir(app.deviceBackupPath("EP-LIST"), 0700); err != nil {
+		t.Fatal(err)
+	}
 
 	req := httptest.NewRequest(http.MethodGet, "/api/backup-list/EP-LIST", nil)
 	rr := httptest.NewRecorder()

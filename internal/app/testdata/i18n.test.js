@@ -198,7 +198,7 @@ async function verifyOperationStateAcrossLanguageChanges(){
  }
  console.log('pending checks, deleted backups and notification delivery results survive localization correctly');
 }
-verifyOperationStateAcrossLanguageChanges().catch(error=>{console.error(error);process.exitCode=1;});
+verifyOperationStateAcrossLanguageChanges().then(()=>require('./backup-query.test.js')()).catch(error=>{console.error(error);process.exitCode=1;});
 
 async function verifyBackupControlBehavior(){
  const controls=boot(),nodes=dom(controls);

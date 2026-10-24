@@ -42,6 +42,16 @@ docker compose logs --tail=200 iosbackup
 
 curl prompts for the administrator password. `/healthz` confirms only that HTTP responds, not device readiness, writable storage or recoverable backups. Logs may include device/network details; sanitize before sharing. There is no public log-download API.
 
+## Backup query diagnostics
+
+When a backup information or list query fails, open **Diagnostic details** and select **Copy diagnostics**. If clipboard access is unavailable, select and copy the fallback text. Information can be unavailable while **Size on disk** remains visible; a failed list shows an unknown count, not zero files. Report the application version, iOS version, USB/Wi-Fi connection and copied diagnostic. Review it before sharing; do not attach passwords or the original file list.
+
+Query failures emit a warning with `event=backup_query.failed` at the default log level. CSV preparation failures use `event=backup_export.failed`; interrupted response writes use `event=backup_export.interrupted`. Expected request cancellations use debug-level `event=backup_query.cancelled`. Diagnostics distinguish the actual process exit code from an explicitly reported device error code; exit 49 or 255 alone does not establish a password problem or a damaged backup.
+
+CSV is prepared completely before a download starts. One export may run at a time, up to **32 MiB** per file, with the existing **five-minute command timeout** and a **two-minute response write deadline**. The JSON view still retains at most 5,000 entries. A rejected export remains an error on the page; it does not produce a partial download. A later transfer interruption can still fail and must be retried.
+
+Temporary CSV files use `TMPDIR` (normally `/tmp`), permissions `0600`, and are unlinked immediately. Space is released when the file is closed, including on failure. The default Compose `/tmp` is a **64 MiB tmpfs**, shared with other temporary work; free space must cover the export. An over-limit or full-storage failure returns HTTP 507, and another active export returns 503 with `Retry-After`. For a reverse proxy, allow enough upstream wait time for query preparation as well as transfer; its own timeout may end a request sooner. These diagnostics do not add offline or encrypted-manifest decoding support.
+
 ## Access and data boundaries to retain
 
 The privileged container uses host networking and USB/udev mounts. Deploy only on a trusted host and restricted LAN/VPN, keep authentication enabled, and do not expose it to the public Internet. Use suitable HTTPS and access control across networks.

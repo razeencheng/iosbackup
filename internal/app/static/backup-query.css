@@ -1,0 +1,70 @@
+.bk-query-notice[hidden],.bk-query-details[hidden],.bk-query-rows[hidden]{display:none}
+.bk-query-announcement{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap;border:0}
+.bk-query-notice{font-size:12px;line-height:1.65;overflow-wrap:anywhere}
+.bk-query-info,.bk-query-export{border:1px solid #F0DBB6;border-radius:var(--iosbk-radius);background:#FFF9F0;overflow:hidden;margin-bottom:16px}
+.bk-query-notice-row{display:flex;align-items:center;gap:9px;padding:9px 12px}
+.bk-query-notice-icon{display:flex;flex:none;color:#AD762F}
+.bk-query-notice-copy{flex:1;min-width:0;color:#835623;display:flex;align-items:baseline;flex-wrap:wrap;gap:1px 10px}
+.bk-query-notice-copy strong{font-size:12px;font-weight:600;color:#714514}
+.bk-query-notice-copy p{margin:0;font-size:11.5px}
+.bk-query-actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.bk-query-button,.bk-query-text-button{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:32px;padding:5px 10px;border:1px solid #D8E2EA;border-radius:var(--iosbk-radius);background:#fff;color:#405162;font-family:inherit;font-size:12px;font-weight:600;line-height:1.5;cursor:pointer}
+.bk-query-button:hover{background:#F3F7FA;border-color:#BDCCD9}
+.bk-query-text-button{border:0;background:transparent;color:#2C62C6;padding:4px 6px}
+.bk-query-text-button:hover{background:#EAF1FC}
+.bk-query-info .bk-query-disclosure,.bk-query-export .bk-query-disclosure{color:#835623;font-size:11.5px}
+.bk-query-disclosure::after{content:'';width:6px;height:6px;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;transform:translateY(-2px) rotate(45deg);margin-left:3px;flex:none}
+.bk-query-disclosure[aria-expanded=true]::after{transform:translateY(2px) rotate(225deg)}
+.bk-query-button:disabled,.bk-query-text-button:disabled{opacity:.45;cursor:default}
+.bk-query-button:focus-visible,.bk-query-text-button:focus-visible,.bk-query-search:focus-visible,.bk-query-copy-fallback:focus-visible{outline:2px solid #2C62C6;outline-offset:2px}
+.bk-query-list .bk-query-notice-row{align-items:flex-start;gap:14px;padding:27px 24px 26px}
+.bk-query-list .bk-query-notice-icon{height:38px;width:38px;align-items:center;justify-content:center;background:#FFF9F0;border:1px solid #F0DBB6;border-radius:var(--iosbk-radius)}
+.bk-query-list .bk-query-notice-copy{display:block;color:#718090}
+.bk-query-list .bk-query-notice-copy strong{font-size:13.5px;color:#213041}
+.bk-query-list .bk-query-notice-copy p{font-size:12px;margin-top:5px;line-height:1.75}
+.bk-query-list .bk-query-actions{margin-top:16px}
+.bk-query-retry{color:#2C62C6;border-color:#C5DAF6;min-height:38px;padding-inline:13px}
+.bk-query-details{padding:18px 22px;border-top:1px solid #E7EDF2;background:#F8FAFC}
+.bk-query-info .bk-query-details,.bk-query-export .bk-query-details{padding:15px 16px;background:#FFFCF7;border-color:#F0DBB6}
+.bk-query-detail-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;color:#405162}
+.bk-query-detail-head strong{font-size:12px;font-weight:600}
+.bk-query-fields{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px 20px;margin:0}
+.bk-query-fields>div{min-width:0}
+.bk-query-fields dt{font-size:11px;color:#718090}
+.bk-query-fields dd{margin:5px 0 0;font-size:12px;font-weight:600;color:#405162;font-variant-numeric:tabular-nums}
+.bk-query-raw-label{font-size:11px;color:#718090;margin-top:17px}
+.bk-query-raw{margin:7px 0 0;padding:11px 12px;background:#fff;border:1px solid #E7EDF2;border-radius:6px;color:#607181;font:11.5px/1.7 'IBM Plex Mono',monospace;white-space:pre-wrap;overflow-wrap:anywhere}
+.bk-query-code{display:block;margin-top:11px;color:#718090;font:10.5px/1.6 'IBM Plex Mono',monospace}
+.bk-query-footnote{margin:8px 0 0;color:#718090;font-size:11px}
+.bk-query-copy-status{color:#2E7D5B;font-size:11.5px;margin:8px 0 0}
+.bk-query-copy-status:empty{display:none}
+.bk-query-copy-fallback{display:block;width:100%;box-sizing:border-box;margin-top:10px;padding:10px;border:1px solid #D8E2EA;border-radius:6px;color:#405162;background:#fff;font:11px/1.6 'IBM Plex Mono',monospace}
+.bk-query-pending{background:#EEF4FF;border-color:#C5DAF6}
+.bk-query-pending .bk-query-notice-copy,.bk-query-pending strong,.bk-query-pending .bk-query-notice-icon{color:#2C62C6}
+.bk-query-file-heading{margin-top:20px}
+.bk-query-surface{border:1px solid #D8E2EA;border-radius:var(--iosbk-radius);overflow:hidden;background:#fff}
+.bk-query-toolbar{display:flex;align-items:center;gap:8px;padding:11px 13px;border-bottom:1px solid #E7EDF2;background:#FBFCFD;color:#96A3AE}
+.bk-query-search{flex:1;width:100%;min-width:0;padding:4px 0;border:0;background:none;color:#213041;font:12px/1.5 'IBM Plex Sans','Noto Sans SC',sans-serif}
+.bk-query-search::placeholder{color:#96A3AE}
+.bk-query-search:disabled{cursor:not-allowed}
+.bk-query-rows{overflow:auto;max-height:300px;padding:10px 12px;color:#607181;white-space:pre;font:12px/1.7 'IBM Plex Mono',monospace}
+.bk-query-rows.bk-query-placeholder{padding:28px 20px;white-space:normal;text-align:center;font:12px/1.7 'IBM Plex Sans','Noto Sans SC',sans-serif}
+.bk-query-footer{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:10px;font-size:11.5px;color:#718090;flex-wrap:wrap}
+.bk-query-pages{display:inline-flex;align-items:center;gap:6px;margin-left:auto}
+.bk-query-pages .bk-query-button{font-size:11px;min-height:29px;padding:4px 9px}
+@media(max-width:700px){
+  .bk-query-notice-row{align-items:flex-start;padding:11px;flex-wrap:wrap}
+  .bk-query-notice-icon{margin-top:3px}
+  .bk-query-notice-copy{display:block;flex-basis:calc(100% - 28px)}
+  .bk-query-notice-copy p{margin-top:3px}
+  .bk-query-notice-row>.bk-query-actions{margin-left:25px}
+  .bk-query-list .bk-query-notice-row{padding:23px 16px;gap:11px;flex-wrap:nowrap}
+  .bk-query-list .bk-query-notice-icon{height:32px;width:32px;margin-top:0}
+  .bk-query-list .bk-query-notice-copy{flex-basis:auto}
+  .bk-query-list .bk-query-notice-copy strong{font-size:13px}
+  .bk-query-actions{gap:7px}
+  .bk-query-details{padding:16px}
+  .bk-query-fields{grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+  .bk-query-button,.bk-query-text-button,.bk-query-pages .bk-query-button{min-height:44px}
+  .bk-query-search{min-height:30px}
+}

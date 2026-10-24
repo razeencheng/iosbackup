@@ -217,17 +217,21 @@ func (app *application) runIdeviceCmdStreamEnv(ctx context.Context, kind cmdKind
 		defer cancel()
 	}
 	if app.streamCmdRunner != nil {
-		return app.streamCmdRunner.Run(cmdCtx, bin, args, env, stdout, stderr)
-	}
-	// 兼容现有注入式单元测试；生产路径不设置 cmdRunner，因此始终真正流式执行。
-	if app.cmdRunner != nil {
-		out, err := app.cmdRunner(cmdCtx, bin, args, env)
+		err = app.streamCmdRunner.Run(cmdCtx, bin, args, env, stdout, stderr)
+	} else if app.cmdRunner != nil {
+		// 兼容普通 runner 注入；生产路径使用真实流式执行。
+		var out []byte
+		out, err = app.cmdRunner(cmdCtx, bin, args, env)
 		if len(out) > 0 {
-			_, _ = stdout.Write(out)
+			if _, writeErr := stdout.Write(out); err == nil {
+				err = writeErr
+			}
 		}
-		return err
+	} else {
+		err = (defaultStreamCmdRunner{}).Run(cmdCtx, bin, args, env, stdout, stderr)
 	}
-	return (defaultStreamCmdRunner{}).Run(cmdCtx, bin, args, env, stdout, stderr)
+	// 必须在 defer cancel 执行前读取原因，成功命令不因随后的取消变成失败。
+	return annotateCommandError(err, context.Cause(cmdCtx))
 }
 
 // isListCommand 判断是否是 idevice_id -l 列表命令（不需要 -u UDID）。
