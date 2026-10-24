@@ -17,6 +17,8 @@ lockdown
 data
 configs/backup_configs.json
 configs/notification_configs.json
+# 本地索引包含明文设备元数据和私有文件路径
+configs/backup-index/
 secrets.enc
 
 # 包括首次初始化中断时遗留的秘密临时文件

@@ -140,7 +140,7 @@ check_directory_policy() {
   if find "$root" -maxdepth 1 -name '.env*' -print -quit | grep -q .; then
     fail 'local environment path is present in the public tree'
   fi
-  if find "$root/configs" \( -name 'backup_configs.json' -o -name 'notification_configs.json' -o -name '*runtime*.json' \
+  if find "$root/configs" \( -name 'backup-index' -o -name 'backup_configs.json' -o -name 'notification_configs.json' -o -name '*runtime*.json' \
     -o -name 'admin_password*' -o -name 'secret_key*' -o -name 'auth_credentials.json*' -o -name 'csrf_secret.json*' -o -name 'secrets.enc*' \
     -o -name '.admin_password-*' -o -name '.secret_key-*' -o -name '.auth_credentials.json-*' -o -name '.csrf_secret.json-*' -o -name '.secrets.enc-*' \) \
     -print -quit 2>/dev/null | grep -q .; then
@@ -162,8 +162,37 @@ check_directory_policy() {
   grep -Fq 'COPY internal/ ./internal/' "$dockerfile" || fail 'Dockerfile does not copy internal packages'
   grep -Fq './cmd/iosbackup' "$dockerfile" || fail 'Dockerfile does not build cmd/iosbackup'
   grep -Fq 'iosbackup/internal/buildinfo.' "$dockerfile" || fail 'Dockerfile does not inject buildinfo metadata'
-  if grep -E '^FROM ' "$dockerfile" | grep -vE '^FROM (scratch|[^ ]+@sha256:[0-9a-f]{64})($| AS )'; then
-    fail 'Dockerfile contains an unpinned tagged base image'
+  # 只允许已锁定的外部镜像、scratch 或之前已定义的阶段；别名不能前向引用。
+  if ! awk '
+    function reject(reason) {
+      printf "Dockerfile line %d: %s\n", NR, reason > "/dev/stderr"
+      invalid = 1
+      exit 1
+    }
+    tolower($1) == "from" {
+      count++
+      position = 2
+      if ($position ~ /^--platform=/) {
+        if (length($position) == length("--platform=")) reject("empty platform")
+        position++
+      }
+      base = $position
+      pinned = split(base, parts, "@sha256:") == 2 &&
+        parts[1] ~ /^[A-Za-z0-9][A-Za-z0-9._\/:+-]*$/ &&
+        length(parts[2]) == 64 && parts[2] ~ /^[0-9a-f]+$/
+      if (base != "scratch" && !pinned && !(tolower(base) in stages))
+        reject("base must be SHA-256 pinned or a previously defined stage")
+      if (NF == position) next
+      if (NF != position + 2 || tolower($(position + 1)) != "as" ||
+          $(position + 2) !~ /^[A-Za-z][A-Za-z0-9_.-]*$/)
+        reject("invalid stage declaration")
+      stage = tolower($(position + 2))
+      if (stage in stages) reject("duplicate stage declaration")
+      stages[stage] = 1
+    }
+    END { if (invalid || count == 0) exit 1 }
+  ' "$dockerfile"; then
+    fail 'Dockerfile contains an unpinned base image or invalid stage reference'
   fi
   grep -Fq '此项目基于 MIT 许可证开源' "$root/README.md" && fail 'README contains a license contradiction'
   grep -Fq '"release_blocker":true' "$root/third_party/components.lock.json" && fail 'component lock contains a release blocker'

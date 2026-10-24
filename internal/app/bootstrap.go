@@ -141,6 +141,7 @@ func run(ctx context.Context, cfg runtimeConfig) error {
 		app.mu.Lock()
 		app.connectionClosed = true
 		app.mu.Unlock()
+		app.closeBackupIndex()
 		workers.Wait()
 		app.connectionRecoveryWorkers.Wait()
 		app.StopNetmuxd()

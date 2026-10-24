@@ -21,6 +21,7 @@ func newDeviceRemovalTestApp(t *testing.T, udid string) (*application, backupCon
 	cfg.ConfigsRoot = filepath.Join(root, "configs")
 	cfg.BackupsRoot = filepath.Join(root, "backups")
 	app := newApplicationWithRuntime(context.Background(), cfg)
+	t.Cleanup(app.closeBackupIndex)
 	if err := os.MkdirAll(cfg.ConfigsRoot, 0700); err != nil {
 		t.Fatal(err)
 	}

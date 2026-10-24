@@ -113,8 +113,11 @@ const (
 
 // App 应用结构
 type application struct {
-	devices map[string]*device
-	configs map[string]*backupConfig
+	backupIndex         *backupIndexCoordinator
+	backupIndexStatuses map[string]backupIndexBrief
+	backupIndexClosed   bool
+	devices             map[string]*device
+	configs             map[string]*backupConfig
 	// configPersistMu 串行化“快照 -> 落盘 -> 发布”事务，避免并发保存丢失更新。
 	configPersistMu sync.Mutex
 	configStore     *backupConfigStore

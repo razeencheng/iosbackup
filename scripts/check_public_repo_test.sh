@@ -179,6 +179,35 @@ directory_fixture="$test_root/directory"
 populate_fixture "$directory_fixture"
 run_check directory "$directory_fixture" pass --directory .
 
+# 外部镜像必须锁定摘要；只有前面已定义的构建阶段可以作为 FROM 来源。
+for from_case in chained-stage platform-stage undefined-stage forward-stage unpinned-image malformed-digest self-reference; do
+    from_fixture="$test_root/from-$from_case"
+    populate_fixture "$from_fixture"
+    expected=fail
+    case "$from_case" in
+        chained-stage)
+            printf '\nFROM go-builder AS policy-test-first\nFROM policy-test-first AS policy-test-second\n' >>"$from_fixture/Dockerfile"
+            expected=pass ;;
+        platform-stage)
+            printf '\n  from --platform=linux/amd64 runtime as policy-test-platform\n' >>"$from_fixture/Dockerfile"
+            expected=pass ;;
+        undefined-stage)
+            printf '\nFROM unreviewed-stage AS policy-test-undefined\n' >>"$from_fixture/Dockerfile" ;;
+        forward-stage)
+            printf '\nFROM future-stage AS policy-test-forward\nFROM scratch AS future-stage\n' >>"$from_fixture/Dockerfile" ;;
+        unpinned-image)
+            printf '\n  from alpine:latest as policy-test-unpinned\n' >>"$from_fixture/Dockerfile" ;;
+        malformed-digest)
+            printf '\nFROM alpine@sha256:abc AS policy-test-digest\n' >>"$from_fixture/Dockerfile" ;;
+        self-reference)
+            printf '\nFROM policy-test-self AS policy-test-self\n' >>"$from_fixture/Dockerfile" ;;
+    esac
+    run_check "from-$from_case" "$from_fixture" "$expected" --directory .
+    if [ "$expected" = fail ] && ! grep -Fq 'Dockerfile' "$test_root/output-from-$from_case"; then
+        record_failure "from-$from_case did not reject the base at the Dockerfile boundary"
+    fi
+done
+
 index_fixture="$test_root/index"
 init_index_fixture "$index_fixture"
 run_check public-index "$index_fixture" pass --public-index public-files.txt
@@ -230,7 +259,7 @@ assert_runtime_boundary() {
 # Filenames alone must block runtime secrets, including partial initialization
 # files, even when harmless fixture bytes evade content-based secret detection.
 for runtime_path in .env .env.local data/configs/admin_password \
-    configs/admin_password configs/secret_key configs/auth_credentials.json configs/csrf_secret.json configs/secrets.enc \
+    configs/backup-index/v1/example/current.json configs/admin_password configs/secret_key configs/auth_credentials.json configs/csrf_secret.json configs/secrets.enc \
     configs/.admin_password-example configs/.secret_key-example configs/.auth_credentials.json-example \
     configs/.csrf_secret.json-example configs/.secrets.enc-example; do
     runtime_label=$(printf '%s' "$runtime_path" | tr '/.' '__')
@@ -252,7 +281,7 @@ for runtime_path in .env .env.local data/configs/admin_password \
  done
 
 # The same forbidden names cannot bypass the directory gate by changing type.
-for runtime_path in .env.local data configs/secret_key configs/.admin_password-example; do
+for runtime_path in .env.local data configs/backup-index configs/secret_key configs/.admin_password-example; do
     runtime_label=$(printf '%s' "$runtime_path" | tr '/.' '__')
     for kind in directory symlink dangling; do
         special="$test_root/runtime-type-$runtime_label-$kind"

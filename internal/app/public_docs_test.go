@@ -447,7 +447,7 @@ func TestPublicRuntimeSecretsAreIgnored(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(root, ".gitignore"), []byte(readRepoFile(t, ".gitignore")), 0600); err != nil {
 		t.Fatal(err)
 	}
-	privatePaths := []string{".env", ".env.local", "data/configs/admin_password", "data/backups/example", "configs/admin_password", "configs/secret_key", "configs/auth_credentials.json", "configs/csrf_secret.json", "configs/secrets.enc", "configs/.admin_password-example", "configs/.secret_key-example", "configs/.auth_credentials.json-example", "configs/.csrf_secret.json-example", "configs/.secrets.enc-example"}
+	privatePaths := []string{"configs/backup-index/v1/example/current.json", ".env", ".env.local", "data/configs/admin_password", "data/backups/example", "configs/admin_password", "configs/secret_key", "configs/auth_credentials.json", "configs/csrf_secret.json", "configs/secrets.enc", "configs/.admin_password-example", "configs/.secret_key-example", "configs/.auth_credentials.json-example", "configs/.csrf_secret.json-example", "configs/.secrets.enc-example"}
 	for _, path := range privatePaths {
 		cmd := exec.Command("git", "-c", "core.excludesfile=/dev/null", "check-ignore", "--no-index", "-q", "--", path)
 		cmd.Dir = root
@@ -463,7 +463,7 @@ func TestPublicRuntimeSecretsAreIgnored(t *testing.T) {
 		}
 	}
 	dockerIgnore := readRepoFile(t, ".dockerignore")
-	for _, pattern := range []string{".env*", "data", "configs/admin_password*", "configs/secret_key*", "configs/auth_credentials.json*", "configs/csrf_secret.json*", "configs/secrets.enc*", "configs/.admin_password-*", "configs/.secret_key-*", "configs/.auth_credentials.json-*", "configs/.csrf_secret.json-*", "configs/.secrets.enc-*"} {
+	for _, pattern := range []string{"configs/backup-index/", ".env*", "data", "configs/admin_password*", "configs/secret_key*", "configs/auth_credentials.json*", "configs/csrf_secret.json*", "configs/secrets.enc*", "configs/.admin_password-*", "configs/.secret_key-*", "configs/.auth_credentials.json-*", "configs/.csrf_secret.json-*", "configs/.secrets.enc-*"} {
 		if !strings.Contains("\n"+dockerIgnore, "\n"+pattern+"\n") {
 			t.Errorf("Docker build context lacks explicit runtime-secret exclusion %s", pattern)
 		}

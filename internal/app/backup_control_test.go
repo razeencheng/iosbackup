@@ -16,6 +16,7 @@ func newBackupControlTestApp(t *testing.T) *application {
 	cfg.BackupsRoot = t.TempDir()
 	cfg.WiFiPowerAssertion = false
 	app := newApplicationWithRuntime(context.Background(), cfg)
+	t.Cleanup(app.closeBackupIndex)
 	app.devices["CONTROL"] = &device{UDID: "CONTROL", Name: "Test phone", IsOnline: true, Connection: connectionTypeDesc(connectTypeUSB), BatteryLevel: 90, IsCharging: true}
 	app.configs["CONTROL"] = app.defaultBackupConfig("CONTROL", "Test phone")
 	app.backupCommand = func(ctx context.Context, _ string, _ ...string) *execCmd {

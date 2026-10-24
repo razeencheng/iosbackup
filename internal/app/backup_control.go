@@ -110,12 +110,24 @@ func (app *application) finishBackupJob(job *backupJob, err error) {
 	app.recordBackupResult(job, err)
 	job.cancel(nil)
 	job.release()
+	// 先锁住索引收束，再释放设备占用，旧任务不能清理下一次备份的写入租约。
+	manager := app.lockBackupIndexFinish()
+	finished, success := false, false
 	app.mu.Lock()
 	if app.backupJobs[job.udid] == job {
 		job.finished = true
+		finished, success = true, job.result == nil
 		app.finishBackupOperationUnsafe(job.udid, job.result, nowBeijing())
 	}
 	app.mu.Unlock()
+	var lease *backupIndexWrite
+	if manager != nil {
+		if finished {
+			lease = manager.releaseWriteUnsafe(job.udid)
+		}
+		manager.mu.Unlock()
+	}
+	app.afterBackupIndexWrite(manager, lease, success)
 	app.broadcastStatus()
 }
 

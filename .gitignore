@@ -5,6 +5,8 @@ backups/
 iosbackup2
 main
 configs/notification_configs.json
+# 本地索引包含明文设备元数据和私有文件路径
+configs/backup-index/
 .worktrees/
 coverage.out
 coverage.html

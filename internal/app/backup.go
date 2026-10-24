@@ -135,6 +135,8 @@ func (app *application) runBackupJob(job *backupJob) (retErr error) {
 	if backupDir == "" {
 		backupDir = app.paths.BackupsRoot
 	}
+	// 先停止旧索引扫描，备份进程才能修改这份备份。
+	app.beginBackupIndexWrite(udid, backupDir, true)
 	if err := os.MkdirAll(backupDir, 0755); err != nil {
 		return err
 	}

@@ -17,7 +17,7 @@
 | [设置自动备份](manual/scheduling.zh-CN.md) | 设置时间窗、间隔、电量和充电条件并观察一次执行 |
 | [启用并验证 Wi-Fi 备份](manual/wifi.zh-CN.md) | 用电脑准备手机、与 NAS 配对、测试无线备份，失败时改用 USB |
 | [管理备份加密与密码](manual/encryption.zh-CN.md) | 区分四类密码，处理已有加密备份和接管限制 |
-| [查看备份信息和导出清单](manual/inspection.zh-CN.md) | 理解 5000 项限制、CSV 与完整数据的区别 |
+| [查看本地备份和导出清单](manual/backup-browser.zh-CN.md) | 手机离线时读取，区分读取时间，搜索有限预览并下载已保存的完整 CSV |
 | [设置并验证通知](manual/notifications.zh-CN.md) | 保存规则、检查测试送达、观察真实事件 |
 | [管理设备和存储](manual/device-storage.zh-CN.md) | 移除设备、重新添加、检查空间和保留副本 |
 | [恢复手机数据：总览与准备](manual/restore.zh-CN.md) | 先保护现有备份，查看 Finder / Apple Devices 的前提与待验证范围 |
@@ -28,6 +28,8 @@
 | [查配置、路径和生效方式](manual/configuration.zh-CN.md) | 区分程序/Compose 默认值与设备设置 |
 | [看懂状态、进度和错误](manual/states.zh-CN.md) | 看懂任务阶段、无活动超时，判断备份是否完成 |
 | [排查高级 Wi-Fi / NAT 问题](manual/wifi-nat.zh-CN.md) | 仅在 USB 对照后调查跨网段和空闲连接 |
+
+原[查看备份说明](manual/inspection.zh-CN.md)保留为兼容入口，指向新的本地备份浏览手册。
 
 ## 日常查看
 

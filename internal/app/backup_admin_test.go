@@ -1,13 +1,16 @@
 package app
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
+
+	"iosbackup/internal/i18n"
 )
 
-// checkBackupDir：空/相对路径失败；可写目录可用；被文件占用失败。
+// checkBackupDir：空/相对路径失败；持久化可写目录可用；临时挂载及文件占用失败。
 func TestCheckBackupDir(t *testing.T) {
 	if ok, _ := checkBackupDir(""); ok {
 		t.Error("空路径应失败")
@@ -16,8 +19,27 @@ func TestCheckBackupDir(t *testing.T) {
 		t.Error("相对路径应失败")
 	}
 	dir := t.TempDir()
-	if ok, reason := checkBackupDir(filepath.Join(dir, "sub")); !ok {
-		t.Errorf("可创建/可写目录应可用，得 %q", reason)
+	path := filepath.Join(dir, "sub")
+	ok, reason := checkBackupDir(path)
+	// 临时目录可能落在 CI 的 tmpfs 或容器 overlay 上，不能无条件视作持久化备份盘。
+	if persisted, knowable := pathPersistsToHost(dir); knowable && !persisted {
+		var message *i18n.Error
+		if ok || !errors.As(reason, &message) || message.Code != i18n.DirectoryNotPersistent {
+			t.Fatalf("临时文件系统应拒绝备份，得 ok=%v error=%v", ok, reason)
+		}
+		if _, err := os.Stat(path); !errors.Is(err, os.ErrNotExist) {
+			t.Fatalf("拒绝临时挂载后不应创建备份目录：%v", err)
+		}
+	} else {
+		if !ok {
+			t.Fatalf("可创建/可写目录应可用，得 %q", reason)
+		}
+		if info, err := os.Stat(path); err != nil || !info.IsDir() {
+			t.Fatalf("校验成功后应存在备份目录：%v", err)
+		}
+		if _, err := os.Stat(filepath.Join(path, ".iosbk_write_test")); !errors.Is(err, os.ErrNotExist) {
+			t.Fatalf("写入探针应已清理：%v", err)
+		}
 	}
 	f := filepath.Join(dir, "afile")
 	if err := os.WriteFile(f, []byte("x"), 0644); err != nil {

@@ -17,7 +17,7 @@ Before enabling a schedule, **complete one USB backup on a non-critical device**
 | [Schedule automatic backups](manual/scheduling.md) | Set window, interval, battery and charging rules, then observe a run |
 | [Enable and validate Wi-Fi backup](manual/wifi.md) | Prepare on a computer, pair on the NAS, validate Wi-Fi and fall back to USB |
 | [Manage backup encryption and passwords](manual/encryption.md) | Distinguish four credentials and handle existing encrypted backups |
-| [Inspect backups and export file lists](manual/inspection.md) | Understand the 5,000-entry limit and what CSV contains |
+| [Browse local backups and export file lists](manual/backup-browser.md) | Read while the phone is offline, distinguish read times, search the bounded preview and download a complete saved CSV |
 | [Configure and verify notifications](manual/notifications.md) | Save rules, check test delivery and observe a real event |
 | [Manage devices and storage](manual/device-storage.md) | Remove and re-add devices, check capacity and protect copies |
 | [Restore device data: overview and preparation](manual/restore.md) | Protect the backup and check Finder / Apple Devices prerequisites and validation gaps |
@@ -28,6 +28,8 @@ Before enabling a schedule, **complete one USB backup on a non-critical device**
 | [Look up configuration, paths and applying changes](manual/configuration.md) | Distinguish program/Compose defaults and per-device settings |
 | [Understand states, progress and errors](manual/states.md) | Interpret phases, inactivity deadlines and success criteria |
 | [Investigate advanced Wi-Fi / NAT issues](manual/wifi-nat.md) | Investigate routed networks and idle connections after a USB comparison |
+
+The [previous inspection guide](manual/inspection.md) points to the local backup browser instructions.
 
 ## Routine checks
 

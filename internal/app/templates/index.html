@@ -158,6 +158,8 @@
   }
   @media(prefers-reduced-motion:reduce){.backup-overall-fill{transition:none}.backup-overall-track.indeterminate .backup-overall-fill{animation:none;transform:translateX(95%)}}
 </style>
+<link rel="stylesheet" href="/static/backup-browser.css?v={{.Version}}">
+<script src="/static/backup-browser.js?v={{.Version}}"></script>
 <script src="/static/i18n.js?v={{.Version}}"></script>
 <script src="/static/ui-messages.js?v={{.Version}}"></script>
 <script src="/static/api-messages.js?v={{.Version}}"></script>
@@ -352,27 +354,28 @@
             </div>
           </div>
 
-          <!-- ===== BACKUP MANAGEMENT ===== -->
-          <div data-sec-panel="backups" data-udid="{{$d.UDID}}" class="hidden" style="padding:20px">
-            {{if not $d.IsOnline}}<div style="display:flex;gap:9px;align-items:center;background:#F3F7FA;border:1px solid #D8E2EA;border-radius:var(--iosbk-radius);padding:11px 13px;margin-bottom:16px;font-size:12.5px;color:#6F7E8C"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-power"></use></svg><span data-i18n="bmgmt.offlineNote">{{t $.Locale "bmgmt.offlineNote"}}</span></div>{{end}}
-            <div style="{{if not $d.IsOnline}}opacity:.5;pointer-events:none;{{end}}">
-              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px"><div style="font-size:13.5px;font-weight:600" data-i18n="bmgmt.infoTitle">{{t $.Locale "bmgmt.infoTitle"}}</div><button onclick="loadBackups('{{$d.UDID}}')" style="display:inline-flex;align-items:center;gap:5px;background:none;border:none;color:#2C62C6;font-weight:600;cursor:pointer;font-size:12.5px;font-family:inherit"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-refresh"></use></svg><span data-i18n="bmgmt.infoRefresh">{{t $.Locale "bmgmt.infoRefresh"}}</span></button></div>
-              <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:20px">
-                <div style="background:#F3F7FA;border:1px solid #E7EDF2;border-radius:var(--iosbk-radius);padding:13px"><div style="font-size:11.5px;color:#718090" data-i18n="bmgmt.size">{{t $.Locale "bmgmt.size"}}</div><div id="bkSize-{{$d.UDID}}" style="font-size:18px;font-weight:700;margin-top:3px">—</div></div>
-                <div style="background:#F3F7FA;border:1px solid #E7EDF2;border-radius:var(--iosbk-radius);padding:13px"><div style="font-size:11.5px;color:#718090" data-i18n="bmgmt.count">{{t $.Locale "bmgmt.count"}}</div><div id="bkCount-{{$d.UDID}}" style="font-size:18px;font-weight:700;margin-top:3px">—</div></div>
-                <div style="background:#F3F7FA;border:1px solid #E7EDF2;border-radius:var(--iosbk-radius);padding:13px"><div style="font-size:11.5px;color:#718090" data-i18n="bmgmt.encrypted">{{t $.Locale "bmgmt.encrypted"}}</div><div id="bkEnc-{{$d.UDID}}" style="font-size:14px;font-weight:600;margin-top:6px;color:#718090">—</div></div>
-                <div style="background:#F3F7FA;border:1px solid #E7EDF2;border-radius:var(--iosbk-radius);padding:13px"><div style="font-size:11.5px;color:#718090" data-i18n="bmgmt.latest">{{t $.Locale "bmgmt.latest"}}</div><div style="font-size:13px;font-weight:600;margin-top:6px">{{if $d.LastBackup.IsZero}}<span data-i18n="device.never">{{t $.Locale "device.never"}}</span>{{else}}<time data-time="{{$d.LastBackup.Format "2006-01-02T15:04:05Z07:00"}}">{{$d.LastBackup.Format "2006-01-02 15:04"}}</time>{{end}}</div></div>
+          <!-- 本地备份信息独立于设备连接状态。 -->
+          <div data-sec-panel="backups" data-udid="{{$d.UDID}}" class="hidden backup-browser" style="padding:20px">
+            <div id="bkOffline-{{$d.UDID}}" class="backup-offline-note{{if $d.IsOnline}} hidden{{end}}"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-info"></use></svg><span data-i18n="bindex.offlineNote">{{t $.Locale "bindex.offlineNote"}}</span></div>
+            <div>
+              <div class="backup-browser-heading"><div class="backup-browser-title" data-i18n="bmgmt.infoTitle">{{t $.Locale "bmgmt.infoTitle"}}</div><button id="bkRefresh-{{$d.UDID}}" class="backup-browser-link" onclick="loadBackups('{{$d.UDID}}')"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-refresh"></use></svg><span id="bkRefreshLabel-{{$d.UDID}}" data-i18n="bmgmt.infoRefresh">{{t $.Locale "bmgmt.infoRefresh"}}</span></button></div>
+              <div class="backup-browser-metrics">
+                <div class="backup-browser-metric"><div class="backup-metric-label" data-i18n="bmgmt.size">{{t $.Locale "bmgmt.size"}}</div><div id="bkSize-{{$d.UDID}}" class="backup-metric-value">—</div><div class="backup-metric-caption" data-i18n="bindex.sizeNote">{{t $.Locale "bindex.sizeNote"}}</div></div>
+                <div class="backup-browser-metric"><div class="backup-metric-label" data-i18n="bindex.count">{{t $.Locale "bindex.count"}}</div><div id="bkCount-{{$d.UDID}}" class="backup-metric-value">—</div><div class="backup-metric-caption" data-i18n="bindex.countNote">{{t $.Locale "bindex.countNote"}}</div></div>
+                <div class="backup-browser-metric"><div class="backup-metric-label" data-i18n="bmgmt.encrypted">{{t $.Locale "bmgmt.encrypted"}}</div><div id="bkEnc-{{$d.UDID}}" class="backup-metric-value backup-metric-text">—</div></div>
+                <div class="backup-browser-metric"><div class="backup-metric-label" data-i18n="bindex.latest">{{t $.Locale "bindex.latest"}}</div><div id="bkLatest-{{$d.UDID}}" class="backup-metric-value backup-metric-date">—</div><div class="backup-metric-caption" data-i18n="bindex.latestNote">{{t $.Locale "bindex.latestNote"}}</div></div>
               </div>
-              <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px">
-                <div><span style="font-size:13.5px;font-weight:600" data-i18n="bmgmt.filesTitle">{{t $.Locale "bmgmt.filesTitle"}}</span> <span style="font-size:11.5px;color:#96A3AE">· <span data-i18n="bmgmt.filesNote">{{t $.Locale "bmgmt.filesNote"}}</span></span></div>
-                <a href="/api/backup-list/{{$d.UDID}}?format=csv" style="display:inline-flex;align-items:center;gap:5px;font-size:12.5px;color:#2C62C6;font-weight:600;text-decoration:none"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-download"></use></svg><span data-i18n="bmgmt.downloadCsv">{{t $.Locale "bmgmt.downloadCsv"}}</span></a>
+              <div id="bkStatus-{{$d.UDID}}" class="backup-index-status" role="status" aria-live="polite" data-state="first">
+                <svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-info"></use></svg>
+                <div><strong id="bkStatusTitle-{{$d.UDID}}" data-i18n="bindex.firstTitle">{{t $.Locale "bindex.firstTitle"}}</strong><p id="bkStatusBody-{{$d.UDID}}" data-i18n="bindex.firstBody">{{t $.Locale "bindex.firstBody"}}</p><p id="bkReadAt-{{$d.UDID}}" class="backup-read-at"></p><p id="bkReadDetail-{{$d.UDID}}" class="backup-read-at hidden"></p></div>
               </div>
-              <input type="text" data-i18n-ph="bmgmt.search" oninput="filterBackupList('{{$d.UDID}}',this.value)" class="iosbk-in" style="width:100%;margin-bottom:9px" placeholder="{{t $.Locale "bmgmt.search"}}">
-              <div id="list-{{$d.UDID}}" style="border:1px solid #E7EDF2;border-radius:var(--iosbk-radius);overflow:auto;max-height:300px;font-family:'IBM Plex Mono',monospace;font-size:12px;color:#607181;padding:10px 12px;white-space:pre;line-height:1.7"><span data-i18n="bmgmt.loadHint" style="color:#96A3AE;font-family:'IBM Plex Sans','Noto Sans SC',sans-serif;font-size:12.5px;white-space:normal;display:block;line-height:1.55">{{t $.Locale "bmgmt.loadHint"}}</span></div>
-              <div style="display:flex;align-items:center;justify-content:space-between;margin-top:10px;font-size:12.5px;color:#6F7E8C">
-                <span id="listMeta-{{$d.UDID}}"></span>
-                <span style="display:inline-flex;gap:6px;align-items:center"><button onclick="pageBackupList('{{$d.UDID}}',-1)" style="padding:5px 11px;border:1px solid #D8E2EA;background:#fff;border-radius:var(--iosbk-radius);font-size:12px;cursor:pointer;font-family:inherit;color:#6F7E8C" data-i18n="bmgmt.prev">{{t $.Locale "bmgmt.prev"}}</button><span id="listPage-{{$d.UDID}}" style="font-family:'IBM Plex Mono',monospace">—</span><button onclick="pageBackupList('{{$d.UDID}}',1)" style="padding:5px 11px;border:1px solid #D8E2EA;background:#fff;border-radius:var(--iosbk-radius);font-size:12px;cursor:pointer;font-family:inherit" data-i18n="bmgmt.next">{{t $.Locale "bmgmt.next"}}</button></span>
-              </div>
+              <div class="backup-browser-heading backup-files-heading"><div><div class="backup-browser-title" data-i18n="bmgmt.filesTitle">{{t $.Locale "bmgmt.filesTitle"}}</div><p class="backup-files-subtitle" data-i18n="bindex.filesNote">{{t $.Locale "bindex.filesNote"}}</p></div><a id="bkCSV-{{$d.UDID}}" class="backup-browser-link" aria-disabled="true" tabindex="-1"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-download"></use></svg><span data-i18n="bindex.downloadCsv">{{t $.Locale "bindex.downloadCsv"}}</span></a></div>
+              <input id="bkSearch-{{$d.UDID}}" type="search" data-i18n-ph="bindex.search" data-i18n-aria="bindex.search" oninput="filterBackupList('{{$d.UDID}}',this.value)" class="iosbk-in backup-list-search" placeholder="{{t $.Locale "bindex.search"}}" aria-label="{{t $.Locale "bindex.search"}}" disabled>
+              <div class="backup-preview-meta"><span id="bkPreview-{{$d.UDID}}"></span><span data-i18n="bindex.previewNote">{{t $.Locale "bindex.previewNote"}}</span></div>
+              <div class="backup-file-heading" aria-hidden="true"><span data-i18n="bindex.filePath">{{t $.Locale "bindex.filePath"}}</span><span data-i18n="bindex.domain">{{t $.Locale "bindex.domain"}}</span></div>
+              <div id="list-{{$d.UDID}}" class="backup-file-list" role="region" tabindex="0" data-i18n-aria="bmgmt.filesTitle" aria-label="{{t $.Locale "bmgmt.filesTitle"}}"><div class="backup-list-empty" data-i18n="bindex.readingList">{{t $.Locale "bindex.readingList"}}</div></div>
+              <div class="backup-list-pagination"><span id="listMeta-{{$d.UDID}}"></span><span class="backup-page-controls"><button id="bkPrev-{{$d.UDID}}" onclick="pageBackupList('{{$d.UDID}}',-1)" data-i18n="bmgmt.prev" disabled>{{t $.Locale "bmgmt.prev"}}</button><span id="listPage-{{$d.UDID}}">—</span><button id="bkNext-{{$d.UDID}}" onclick="pageBackupList('{{$d.UDID}}',1)" data-i18n="bmgmt.next" disabled>{{t $.Locale "bmgmt.next"}}</button></span></div>
+              <p class="backup-browser-footnote" data-i18n="bindex.trustNote">{{t $.Locale "bindex.trustNote"}}</p>
               {{if $.ExperimentalOperationsEnabled}}
               <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;margin-top:20px;padding-top:16px;border-top:1px solid #F3F7FA">
                 <div style="flex:1;min-width:200px"><div style="font-size:13px;font-weight:600" data-i18n="bmgmt.deleteTitle">{{t $.Locale "bmgmt.deleteTitle"}}</div><div style="font-size:12px;color:#718090;margin-top:3px;line-height:1.4" data-i18n="bmgmt.deleteNote">{{t $.Locale "bmgmt.deleteNote"}}</div></div>
@@ -414,7 +417,7 @@
                 <div style="display:flex;flex-wrap:wrap;gap:9px;align-items:center">
                   <input type="password" id="oldPw-{{$d.UDID}}" data-i18n-ph="enc.oldPw" class="iosbk-in" style="min-width:150px" placeholder="{{t $.Locale "enc.oldPw"}}">
                   <input type="password" id="newPw-{{$d.UDID}}" data-i18n-ph="enc.newPw" class="iosbk-in" style="min-width:150px" placeholder="{{t $.Locale "enc.newPw"}}">
-                  <button onclick="changeBackupPw('{{$d.UDID}}')" style="padding:9px 15px;background:#2C62C6;color:#fff;border:none;border-radius:var(--iosbk-radius);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit" data-i18n="enc.changeBtn">{{t $.Locale "enc.changeBtn"}}</button>
+                  <button data-connection-action="{{$d.UDID}}" onclick="changeBackupPw('{{$d.UDID}}')" style="padding:9px 15px;background:#2C62C6;color:#fff;border:none;border-radius:var(--iosbk-radius);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit" data-i18n="enc.changeBtn">{{t $.Locale "enc.changeBtn"}}</button>
                 </div>
               </div>
             </div>
@@ -613,6 +616,7 @@ function applyI18n(){
   Object.keys(latestEncryptionStatuses).forEach(function(udid){ renderEncStatus(udid, latestEncryptionStatuses[udid]); });
   Object.keys(backupEncryptionStates).forEach(function(udid){ renderBackupEncryption(udid, backupEncryptionStates[udid]); });
   Object.keys(listState).forEach(function(udid){ renderBackupList(udid); });
+  backupBrowser.rerender();
   Object.keys(inlineResults).forEach(function(id){ var state=inlineResults[id]; var box=document.getElementById(id); if(box) showInlineResult(box,state.ok,state.payload,state.fallbackKey); });
   document.querySelectorAll('[data-time]').forEach(function(el){ el.textContent=IOSBKI18n.formatDate(el.getAttribute('data-time')); });
   if(removedDevicesCache!==null) renderRemovedDevices(removedDevicesCache,'ready');
@@ -663,6 +667,7 @@ function toggleCard(udid){
   panel.classList.toggle('hidden', !willOpen);
   setSVGIcon(document.getElementById('chev-'+udid), willOpen ? 'chevron-up' : 'chevron-down');
   if(willOpen) expandedCards.add(udid);
+  backupBrowser.visibilityChanged();
   if(!willOpen) maybeReload(); // 收起后若有挂起的设备增减刷新，此刻执行
 }
 function switchSection(udid, sec){
@@ -672,7 +677,7 @@ function switchSection(udid, sec){
     b.classList.toggle('active', active && !b.dataset.danger);
     b.classList.toggle('active-danger', active && !!b.dataset.danger);
   });
-  // 备份管理不再切 tab 自动加载：清单要从设备下载、备份越大越久，改为用户点「刷新」手动加载
+  if(sec==='backups') backupBrowser.open(udid); else backupBrowser.close(udid);
   if(sec==='enc') loadEncStatus(udid); // 进加密页时拉一次当前加密状态
 }
 
@@ -852,6 +857,7 @@ function connectSSE(){
   if(!window.EventSource){ fallbackPoll(); return; }
   try{
     es=new EventSource('/api/events');
+    es.onopen=function(){ backupBrowser.reconnect(); };
     es.onmessage=function(ev){ try{ applyStatus(JSON.parse(ev.data)); }catch(_){} };
     es.onerror=function(){ /* EventSource 自动重连，无需处理 */ };
   }catch(_){ fallbackPoll(); }
@@ -1036,6 +1042,9 @@ function patchDevice(d){
   renderPairingResult(d);
   var u=d.udid;
   latestDeviceStatuses[u]=d;
+  var backupOffline=document.getElementById('bkOffline-'+u); if(backupOffline) backupOffline.classList.toggle('hidden',d.conn!=='offline');
+  backupBrowser.notify(u,d.backup_index);
+  ['unbackBtn-','delBtn-'].forEach(function(prefix){var action=document.getElementById(prefix+u);if(action) action.disabled=!!d.backing_up;});
   document.querySelectorAll('[data-connection-action]').forEach(function(button){if(button.getAttribute('data-connection-action')===u) button.disabled=d.operations_available===false||d.backing_up;});
   var tile=document.getElementById('itile-'+u); if(tile) tile.setAttribute('style', itileStyle(d.conn));
   var name=document.getElementById('name-'+u); if(name) name.style.color = (d.conn==='offline')?'#96A3AE':'#213041';
@@ -1270,41 +1279,20 @@ document.addEventListener('keydown',function(e){
 /* ============== backup management ============== */
 const loadedBackups={};
 const listState={};
-function loadBackups(udid){
-  loadedBackups[udid]=true;
-  var box=document.getElementById('list-'+udid);
-  listState[udid]={messageKey:'action.loadBackups.loadingDownloadingTheManifestFrom'}; renderBackupList(udid);
-  // 串行：先取 info（占用空间/加密），完成后再取文件清单。
-  // 两个 idevicebackup2 命令不能并发连同一台设备，否则 lockdown 冲突 → exit status 255。
-  IOSBKI18n.fetch('/api/backup-info/'+udid).then(function(r){return r.json();}).then(function(data){
-    if(data.size_human){ var se=document.getElementById('bkSize-'+udid); if(se) se.textContent=data.size_human; }
-    if(data.error||!data.info) return;
-    // idevicebackup2 info 的加密标志形如 "<MBDriveProperties: … encrypted=0, …>"（值为 0/1）；
-    // 个别格式可能写成 "IsEncrypted: No"。两者都认：可选 Is 前缀、值可为数字或单词，且必须有 = / : 分隔避免误匹配。
-    var m=data.info.match(/(?:\bis)?encrypted[^\S\r\n]*[:=][^\S\r\n]*([A-Za-z0-9]+)/i);
-    if(m){ var yes=/^(yes|true|1)$/i.test(m[1]); backupEncryptionStates[udid]=yes; renderBackupEncryption(udid,yes); }
-  }).catch(function(){}).then(function(){ loadBackupFileList(udid, box); });
-}
-function loadBackupFileList(udid, box){
-  IOSBKI18n.fetch('/api/backup-list/'+udid).then(function(r){return r.json();}).then(function(data){
-    if(data.error){ listState[udid]={error:data}; renderBackupList(udid); return; }
-    if(data.empty){
-      box.textContent=tr('bmgmt.noBackup');
-      var c0=document.getElementById('bkCount-'+udid); if(c0) c0.textContent='0';
-      var mt=document.getElementById('listMeta-'+udid); if(mt) mt.textContent='';
-      var pg=document.getElementById('listPage-'+udid); if(pg) pg.textContent='';
-      listState[udid]={all:[], filtered:[], page:0, pageSize:200, total:0, truncated:false,empty:true};
-      return;
-    }
-    var rows=(data.entries||[]).map(function(e){ return (e.fields||[]).join(',  '); });
-    listState[udid]={all:rows, filtered:rows, page:0, pageSize:200, total:data.count, truncated:data.truncated};
-    document.getElementById('bkCount-'+udid).textContent = (data.count!=null?data.count:rows.length);
-    renderBackupList(udid);
-  }).catch(function(){ listState[udid]={error:{}}; renderBackupList(udid); });
-}
-function filterBackupList(udid,q){ var st=listState[udid]; if(!st||!st.all) return; q=(q||'').trim().toLowerCase(); st.filtered=q?st.all.filter(function(r){return r.toLowerCase().indexOf(q)>=0;}):st.all; st.page=0; renderBackupList(udid); }
-function pageBackupList(udid,delta){ var st=listState[udid]; if(!st||!st.filtered) return; var maxPage=Math.max(0,Math.ceil(st.filtered.length/st.pageSize)-1); st.page=Math.min(maxPage,Math.max(0,st.page+delta)); renderBackupList(udid); }
+const backupBrowserRenderer=window.IOSBKBackupBrowser.domRenderer({document:document,tr:tr,formatDate:function(value){return IOSBKI18n.formatDate(value);},locale:function(){return IOSBKI18n.getLocale();},message:apiMessage});
+const backupBrowser=window.IOSBKBackupBrowser.create({
+  fetch:function(url,options){return options.method==='POST'?csrfFetch(url,options):IOSBKI18n.fetch(url,options);},
+  render:backupBrowserRenderer,
+  isVisible:function(udid){var card=document.getElementById('panel-'+udid),section=document.querySelector('[data-sec-panel="backups"][data-udid="'+udid+'"]');return !document.hidden&&card&&!card.classList.contains('hidden')&&section&&!section.classList.contains('hidden');},
+  setTimeout:function(fn,delay){return setTimeout(fn,delay);},clearTimeout:function(timer){clearTimeout(timer);}
+});
+document.addEventListener('visibilitychange',function(){backupBrowser.visibilityChanged();});
+function loadBackups(udid){ loadedBackups[udid]=true; return backupBrowser.refresh(udid); }
+function loadBackupFileList(udid){ return backupBrowser.load(udid); }
+function filterBackupList(udid,q){ backupBrowser.search(udid,q); }
+function pageBackupList(udid,delta){ backupBrowser.page(udid,delta); }
 function renderBackupList(udid){
+  var local=backupBrowser.state(udid); if(local.snapshot||local.open||local.sequence){backupBrowserRenderer(udid,local);return;}
   var st=listState[udid]; if(!st) return;
   var box=document.getElementById('list-'+udid);
   if(st.messageKey){box.textContent=tr(st.messageKey);return;}
@@ -1328,6 +1316,7 @@ function confirmDeleteBackup(udid, name){
   postJSON('/api/delete-backup/'+udid,{confirm_name:typed.trim()}).then(function(d){
     if(d.error){ toast(apiMessage(d),true); return; }
     toast(tr('action.confirmDeleteBackup.backupDeleted'));
+    if(backupBrowser.state(udid).sequence) {delete listState[udid];backupBrowser.invalidate(udid);return;}
     var s=document.getElementById('bkSize-'+udid); if(s) s.textContent='—';
     var c=document.getElementById('bkCount-'+udid); if(c) c.textContent='—';
     delete backupEncryptionStates[udid];

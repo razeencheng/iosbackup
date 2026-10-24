@@ -83,7 +83,7 @@ function dom(app) {
 function pageScript(name) {
  const html=fs.readFileSync(path.join(root,'templates',name),'utf8');
  const scripts=[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)];
- return scripts.at(-1)[1].replace('{{.InitialStatus}}','{"devices":[]}');
+ return (name==='index.html'?fs.readFileSync(path.join(root,'static/backup-browser.js'),'utf8')+'\n':'')+scripts.at(-1)[1].replace('{{.InitialStatus}}','{"devices":[]}');
 }
 const login=boot(), loginDOM=dom(login);
 vm.runInContext(pageScript('login.html'),login.context);
@@ -96,6 +96,14 @@ assert.equal(loginDOM.get('togglePassword').textContent,'隐藏');
 assert.equal(loginDOM.get('password').value,'unsaved secret');
 const consoleApp=boot(), consoleDOM=dom(consoleApp);
 vm.runInContext(pageScript('index.html'),consoleApp.context);
+const backupPasswordButton=fs.readFileSync(path.join(root,'templates/index.html'),'utf8').match(/<button\b[^>]*onclick="changeBackupPw\('[^']+'\)"[^>]*>/)[0];
+assert.match(backupPasswordButton,/data-connection-action="\{\{\$d\.UDID\}\}"/,'backup password changes must participate in live device-operation gating');
+const passwordAction=consoleDOM.get('changeBackupPw-PHONE');passwordAction.setAttribute('data-connection-action','PHONE');
+for(const [conn,available,backingUp,disabled] of [['usb',true,false,false],['offline',false,false,true],['usb',true,true,true],['usb',true,false,false]]) {
+ vm.runInContext('patchDevice('+JSON.stringify({udid:'PHONE',conn,operations_available:available,backing_up:backingUp})+')',consoleApp.context);
+ assert.equal(passwordAction.disabled,disabled,'password action gating for '+conn+' / backing_up='+backingUp);
+}
+
 vm.runInContext(`latestEncryptionStatuses.PHONE={online:true,will_encrypt:true};backupEncryptionStates.PHONE=false;listState.PHONE={all:[],filtered:[],page:0,pageSize:200,total:0};showInlineResult(document.getElementById('ipResult-PHONE'),true,'bset.testOk');dirtyCards.add('PHONE');`,consoleApp.context);
 consoleDOM.get('networkAddress-PHONE').value='192.0.2.1';
 consoleApp.api.setLocale('zh-CN');

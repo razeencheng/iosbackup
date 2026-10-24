@@ -1,8 +1,8 @@
 module iosbackup
 
-go 1.21
+go 1.24
 
-toolchain go1.27.2
+toolchain go1.27.3
 
 require (
 	// 如果需要更多的HTTP客户端功能，可以添加这些依赖

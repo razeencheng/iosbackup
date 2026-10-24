@@ -117,6 +117,7 @@ func (app *application) removeDevice(udid string) (time.Time, error) {
 	delete(app.devicePresenceMissingSince, udid)
 	delete(app.deviceRemovalPending, udid)
 	app.mu.Unlock()
+	app.invalidateBackupIndexDevice(udid)
 	app.broadcastStatus()
 	return removedAt, nil
 }

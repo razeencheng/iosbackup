@@ -249,7 +249,9 @@ func TestHomePageOnlyRendersExperimentalControlsWhenEnabled(t *testing.T) {
 		}
 	}
 	for _, retained := range []string{
-		`href="/api/backup-list/` + experimentalTestUDID + `?format=csv"`,
+		`id="bkCSV-` + experimentalTestUDID + `"`,
+		`data-i18n="bindex.downloadCsv"`,
+		`src="/static/backup-browser.js`,
 		`onclick="loadBackups('` + experimentalTestUDID + `')"`,
 		`openRestoreModal('` + experimentalTestUDID + `'`,
 		`data-sec="remove"`,
