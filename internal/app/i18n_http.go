@@ -37,7 +37,47 @@ func apiMessage(w http.ResponseWriter, code string, params map[string]any, failu
 	return payload
 }
 
+func backupQueryMessageCode(reason string) string {
+	switch reason {
+	case "device_error":
+		return i18n.BackupQueryDeviceError
+	case "encrypted_query_failed":
+		return i18n.BackupQueryEncryptedQueryFailed
+	case "timeout":
+		return i18n.BackupQueryTimeout
+	case "cancelled":
+		return i18n.BackupQueryCancelled
+	case "parse_failed":
+		return i18n.BackupQueryParseFailed
+	case "output_limit":
+		return i18n.BackupQueryOutputLimit
+	case "tool_unavailable":
+		return i18n.BackupQueryToolUnavailable
+	case "storage_unavailable":
+		return i18n.BackupQueryStorageUnavailable
+	case "export_busy":
+		return i18n.BackupQueryExportBusy
+	case "export_storage_failed":
+		return i18n.BackupQueryExportStorageFailed
+	default:
+		return i18n.BackupQueryCommandFailed
+	}
+}
+
 func operationErrorPayload(w http.ResponseWriter, err error, fallbackCode string) map[string]any {
+	var queryErr *backupQueryError
+	if errors.As(err, &queryErr) {
+		d := queryErr.diagnostic
+		params := map[string]any{}
+		if d.DeviceErrorCode != nil {
+			params["device_code"] = *d.DeviceErrorCode
+		}
+		payload := apiMessage(w, backupQueryMessageCode(d.Reason), params, true)
+		payload["code"] = fallbackCode
+		payload["detail"] = d.Summary
+		payload["diagnostic"] = d
+		return payload
+	}
 	var translated *i18n.Error
 	if errors.As(err, &translated) {
 		payload := apiMessage(w, translated.Code, translated.Params, true)

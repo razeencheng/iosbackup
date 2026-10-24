@@ -12,7 +12,7 @@ The CSV contains list records, not the contents of photos, messages, or other fi
 
 - Complete a [USB backup](usb-backup.md) and know the device's current save location.
 - Keep the target device paired, online, and idle. Prefer a validated USB connection and respond to any passcode or authorization prompt on the phone; keeping it unlocked or its screen on is not required.
-- For an encrypted backup, this instance needs its usable master key and the correct saved device backup password. Completing an encrypted backup in a new instance does not mean the correct backup password has been saved; see [Encryption and credentials](encryption.md).
+- Keep the original backup password and this instance's master key/configuration safe. A saved password does not establish that this tool version can read an encrypted list, or that `info/list` consumed the password. Use the returned diagnostic to investigate; see [Encryption and credentials](encryption.md).
 - Allow time to read a large list. Do not start another backup or change its save location at the same time.
 
 ## Read the overview and file list
@@ -38,7 +38,7 @@ The list shows loaded records that match your search. The list is an index of pa
 ## Download the full list as CSV
 
 1. Keep the device online with no other operation running, then select **Download CSV** . This reads the full list again. It does not export the current search result, and it is not limited to the Web UI's 5,000 displayed items.
-2. Wait for the browser download to finish. If the device goes offline, the connection breaks, or authorization fails, the download can fail or be incomplete. A downloaded file or successful HTTP status alone does not establish a complete list.
+2. Wait while the complete CSV is prepared. One export can run at a time, with a 32 MiB file limit; preparation failures appear on the current page without starting a download. The browser saves the file after receiving the complete response. A connection break during transfer can still fail; see the [query limits and temporary-storage requirements](../OPERATIONS.md#backup-query-diagnostics).
 3. **On your computer** , open the file with a CSV-capable text or spreadsheet tool and check for plausible list records. If a previous successful load reported the full total, compare record counts. Do not substitute a plain-text line count for CSV records, which can contain quoted line breaks.
 4. Store the list in a protected location. The downloaded filename can include the device identifier, and contents can expose private paths. Redact both filename and content before reporting a problem; prefer only the necessary sanitized excerpt.
 
@@ -51,8 +51,8 @@ After downloading, check that the CSV opens correctly and contains records for t
 | Device offline and Backups controls disabled | Reconnect over USB, respond to any phone authorization prompt, wait for online state, and retry. A backup existing on disk does not establish offline list support in the current UI |
 | Device is backing up | Wait for the backup to end before refreshing; do not interrupt a backup just to inspect its list |
 | No backup found | Check the device and save location. Changing the path does not move an older backup automatically. See [Devices and storage](device-storage.md) |
-| `MBErrorDomain/207`, invalid password, or encrypted-list failure | Check the original password, master key, and configuration volume using [Encryption and credentials](encryption.md). Do not delete the backup or disable encryption to fix a reading error |
-| Size exists but information or list is empty | Treat this as a partial result. Inspect the matching query logs and device/password state; do not infer an empty or unencrypted backup |
+| `MBErrorDomain/207`, invalid password, or encrypted-list failure | Open **Diagnostic details** and copy the error. Use the explicit original reason to check credentials or device state. Exit 49/255 alone does not establish a password problem. Do not delete the backup or disable encryption to fix a reading error |
+| Size exists but information or list failed | Treat this as a partial result. Information and list failures have separate diagnostic details; the failed list count remains unknown. Do not infer an empty or unencrypted backup |
 | Large list is slow or its download breaks | Keep the device online and wait for the old query to end. Retry once over USB; if it still fails, retain a sanitized error and follow [Troubleshooting](troubleshooting.md) |
 | No search matches while truncation is shown | Search the full downloaded CSV; do not conclude a file is absent from the partial list |
 

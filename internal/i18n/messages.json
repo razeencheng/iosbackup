@@ -144,7 +144,19 @@
     "api.backup_auto_held": "Automatic backups are on hold until you resume them.",
     "api.backup_hold_save_failed": "Automatic backups remain on hold in this session, but the setting could not be saved reliably. Retry saving before restarting.",
     "api.backup_control_identity_required": "The backup task or hold identifier is missing. Refresh the page and retry.",
-    "api.backup_control_updated": "Backup control updated."
+    "api.backup_control_updated": "Backup control updated.",
+    "api.backup_query_device_error": "The device reported error {device_code}. The backup query could not be completed.",
+    "api.backup_query_command_failed": "The backup query failed. Expand the diagnostic details for available evidence.",
+    "api.backup_query_encrypted_query_failed": "The encrypted backup could not be queried. This does not confirm that the saved password is incorrect.",
+    "api.backup_query_timeout": "The backup query timed out. Check the connection and retry.",
+    "api.backup_query_cancelled": "The backup query was cancelled.",
+    "api.backup_query_parse_failed": "The backup list contains an invalid record and could not be read completely.",
+    "api.backup_query_output_limit": "The backup query exceeded the output limit. No complete export is available.",
+    "api.backup_query_tool_unavailable": "The backup query tool could not be started. Check the server installation.",
+    "api.backup_query_storage_unavailable": "The backup location cannot be read. Check the storage mount and permissions.",
+    "api.backup_query_export_busy": "Another CSV export is running. Wait for it to finish and retry.",
+    "api.backup_query_export_storage_failed": "The CSV export could not be prepared. Check temporary storage space and access.",
+    "api.backup_query_download_interrupted": "The CSV download was interrupted. Retry the download."
   },
   "zh-CN": {
     "api.operation_failed": "操作未能完成，请重试或查看服务日志。",
@@ -291,6 +303,18 @@
     "api.backup_auto_held": "自动备份已暂缓，直到你主动恢复。",
     "api.backup_hold_save_failed": "当前进程仍暂缓自动备份，但设置未能可靠保存。请重试保存，重启后的状态尚无保证。",
     "api.backup_control_identity_required": "缺少备份任务或暂缓状态标识，请刷新页面后重试。",
-    "api.backup_control_updated": "备份控制状态已更新。"
+    "api.backup_control_updated": "备份控制状态已更新。",
+    "api.backup_query_device_error": "设备返回错误 {device_code}，无法完成备份查询。",
+    "api.backup_query_command_failed": "备份查询失败，请展开诊断详情查看已有线索。",
+    "api.backup_query_encrypted_query_failed": "无法查询加密备份；这不能确认已保存的密码错误。",
+    "api.backup_query_timeout": "备份查询超时，请检查连接后重试。",
+    "api.backup_query_cancelled": "备份查询已取消。",
+    "api.backup_query_parse_failed": "备份清单包含无效记录，无法完整读取。",
+    "api.backup_query_output_limit": "备份查询输出超过限制，无法提供完整导出。",
+    "api.backup_query_tool_unavailable": "无法启动备份查询工具，请检查服务安装。",
+    "api.backup_query_storage_unavailable": "无法读取备份位置，请检查存储挂载和权限。",
+    "api.backup_query_export_busy": "另一项 CSV 导出正在进行，请等待完成后重试。",
+    "api.backup_query_export_storage_failed": "无法准备 CSV 导出，请检查临时存储空间与访问权限。",
+    "api.backup_query_download_interrupted": "CSV 下载中断，请重新下载。"
   }
 }

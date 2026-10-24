@@ -188,7 +188,8 @@ type application struct {
 	hub                        *eventHub
 	lastSnapshotJSON           string
 	deviceRefreshGeneration    uint64
-	backupSem                  *backupSem // 全局备份并发闸：限制同时运行的 idevicebackup2 数量
+	backupSem                  *backupSem         // 全局备份并发闸：限制同时运行的 idevicebackup2 数量
+	backupCSV                  *backupCSVExporter // 导出名额覆盖准备及传输，与备份任务独立
 	activeDeviceCommands       map[string]*activeDeviceCommand
 	deviceOfflineSince         map[string]time.Time
 	devicePresenceMissingSince map[string]time.Time
@@ -226,6 +227,7 @@ func newApplicationWithRuntime(ctx context.Context, cfg runtimeConfig) *applicat
 		backupProgress:               make(map[string]backupProgress),
 		backupProgressBroadcast:      make(map[string]time.Time),
 		backupSem:                    newBackupSem(cfg.MaxHeavyJobs),
+		backupCSV:                    newBackupCSVExporter(),
 		activeDeviceCommands:         make(map[string]*activeDeviceCommand),
 		deviceOfflineSince:           make(map[string]time.Time),
 		devicePresenceMissingSince:   make(map[string]time.Time),

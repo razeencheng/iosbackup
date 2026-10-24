@@ -2,7 +2,6 @@ package app
 
 import (
 	"context"
-	"encoding/csv"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -1144,6 +1143,7 @@ func (app *application) handleNotificationStatus(w http.ResponseWriter, r *http.
 
 // handleBackupInfo 读取设备备份信息（只读）。GET /api/backup-info/{udid}
 func (app *application) handleBackupInfo(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", "no-store")
 	if r.Method != http.MethodGet {
 		writeError(w, http.StatusMethodNotAllowed, i18n.MethodNotAllowed)
 		return
@@ -1156,23 +1156,30 @@ func (app *application) handleBackupInfo(w http.ResponseWriter, r *http.Request)
 	if app.rejectRemovedDeviceOperation(w, udid) {
 		return
 	}
+	path, err := app.backupQueryPath(udid)
+	if err != nil {
+		writeOperationError(w, http.StatusBadRequest, err, i18n.BackupInfoFailed)
+		return
+	}
 	// 占用空间来自磁盘（遍历备份目录），与设备无关——即便下面取设备 info 失败也照样返回
-	sizeHuman := humanSize(dirSizeBytes(app.deviceBackupPath(udid)))
+	sizeHuman := humanSize(dirSizeBytes(path))
 
 	out, err := app.BackupInfo(r.Context(), udid)
 	if err != nil {
 		writeJSON(w, http.StatusOK, map[string]interface{}{
-			"udid": udid, "info": "", "size_human": sizeHuman,
+			"udid": udid, "info": "", "size_human": sizeHuman, "info_status": "unavailable",
+			"info_error": operationErrorPayload(w, err, i18n.BackupInfoFailed),
 		})
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]interface{}{
-		"udid": udid, "info": string(out), "size_human": sizeHuman,
+		"udid": udid, "info": string(out), "size_human": sizeHuman, "info_status": "available",
 	})
 }
 
 // handleBackupList 列出备份内文件（只读，CSV→JSON）。GET /api/backup-list/{udid}
 func (app *application) handleBackupList(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", "no-store")
 	if r.Method != http.MethodGet {
 		writeError(w, http.StatusMethodNotAllowed, i18n.MethodNotAllowed)
 		return
@@ -1185,36 +1192,32 @@ func (app *application) handleBackupList(w http.ResponseWriter, r *http.Request)
 	if app.rejectRemovedDeviceOperation(w, udid) {
 		return
 	}
-	// format=csv：命令输出逐行清洗并直接编码到响应；客户端断开时 context 会取消子进程。
+	path, err := app.backupQueryPath(udid)
+	if err != nil {
+		writeOperationError(w, http.StatusBadRequest, err, i18n.BackupListFailed)
+		return
+	}
+	if _, _, err := app.backupDeviceContext(udid); err != nil {
+		writeOperationError(w, http.StatusConflict, err, i18n.BackupListFailed)
+		return
+	}
+	empty, err := confirmedBackupAbsent(path)
+	if err != nil {
+		writeOperationError(w, http.StatusConflict, &backupQueryError{diagnostic: backupQueryDiagnostic{Operation: "list", Stage: "admission", Reason: "storage_unavailable", Summary: "Local backup storage is unavailable."}, cause: err}, i18n.BackupListFailed)
+		return
+	}
+	if empty && r.URL.Query().Get("format") != "csv" {
+		writeJSON(w, http.StatusOK, map[string]interface{}{"udid": udid, "entries": []backupListEntry{}, "count": 0, "truncated": false, "empty": true})
+		return
+	}
 	if r.URL.Query().Get("format") == "csv" {
-		w.Header().Set("Content-Type", "text/csv; charset=utf-8")
-		w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"backup-list-%s.csv\"", udid))
-		cw := csv.NewWriter(w)
-		_, err := app.streamBackupList(r.Context(), udid, func(fields []string) error {
-			if err := cw.Write(fields); err != nil {
-				return err
-			}
-			cw.Flush()
-			return cw.Error()
-		})
-		cw.Flush()
-		if err != nil && !app.hasLocalBackup(udid) {
-			return
-		}
+		app.serveBackupCSV(w, r, udid, empty)
 		return
 	}
 
 	const maxJSONEntries = 5000
 	entries, total, truncated, err := app.BackupListLimited(r.Context(), udid, maxJSONEntries)
 	if err != nil {
-		// 设备还没有任何本地备份 → 友好返回空清单（empty=true），而不是把 idevicebackup2 的
-		// exit status 51 原始错误抛给用户。有备份但报错（加密无密码 / 离线等）仍照常返回错误。
-		if !app.hasLocalBackup(udid) {
-			writeJSON(w, http.StatusOK, map[string]interface{}{
-				"udid": udid, "entries": []backupListEntry{}, "count": 0, "truncated": false, "empty": true,
-			})
-			return
-		}
 		writeOperationError(w, http.StatusConflict, err, i18n.BackupListFailed)
 		return
 	}

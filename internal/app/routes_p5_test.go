@@ -101,8 +101,8 @@ func TestIndexTemplateShowsDiscoveredIP(t *testing.T) {
 		BackupStatuses: map[string]bool{"U-DISC": false}, EncryptionAvailable: true,
 		DiscoveredIPs: map[string]string{"U-DISC": "192.0.2.249"},
 	})
-	// 发现块的唯一标记是语义搜索图标 + IP 值
-	if !strings.Contains(html, "ui-icons.svg#icon-search") || !strings.Contains(html, "192.0.2.249") {
+	// 按发现块的语义标签与 IP 值判断，搜索图标也用于备份清单。
+	if !strings.Contains(html, `data-i18n="bset.discovered"`) || !strings.Contains(html, "192.0.2.249") {
 		t.Error("有发现 IP 时应在设备 IP 栏下显示自动发现的 IP")
 	}
 }
@@ -115,7 +115,7 @@ func TestIndexTemplateNoDiscoveredIPLine(t *testing.T) {
 		BackupStatuses: map[string]bool{"U-NODISC": false}, EncryptionAvailable: true,
 		DiscoveredIPs: map[string]string{}, // 无发现 IP
 	})
-	if strings.Contains(html, "ui-icons.svg#icon-search") {
+	if strings.Contains(html, `data-i18n="bset.discovered"`) {
 		t.Error("无发现 IP 时不应显示发现块")
 	}
 }

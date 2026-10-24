@@ -3,7 +3,6 @@ package app
 import (
 	"bytes"
 	"context"
-	"encoding/csv"
 	"errors"
 	"fmt"
 	"io"
@@ -316,7 +315,7 @@ func (app *application) backupDeviceContext(udid string) (*device, string, error
 	if err := app.deviceRemovalBlockedUnsafe(udid); err != nil {
 		return nil, "", err
 	}
-	if app.backupInProgress[udid] {
+	if app.backupInProgress[udid] || app.checkInProgress[udid] {
 		return nil, "", i18n.NewError(i18n.Busy, nil)
 	}
 	device, ok := app.devices[udid]
@@ -335,9 +334,55 @@ func (app *application) backupDeviceContext(udid string) (*device, string, error
 	return &devCopy, dir, nil
 }
 
-// backupPasswordEnv 若该设备存了备份密码，返回 BACKUP_PASSWORD env（读加密备份的
-// info/list 需要它解密 manifest，否则报 ErrorCode 207）。无可用密码返回 nil。密码经 env
-// 注入、绝不进 argv/日志。
+// backupQueryPath 在访问磁盘前验证受管设备身份，不要求设备在线。
+func (app *application) backupQueryPath(udid string) (string, error) {
+	if udid == "" || udid == "." || udid == ".." || strings.ContainsAny(udid, "/\\\x00\r\n") {
+		return "", i18n.NewError(i18n.InvalidUDID, nil)
+	}
+	app.mu.RLock()
+	defer app.mu.RUnlock()
+	if _, ok := app.devices[udid]; !ok {
+		return "", i18n.NewError(i18n.DeviceNotFound, nil)
+	}
+	if err := app.deviceRemovalBlockedUnsafe(udid); err != nil {
+		return "", err
+	}
+	root := dirBackups
+	if cfg := app.configs[udid]; cfg != nil && cfg.BackupDirectory != "" {
+		root = cfg.BackupDirectory
+	}
+	return filepath.Join(root, udid), nil
+}
+
+// confirmedBackupAbsent 只在根目录可读、设备目录确实不存在时返回空备份。
+func confirmedBackupAbsent(path string) (bool, error) {
+	root, err := os.Open(filepath.Dir(path))
+	if err != nil {
+		return false, err
+	}
+	_, readErr := root.ReadDir(1)
+	closeErr := root.Close()
+	if readErr != nil && readErr != io.EOF {
+		return false, readErr
+	}
+	if closeErr != nil {
+		return false, closeErr
+	}
+	stat, err := os.Lstat(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return true, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	if !stat.IsDir() {
+		return false, errors.New("backup location is not a directory")
+	}
+	return false, nil
+}
+
+// backupPasswordEnv 将已保存密码经 env 注入，不进入 argv 或日志。
+// Info/List 是否使用该变量取决于上游协议，不能据此保证支持加密清单。
 func (app *application) backupPasswordEnv(udid string) []string {
 	if app.secretStore == nil || !app.secretStore.Available() {
 		return nil
@@ -368,13 +413,15 @@ func (app *application) BackupInfo(ctx context.Context, udid string) ([]byte, er
 		return nil, err
 	}
 	defer release()
-	// 加密备份的 info 需要 BACKUP_PASSWORD 才能解密 manifest
+	started := time.Now()
+	app.addDebugLog(udid, "event=backup_query.started operation=info")
+	env := app.backupPasswordEnv(udid)
+	stdout, stderr := newQueryDiagnostics(udid, dir, env), newQueryDiagnostics(udid, dir, env)
 	const maxBackupInfoBytes = 1 << 20
 	out := newHeadBuffer(maxBackupInfoBytes)
-	errTail := newTailBuffer(maxCommandErrorBytes)
-	err = app.runIdeviceCmdStreamEnv(ctx, cmdKindMedium, device, app.backupPasswordEnv(udid), cmdIdevicebackup2, out, errTail, "info", dir)
-	if err != nil {
-		return out.Bytes(), operationError(i18n.BackupInfoFailed, err, errTail.String())
+	err = app.runIdeviceCmdStreamEnv(ctx, cmdKindMedium, device, env, cmdIdevicebackup2, io.MultiWriter(out, stdout), stderr, "info", dir)
+	if err = app.finishBackupQuery("info", udid, device.Connection, started, err, nil, stdout, stderr); err != nil {
+		return nil, err
 	}
 	// 清洗掉下载 manifest 的进度条/ANSI 噪声，只留真实信息
 	cleaned := cleanBackupOutput(out.Bytes())
@@ -414,91 +461,38 @@ func (app *application) streamBackupList(ctx context.Context, udid string, onRow
 		return 0, err
 	}
 	defer release()
-	// 加密备份的 list 需要 BACKUP_PASSWORD 才能解密 manifest
+	started := time.Now()
+	app.addDebugLog(udid, "event=backup_query.started operation=list")
 	pwEnv := app.backupPasswordEnv(udid)
-	cmdCtx, cancel := context.WithCancel(ctx)
-	defer cancel()
+	stdout, stderr := newQueryDiagnostics(udid, dir, pwEnv), newQueryDiagnostics(udid, dir, pwEnv)
+	cmdCtx, cancel := context.WithCancelCause(ctx)
+	defer cancel(nil)
 	stdoutR, stdoutW := io.Pipe()
-	stderr := newTailBuffer(maxCommandErrorBytes)
+	defer stdoutR.Close()
 	result := make(chan error, 1)
 	go func() {
 		runErr := app.runIdeviceCmdStreamEnv(cmdCtx, cmdKindMedium, device, pwEnv, cmdIdevicebackup2, stdoutW, stderr, "list", dir)
 		_ = stdoutW.Close()
 		result <- runErr
 	}()
-
 	total := 0
-	parseErr := forEachBackupListRow(stdoutR, func(fields []string) error {
+	parseErr := consumeQueryRows(stdoutR, stdout, func(fields []string) error {
+		if err := onRow(fields); err != nil {
+			return err
+		}
 		total++
-		return onRow(fields)
+		return nil
 	})
 	if parseErr != nil {
-		cancel()
+		cancel(parseErr)
 		_ = stdoutR.CloseWithError(parseErr)
 	}
 	cmdErr := <-result
-	if parseErr != nil {
-		return total, parseErr
-	}
-	if cmdErr != nil {
-		errOutput := stderr.Bytes()
-		if isEncryptedBackupError(errOutput) {
-			if len(pwEnv) == 0 {
-				return total, i18n.NewError(i18n.BackupPasswordMissing, nil)
-			}
-			return total, i18n.NewError(i18n.BackupPasswordIncorrect, nil)
-		}
-		return total, operationError(i18n.BackupListFailed, cmdErr, stderr.String())
-	}
-	return total, nil
+	return total, app.finishBackupQuery("list", udid, device.Connection, started, cmdErr, parseErr, stdout, stderr)
 }
 
 func forEachBackupListRow(reader io.Reader, onRow func([]string) error) error {
-	filteredR, filteredW := io.Pipe()
-	filterResult := make(chan error, 1)
-	go func() {
-		err := consumeBoundedLines(reader, func(line string, _ bool) error {
-			line = strings.TrimSpace(line)
-			if strings.ContainsRune(line, '\x1b') {
-				line = ansiRE.ReplaceAllString(line, "")
-			}
-			if line == "" || strings.HasSuffix(line, backupLogTruncatedMarker) ||
-				(!strings.Contains(line, ",") && isProgressLine(line)) {
-				return nil
-			}
-			if _, writeErr := io.WriteString(filteredW, line); writeErr != nil {
-				return writeErr
-			}
-			_, writeErr := io.WriteString(filteredW, "\n")
-			return writeErr
-		})
-		_ = filteredW.CloseWithError(err)
-		filterResult <- err
-	}()
-
-	r := csv.NewReader(filteredR)
-	r.FieldsPerRecord = -1
-	r.LazyQuotes = true
-	r.ReuseRecord = true
-	for {
-		fields, err := r.Read()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			_ = filteredR.CloseWithError(err)
-			<-filterResult
-			return err
-		}
-		if len(fields) > 0 {
-			if err := onRow(fields); err != nil {
-				_ = filteredR.CloseWithError(err)
-				<-filterResult
-				return err
-			}
-		}
-	}
-	return <-filterResult
+	return consumeQueryRows(reader, newQueryDiagnostics("", "", nil), onRow)
 }
 
 // parseBackupList 把 idevicebackup2 list 的 CSV 输出解析为行集合（字段数可变，容错）。
