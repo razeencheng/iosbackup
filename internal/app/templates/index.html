@@ -111,6 +111,13 @@
   .remove-dialog-cancel{border:1px solid #D8E2EA;background:#fff;color:#405162}
   .remove-dialog-confirm{border:1px solid #9F231C;background:#9F231C;color:#fff;min-width:132px}
   .remove-dialog-confirm:disabled{border-color:#D8E2EA;background:#F3F7FA;color:#ADB9C2;cursor:not-allowed}
+  .backup-control-button{border:1px solid #D8E2EA;background:#fff;color:#405162;border-radius:var(--iosbk-radius);padding:9px 13px;font:inherit;font-size:13px;font-weight:600;cursor:pointer;white-space:normal}
+  .backup-control-button.stop{border-color:#E2B8B3;color:#9F231C}
+  .backup-control-button:disabled{opacity:.55;cursor:not-allowed}
+  .backup-hold-banner{margin:0 20px 16px;padding:13px 14px;background:#FFF8EB;border:1px solid #EEDAB4;border-radius:var(--iosbk-radius);display:flex;flex-wrap:wrap;align-items:center;gap:12px;color:#78521E;font-size:13px;line-height:1.6}
+  .backup-hold-banner .copy{flex:1;min-width:180px}
+  .backup-hold-banner small{display:block;color:#847052;margin-top:3px}
+  .backup-control-error{color:#9F231C}
   /* top-bar menu */
   .menu-item{display:flex;gap:11px;align-items:flex-start;width:100%;text-align:left;padding:9px 11px;border-radius:var(--iosbk-radius);background:none;border:none;cursor:pointer;font-family:inherit;color:#27384A;text-decoration:none}
   .menu-item:hover{background:#F3F7FA}
@@ -250,10 +257,16 @@
               {{else}}<span class="connection-badge" style="gap:7px;padding:5px 11px;background:#F3F7FA;color:#718090;border:1px solid #D8E2EA;font-size:12.5px;font-weight:600;white-space:nowrap"><svg class="connection-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2.6v6.1M5.5 5.7a6.2 6.2 0 1 0 9 0" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path></svg><span data-i18n="status.offline">{{t $.Locale "status.offline"}}</span></span>{{end}}
             </div>
             <button id="backupBtn-{{$d.UDID}}" class="backup-action" onclick="event.stopPropagation();startBackup('{{$d.UDID}}',this)" {{if or (eq $conn "offline") $backingUp}}disabled{{end}} style="gap:9px;padding:10px 17px;font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit;border:none;white-space:nowrap;min-width:132px;{{if or (eq $conn "offline") $backingUp}}background:#F3F7FA;color:#ADB9C2;cursor:not-allowed;{{else}}background:#2C62C6;color:#fff;{{end}}">{{if $backingUp}}<span data-i18n="device.backingUp">{{t $.Locale "device.backingUp"}}</span>{{else}}<span data-i18n="device.backupNow">{{t $.Locale "device.backupNow"}}</span>{{end}}</button>
+            <button id="stopBackup-{{$d.UDID}}" type="button" class="backup-control-button stop hidden" disabled onclick="event.stopPropagation();openStopBackup('{{$d.UDID}}')" data-i18n="control.stop">{{t $.Locale "control.stop"}}</button>
             <svg id="chev-{{$d.UDID}}" class="ui-icon" style="color:#ADB9C2;width:15px;height:15px" aria-hidden="true"><use href="/static/ui-icons.svg#icon-chevron-down"></use></svg>
           </div>
         </div>
 
+        <div id="backupHold-{{$d.UDID}}" class="backup-hold-banner{{if not $cfg.AutoBackupHold}} hidden{{end}}" role="status">
+          <div class="copy"><strong data-i18n="control.held">{{t $.Locale "control.held"}}</strong><div id="backupHoldMessage-{{$d.UDID}}" data-i18n="control.holdHint">{{t $.Locale "control.holdHint"}}</div><small data-i18n="control.resumeHint">{{t $.Locale "control.resumeHint"}}</small></div>
+          <button id="retryHold-{{$d.UDID}}" type="button" class="backup-control-button hidden" onclick="retryBackupHold('{{$d.UDID}}')" data-i18n="control.retrySave">{{t $.Locale "control.retrySave"}}</button>
+          <button id="resumeBackup-{{$d.UDID}}" type="button" class="backup-control-button" disabled onclick="resumeAutomaticBackup('{{$d.UDID}}')" data-i18n="control.resume">{{t $.Locale "control.resume"}}</button>
+        </div>
         <div id="bkbar-{{$d.UDID}}" class="backup-progress-panel{{if not $backingUp}} hidden{{end}}" data-progress-mode="preparing">
           <div class="backup-progress-heading">
             <div class="backup-progress-heading-copy"><strong id="bkprogress-title-{{$d.UDID}}" data-i18n="progress.preparingTitle">{{t $.Locale "progress.preparingTitle"}}</strong><span id="bkprogress-subtitle-{{$d.UDID}}" data-i18n="progress.preparingSubtitle">{{t $.Locale "progress.preparingSubtitle"}}</span></div>
@@ -572,6 +585,14 @@
 <!-- ===================== UPDATE BANNER (新版本部署后提示刷新) ===================== -->
 <div id="updateBanner" class="hidden" onclick="location.reload()" style="position:fixed;left:50%;top:14px;transform:translateX(-50%);z-index:80;background:#2C62C6;color:#fff;padding:10px 18px;border-radius:var(--iosbk-radius);font-size:13.5px;font-weight:600;cursor:pointer;box-shadow:0 10px 24px -8px rgba(35,52,68,.45);display:flex;align-items:center;gap:9px"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-refresh"></use></svg><span data-i18n="update.banner">{{t $.Locale "update.banner"}}</span></div>
 
+<div id="stopBackupModal" class="remove-device-overlay hidden" onclick="closeStopBackup()">
+  <section class="remove-device-dialog" role="dialog" aria-modal="true" aria-labelledby="stopBackupTitle" aria-describedby="stopBackupRisk" onclick="event.stopPropagation()">
+    <div class="remove-dialog-head"><div><h2 id="stopBackupTitle" style="margin:0;font-size:18px" data-i18n="control.confirmTitle">{{t $.Locale "control.confirmTitle"}}</h2><div id="stopBackupDevice" style="margin-top:6px;color:#718090;font-size:13px"></div></div></div>
+    <div class="remove-dialog-body"><p id="stopBackupRisk" style="margin:0;padding:13px;background:#FFF8EB;border:1px solid #EEDAB4;color:#78521E;line-height:1.7;border-radius:var(--iosbk-radius)" data-i18n="control.stopRisk">{{t $.Locale "control.stopRisk"}}</p><p style="margin:14px 0 0;color:#718090;font-size:13px;line-height:1.6" data-i18n="control.stopDetail">{{t $.Locale "control.stopDetail"}}</p></div>
+    <div class="remove-dialog-actions"><button id="stopBackupCancel" type="button" class="remove-dialog-cancel" onclick="closeStopBackup()" data-i18n="control.keepRunning">{{t $.Locale "control.keepRunning"}}</button><button id="stopBackupConfirm" type="button" class="remove-dialog-confirm" onclick="submitStopBackup()" data-i18n="control.confirmStop">{{t $.Locale "control.confirmStop"}}</button></div>
+  </section>
+</div>
+
 <!-- ===================== TOAST ===================== -->
 <div id="toast" class="hidden" style="position:fixed;left:50%;top:14px;transform:translateX(-50%);z-index:75;background:#213041;color:#fff;padding:12px 18px;border-radius:var(--iosbk-radius);font-size:13.5px;font-weight:500;box-shadow:0 14px 30px -10px rgba(35,52,68,.5);display:flex;align-items:center;gap:9px;max-width:90vw">
   <svg id="toastIcon" class="ui-icon" style="color:#5FD0A0" aria-hidden="true"><use href="/static/ui-icons.svg#icon-check-circle"></use></svg><span id="toastMsg"></span>
@@ -588,6 +609,8 @@ function applyI18n(){
   IOSBKI18n.apply();
   updateAutoText();
   rerenderBackupProgress();
+  Object.keys(latestDeviceStatuses).forEach(function(u){renderBackupControl(latestDeviceStatuses[u]);});
+  renderStopBackupDialog();
   renderConnectionHealth();
   Object.keys(latestPairingStatuses).forEach(function(udid){ renderPairingResult(latestPairingStatuses[udid]); });
   Object.keys(latestEncryptionStatuses).forEach(function(udid){ renderEncStatus(udid, latestEncryptionStatuses[udid]); });
@@ -965,6 +988,8 @@ function formatBackupBytes(value){
   return size.toLocaleString(IOSBKI18n.getLocale(),{minimumFractionDigits:0,maximumFractionDigits:digits})+' '+units[unit];
 }
 function backupProgressCopy(mode,d){
+  if(mode==='stopping') return {title:'control.stopping',subtitle:'progress.overallSubtitle',hint:'control.stoppingHint',tone:'warning',icon:'info'};
+  if(mode==='stopped') return {title:'control.stopped',subtitle:'progress.overallSubtitle',hint:'control.stoppedHint',tone:'warning',icon:'info'};
   if(mode==='waiting-authorization') return {title:'progress.waitingAuthorizationTitle',subtitle:'progress.overallSubtitle',hint:'progress.waitingAuthorizationHint',tone:'warning',icon:'info'};
   if(mode==='waiting-device') return {title:'progress.waitingDeviceTitle',subtitle:'progress.overallSubtitle',hint:'progress.waitingDeviceHint',tone:'',icon:'info'};
   if((mode==='transferring'||mode==='overall-only') && d.backup_progress.phase==='sending') return {title:'progress.sendingTitle',subtitle:'progress.overallSubtitle',hint:'progress.sendingHint',tone:'',icon:'info'};
@@ -983,10 +1008,10 @@ function backupProgressCopy(mode,d){
 function renderBackupProgress(d){
   var u=d.udid, panel=document.getElementById('bkbar-'+u); if(!panel) return;
   var progress=d.backup_progress;
-  if(!progress && d.backing_up) progress={state:'preparing'};
+  if(!progress && (d.backing_up || d.backup_state==='stopped')) progress={state:'preparing'};
   if(!progress){ panel.classList.add('hidden'); panel.removeAttribute('data-progress-mode'); return; }
 
-  var mode=backupProgressMode(progress), copy=backupProgressCopy(mode,d);
+  var mode=d.backup_state==='stopping'?'stopping':(d.backup_state==='stopped'?'stopped':backupProgressMode(progress)), copy=backupProgressCopy(mode,d);
   panel.classList.remove('hidden'); panel.setAttribute('data-progress-mode',mode);
   var title=document.getElementById('bkprogress-title-'+u), subtitle=document.getElementById('bkprogress-subtitle-'+u), value=document.getElementById('bkprogress-value-'+u);
   var track=document.getElementById('bkprogress-track-'+u), fill=document.getElementById('bkprogress-fill-'+u);
@@ -1034,8 +1059,10 @@ function patchDevice(d){
     btn.disabled = dis;
     btn.setAttribute('style','gap:9px;padding:10px 17px;font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit;border:none;white-space:nowrap;min-width:132px;'+(dis?'background:#F3F7FA;color:#ADB9C2;cursor:not-allowed;':'background:#2C62C6;color:#fff;'));
     var retry=d.backup_progress && (d.backup_progress.state==='interrupted'||d.backup_progress.state==='failed');
-    btn.innerHTML = d.backing_up ? '<span data-i18n="device.backingUp"></span>' : (retry?'<span data-i18n="progress.retry"></span>':'<span data-i18n="device.backupNow"></span>');
+    btn.innerHTML = d.backing_up ? '<span data-i18n="device.backingUp"></span>' : (d.auto_backup_hold?'<span data-i18n="control.manualOnce"></span>':(retry?'<span data-i18n="progress.retry"></span>':'<span data-i18n="device.backupNow"></span>'));
+    btn.style.opacity='';
   }
+  renderBackupControl(d);
 }
 
 /* ============== header actions ============== */
@@ -1161,6 +1188,93 @@ function startBackup(udid, btn){
     else toast(tr('action.fail.backupStartedYourDeviceWill'));
   }).catch(function(e){ fail(tr('common.operationFailed')); });
 }
+
+/* ============== backup stopping and automatic holds ============== */
+const backupControlPending={};
+let backupStopTarget=null, backupStopSubmitting=false, backupStopFocus=null;
+function renderBackupControl(d){
+  var u=d.udid, pending=!!backupControlPending[u], stopping=d.backup_state==='stopping';
+  var stop=document.getElementById('stopBackup-'+u);
+  if(stop){stop.classList.toggle('hidden',!d.backing_up);stop.disabled=pending||stopping||!d.backup_job_id;stop.textContent=tr(stopping?'control.stopping':'control.stop');}
+  var banner=document.getElementById('backupHold-'+u);
+  if(banner)banner.classList.toggle('hidden',!d.auto_backup_hold);
+  var message=document.getElementById('backupHoldMessage-'+u);
+  if(message){message.removeAttribute('data-i18n');message.textContent=tr(d.auto_backup_hold_persistence==='error'?'control.holdSaveFailed':(d.auto_backup_hold_persistence==='pending'?'control.holdSaving':'control.holdHint'));message.classList.toggle('backup-control-error',d.auto_backup_hold_persistence==='error');}
+  var resume=document.getElementById('resumeBackup-'+u);
+  if(resume)resume.disabled=pending||!!d.backing_up||!d.auto_backup_hold_version||d.auto_backup_hold_persistence==='pending';
+  var retry=document.getElementById('retryHold-'+u);
+  if(retry){retry.classList.toggle('hidden',d.auto_backup_hold_persistence!=='error');retry.disabled=pending;}
+}
+function renderStopBackupDialog(){
+  if(!backupStopTarget)return;
+  document.getElementById('stopBackupRisk').textContent=tr('control.stopRisk');
+  document.getElementById('stopBackupConfirm').disabled=backupStopSubmitting;
+  document.getElementById('stopBackupCancel').disabled=backupStopSubmitting;
+  document.getElementById('stopBackupConfirm').textContent=tr(backupStopSubmitting?'control.submitting':'control.confirmStop');
+}
+function openStopBackup(udid){
+  var d=latestDeviceStatuses[udid];
+  if(!d||!d.backing_up||!d.backup_job_id||d.backup_state==='stopping'||backupControlPending[udid])return;
+  backupStopTarget={udid:udid,jobID:d.backup_job_id};
+  backupStopFocus=document.activeElement;
+  backupStopSubmitting=false;
+  document.getElementById('stopBackupDevice').textContent=d.name||udid;
+  document.getElementById('stopBackupModal').classList.remove('hidden');modalOpen=true;
+  renderStopBackupDialog();
+  document.getElementById('stopBackupCancel').focus();
+}
+function closeStopBackup(force){
+  if(backupStopSubmitting&&!force)return;
+  document.getElementById('stopBackupModal').classList.add('hidden');
+  backupStopTarget=null;modalOpen=false;
+  if(backupStopFocus&&backupStopFocus.focus)backupStopFocus.focus();
+  maybeReload();
+}
+function refreshBackupControlStatus(){
+  return IOSBKI18n.fetch('/api/status').then(function(r){return r.json();}).then(function(snap){(snap.devices||[]).forEach(patchDevice);applyI18n();});
+}
+function sendBackupControl(udid,action,body){
+  if(backupControlPending[udid])return Promise.resolve();
+  backupControlPending[udid]=true;
+  if(latestDeviceStatuses[udid])renderBackupControl(latestDeviceStatuses[udid]);
+  return csrfFetch('/api/backup-'+action+'/'+udid,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(r){return r.json();}).then(function(data){
+    var current=latestDeviceStatuses[udid];
+    if(current && (data.backup_job_id||'')===(current.backup_job_id||'')){
+      var next=Object.assign({},current);
+      ['backup_state','backing_up','auto_backup_hold','auto_backup_hold_version','auto_backup_hold_persistence'].forEach(function(key){if(Object.prototype.hasOwnProperty.call(data,key))next[key]=data[key];});
+      patchDevice(next);applyI18n();
+    }
+    if(data.error)toast(apiMessage(data),true);
+    else if(action==='resume')toast(tr('control.resumed'));
+    else if(action==='hold-retry')toast(tr('control.holdSaved'));
+  }).catch(function(){toast(tr('control.unknownResult'),true);}).then(function(){
+    return refreshBackupControlStatus().catch(function(){toast(tr('control.refreshFailed'),true);});
+  }).finally(function(){delete backupControlPending[udid];if(latestDeviceStatuses[udid])renderBackupControl(latestDeviceStatuses[udid]);});
+}
+function submitStopBackup(){
+  if(!backupStopTarget||backupStopSubmitting)return;
+  var selected=backupStopTarget;
+  backupStopSubmitting=true;renderStopBackupDialog();
+  return sendBackupControl(selected.udid,'stop',{job_id:selected.jobID}).finally(function(){backupStopSubmitting=false;closeStopBackup(true);});
+}
+function resumeAutomaticBackup(udid){
+  var d=latestDeviceStatuses[udid];if(!d||!d.auto_backup_hold||d.backing_up)return;
+  return sendBackupControl(udid,'resume',{hold_version:d.auto_backup_hold_version});
+}
+function retryBackupHold(udid){
+  var d=latestDeviceStatuses[udid];if(!d||!d.auto_backup_hold_version)return;
+  return sendBackupControl(udid,'hold-retry',{hold_version:d.auto_backup_hold_version});
+}
+document.addEventListener('keydown',function(e){
+  if(!backupStopTarget)return;
+  if(e.key==='Escape'){e.preventDefault();closeStopBackup();}
+  if(e.key==='Tab'){
+    var first=document.getElementById('stopBackupCancel'),last=document.getElementById('stopBackupConfirm');
+    if(backupStopSubmitting){e.preventDefault();return;}
+    if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}
+    else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}
+  }
+});
 
 /* ============== backup management ============== */
 const loadedBackups={};

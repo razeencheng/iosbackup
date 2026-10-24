@@ -430,7 +430,7 @@ func (app *application) afterBackupIndexWrite(m *backupIndexCoordinator, lease *
 	}
 }
 
-// 供显式本地操作完成路径使用；正常备份在 finishBackupOperation 中同步释放占用。
+// 供显式本地操作完成路径使用；正常备份在 finishBackupJob 中同步释放占用。
 func (app *application) finishBackupIndexWrite(udid string, success, deleted bool) {
 	if deleted {
 		app.markBackupIndexDeleted(udid)

@@ -28,6 +28,8 @@ Failed queries retain device names and backup information, mark presence unknown
 | Offline | The app can no longer detect the device | Check cable, device and network; for a running job inspect progress first |
 | Starting `starting` | A request was accepted and checks/preparation are underway | Wait for a running state or error; HTTP success is not backup completion |
 | Running `running` | A backup job is still executing | Inspect phase and last activity |
+| Stopping `stopping` | A stop request was accepted; cleanup is still running | Wait; the device remains occupied |
+| Stopped `stopped` | The user stopped this attempt before completion | Automatic backups stay on hold; existing backup recoverability is unverified |
 | Succeeded `succeeded` / progress `completed` | The tool exited successfully, emitted a success marker and was not cancelled | Check the last-success time and optionally read the file list |
 | Failed `failed` | The job ended unsuccessfully | Record the error; start a new job after resolving its cause |
 | Interrupted `interrupted` | Disconnection or cancellation of the execution context ended the job | Reconnect and start again; the old session will not resume |
@@ -48,7 +50,7 @@ The main bar is **overall progress** for the entire backup. When reliable byte c
 | Waiting for the device to reconnect `reconnecting` | Wi-Fi visibility changed temporarily; last reliable progress is retained | Check the device/network and wait for reconnection, or for the job to complete, fail, or be interrupted |
 | Overall 100% | Reported progress reached 100%; finalization may remain | Wait for “Backup completed” before unplugging or shutting down |
 
-A terminated job is **not resumed automatically** . Retrying after reconnection starts a new job, which may reuse the existing on-disk backup set but does not resume the old connection. There is no user-facing cancel-backup button. Refreshing, logging out or closing a tab does not stop the job. The display for waiting for device reconnection is not evidence that an already failed session can resume.
+A terminated job is **not resumed automatically**. Retrying starts a new job, which may reuse the existing on-disk backup set but does not resume the old connection. Use **Stop backup** to end the active job and hold future automatic jobs; refreshing, logging out or closing a tab does not stop it. See [stopping and scheduling](scheduling.md#stop-a-backup-and-hold-automatic-scheduling). The display for waiting for device reconnection is not evidence that an already failed session can resume.
 
 ![Waiting for device authorization](images/15-iosbk-wait-sq.png)
 
@@ -73,7 +75,8 @@ These limit consecutive inactivity, not the total duration of an active transfer
 | `backup_busy` | Global backup concurrency is occupied | Wait for existing jobs, then retry once |
 | `backup_stalled` | The current phase exceeded its inactivity deadline | Inspect authorization, last activity and network; use USB after it ends |
 | `device_disconnected` | Sustained device disappearance interrupted the job | Reconnect and start a new backup |
-| `backup_cancelled` | Execution context was cancelled or reached a deadline; this does not imply a cancel button | Check for restart/shutdown and retry after service recovery |
+| `backup_cancelled` | Execution context was cancelled or reached a deadline | Check for restart/shutdown and retry after service recovery |
+| `backup_stopped_by_user` | The user stopped this job | Run a manual backup once or explicitly resume automatic scheduling when ready |
 | `storage_unavailable` | Tool reported no space, read-only storage or denied permission | Check backup-mount capacity, inodes and write access |
 | `device_locked` | Tool reported a device lock/passcode condition | Enter the device passcode when prompted, or unlock the device and confirm Trust |
 | `backup_failed` | Other backup failure | Inspect logs around the same job, keeping the first error |

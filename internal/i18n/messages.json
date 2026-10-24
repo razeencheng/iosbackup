@@ -147,7 +147,14 @@
     "api.backup_index_cancelled": "Index reading was interrupted. Saved information has been kept.",
     "api.backup_index_refresh_failed": "The index could not be updated. Previous complete information has been kept; retry when storage is available.",
     "api.backup_index_cache_invalid": "The saved index could not be read. Refresh to rebuild it from the local backup.",
-    "api.backup_index_csv_unavailable": "This complete list is no longer available for download. Reload the backup information and retry."
+    "api.backup_index_csv_unavailable": "This complete list is no longer available for download. Reload the backup information and retry.",
+    "api.backup_job_stale": "This backup task has changed. Refresh its status before trying again.",
+    "api.backup_hold_stale": "The automatic backup hold has changed. Refresh its status before trying again.",
+    "api.backup_stopping": "Wait for the backup to stop before resuming automatic backups.",
+    "api.backup_auto_held": "Automatic backups are on hold until you resume them.",
+    "api.backup_hold_save_failed": "Automatic backups remain on hold in this session, but the setting could not be saved reliably. Retry saving before restarting.",
+    "api.backup_control_identity_required": "The backup task or hold identifier is missing. Refresh the page and retry.",
+    "api.backup_control_updated": "Backup control updated."
   },
   "zh-CN": {
     "api.operation_failed": "操作未能完成，请重试或查看服务日志。",
@@ -297,6 +304,13 @@
     "api.backup_index_cancelled": "索引读取已中断，已保留保存的信息。",
     "api.backup_index_refresh_failed": "索引更新失败，已保留先前的完整信息；存储可用后可重试。",
     "api.backup_index_cache_invalid": "无法读取已保存的索引，可刷新以从本地备份重新建立。",
-    "api.backup_index_csv_unavailable": "当前版本的完整清单无法下载，请重新加载备份信息后再试。"
+    "api.backup_index_csv_unavailable": "当前版本的完整清单无法下载，请重新加载备份信息后再试。",
+    "api.backup_job_stale": "备份任务已变化，请刷新状态后重试。",
+    "api.backup_hold_stale": "自动备份暂缓状态已变化，请刷新后重试。",
+    "api.backup_stopping": "请等待本次备份停止后，再恢复自动备份。",
+    "api.backup_auto_held": "自动备份已暂缓，直到你主动恢复。",
+    "api.backup_hold_save_failed": "当前进程仍暂缓自动备份，但设置未能可靠保存。请重试保存，重启后的状态尚无保证。",
+    "api.backup_control_identity_required": "缺少备份任务或暂缓状态标识，请刷新页面后重试。",
+    "api.backup_control_updated": "备份控制状态已更新。"
   }
 }

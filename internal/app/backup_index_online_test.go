@@ -128,7 +128,7 @@ func TestBackupIndexOnlineCaptureCancellation(t *testing.T) {
 				t.Fatal("query stuck")
 			}
 			if mode == "writer" {
-				app.finishBackupOperation(src.UDID, errors.New("cleanup"), nowBeijing())
+				finishIndexTestJob(app, src.UDID, errors.New("cleanup"))
 			}
 		})
 	}

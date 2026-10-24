@@ -70,7 +70,7 @@ func (app *application) autoBackupCandidates() map[string]backupConfig {
 	defer app.mu.RUnlock()
 	configs := make(map[string]backupConfig, len(app.configs))
 	for udid, config := range app.configs {
-		if config != nil && config.AutoBackupEnabled && config.RemovedAt == nil && !app.deviceRemovalPending[udid] {
+		if config != nil && config.AutoBackupEnabled && !app.backupHoldUnsafe(udid).Held && config.RemovedAt == nil && !app.deviceRemovalPending[udid] {
 			configs[udid] = *config
 		}
 	}
@@ -85,7 +85,7 @@ func (app *application) tryBeginAutoBackupCheck(udid string) bool {
 		return false
 	}
 	config := app.configs[udid]
-	if config == nil || !config.AutoBackupEnabled {
+	if config == nil || !config.AutoBackupEnabled || app.backupHoldUnsafe(udid).Held {
 		return false
 	}
 	if app.connectionAdmissionUnsafe(app.devices[udid]) != nil {
@@ -107,7 +107,7 @@ func (app *application) checkAndBackup(udid string, config backupConfig, deviceS
 
 	app.mu.RLock()
 	currentConfig := app.configs[udid]
-	if app.deviceRemovalBlockedUnsafe(udid) != nil || currentConfig == nil || !currentConfig.AutoBackupEnabled {
+	if app.deviceRemovalBlockedUnsafe(udid) != nil || currentConfig == nil || !currentConfig.AutoBackupEnabled || app.backupHoldUnsafe(udid).Held {
 		app.mu.RUnlock()
 		return
 	}
@@ -174,13 +174,6 @@ func (app *application) checkAndBackup(udid string, config backupConfig, deviceS
 	if config.OnlyWhenCharging && !updatedDevice.IsCharging {
 		return
 	}
-
-	// 全局并发上限：满了就跳过，下个 tick 再试（天然排队，避免多台并发成倍占用资源）。
-	if !app.backupSem.tryAcquire() {
-		app.addLog(udid, "event=backup.capacity_reached All backup slots are in use; retry later")
-		return
-	}
-	defer app.backupSem.release()
 
 	// 执行备份，传递连接方式信息
 	sessionID := newBackupSessionID()

@@ -4,12 +4,17 @@
 package i18n
 
 const (
+	BackupAutoHeld                        = "api.backup_auto_held"
 	BackupBusy                            = "api.backup_busy"
 	BackupCancelled                       = "api.backup_cancelled"
+	BackupControlIdentityRequired         = "api.backup_control_identity_required"
+	BackupControlUpdated                  = "api.backup_control_updated"
 	BackupDeleteFailed                    = "api.backup_delete_failed"
 	BackupDeleted                         = "api.backup_deleted"
 	BackupDirectoryNotAllowed             = "api.backup_directory_not_allowed"
 	BackupFailed                          = "api.backup_failed"
+	BackupHoldSaveFailed                  = "api.backup_hold_save_failed"
+	BackupHoldStale                       = "api.backup_hold_stale"
 	BackupIndexCacheInvalid               = "api.backup_index_cache_invalid"
 	BackupIndexCancelled                  = "api.backup_index_cancelled"
 	BackupIndexCorrupt                    = "api.backup_index_corrupt"
@@ -22,6 +27,7 @@ const (
 	BackupIndexUnsafeSource               = "api.backup_index_unsafe_source"
 	BackupInfoFailed                      = "api.backup_info_failed"
 	BackupIntervalRange                   = "api.backup_interval_range"
+	BackupJobStale                        = "api.backup_job_stale"
 	BackupListFailed                      = "api.backup_list_failed"
 	BackupMissing                         = "api.backup_missing"
 	BackupPasswordIncorrect               = "api.backup_password_incorrect"
@@ -29,6 +35,7 @@ const (
 	BackupPathInvalid                     = "api.backup_path_invalid"
 	BackupStalled                         = "api.backup_stalled"
 	BackupStarted                         = "api.backup_started"
+	BackupStopping                        = "api.backup_stopping"
 	BatteryLevelRange                     = "api.battery_level_range"
 	Busy                                  = "api.busy"
 	ConfigFieldInvalid                    = "api.config_field_invalid"

@@ -29,8 +29,17 @@ func (e *execCmd) Output() ([]byte, error) {
 }
 
 func (e *execCmd) Run() error {
+	return e.runWithCompletion(nil)
+}
+
+// runWithCompletion 在发布命令已结束前固定结果；输出消费者可能仍在收尾。
+func (e *execCmd) runWithCompletion(completed func(error)) error {
 	defer e.markDone()
-	return e.cmd.Run()
+	err := e.cmd.Run()
+	if completed != nil {
+		completed(err)
+	}
+	return err
 }
 
 func (e *execCmd) Start() error {

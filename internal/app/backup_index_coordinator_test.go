@@ -143,7 +143,7 @@ func TestBackupIndexAfterBackupAndInvalidation(t *testing.T) {
 	app.backupInProgress[src.UDID] = true
 	app.mu.Unlock()
 	app.beginBackupIndexWrite(src.UDID, app.paths.BackupsRoot, true)
-	app.finishBackupOperation(src.UDID, nil, nowBeijing())
+	finishIndexTestJob(app, src.UDID, nil)
 	waitIndexJob(t, m, src.UDID)
 	if calls.Load() != 1 {
 		t.Fatalf("successful backup queued %d scans", calls.Load())
@@ -152,7 +152,7 @@ func TestBackupIndexAfterBackupAndInvalidation(t *testing.T) {
 	app.backupInProgress[src.UDID] = true
 	app.mu.Unlock()
 	app.beginBackupIndexWrite(src.UDID, app.paths.BackupsRoot, true)
-	app.finishBackupOperation(src.UDID, errors.New("failed backup"), nowBeijing())
+	finishIndexTestJob(app, src.UDID, errors.New("failed backup"))
 	if calls.Load() != 1 {
 		t.Fatal("failed backup rescanned")
 	}
@@ -225,7 +225,7 @@ func TestBackupIndexWriterFinishBarrier(t *testing.T) {
 	old := app.beginBackupIndexWrite(src.UDID, app.paths.BackupsRoot, true)
 	m.mu.Lock()
 	done := make(chan struct{})
-	go func() { app.finishBackupOperation(src.UDID, errors.New("old failure"), nowBeijing()); close(done) }()
+	go func() { finishIndexTestJob(app, src.UDID, errors.New("old failure")); close(done) }()
 	select {
 	case <-done:
 		m.mu.Unlock()
@@ -256,5 +256,18 @@ func TestBackupIndexWriterFinishBarrier(t *testing.T) {
 	if !kept || queued != 0 {
 		t.Fatalf("old completion touched new writer: kept=%v queued=%d", kept, queued)
 	}
-	app.finishBackupOperation(src.UDID, errors.New("cleanup"), nowBeijing())
+	finishIndexTestJob(app, src.UDID, errors.New("cleanup"))
+}
+
+// finishIndexTestJob 为只测试索引协调的用例补齐当前备份任务身份。
+func finishIndexTestJob(app *application, udid string, err error) {
+	ctx, cancel := context.WithCancelCause(app.rootCtx)
+	job := &backupJob{udid: udid, ctx: ctx, cancel: cancel, release: func() {}}
+	app.mu.Lock()
+	if app.backupJobs == nil {
+		app.backupJobs = make(map[string]*backupJob)
+	}
+	app.backupJobs[udid] = job
+	app.mu.Unlock()
+	app.finishBackupJob(job, err)
 }
