@@ -16,6 +16,9 @@ import (
 var udidPattern = regexp.MustCompile(`^[A-Za-z0-9-]{1,128}$`)
 
 func validateBackupConfig(cfg backupConfig, allowedRoots []string) error {
+	if _, err := cfg.History.Normalize(); err != nil {
+		return i18n.NewError(i18n.ConfigInvalid, nil)
+	}
 	if !udidPattern.MatchString(cfg.UDID) {
 		return i18n.NewError(i18n.InvalidUDID, nil)
 	}

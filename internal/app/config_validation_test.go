@@ -2,6 +2,7 @@ package app
 
 import (
 	"encoding/json"
+	"iosbackup/internal/backupstore"
 	"os"
 	"path/filepath"
 	"testing"
@@ -9,6 +10,7 @@ import (
 
 func validBackupConfig(root string) backupConfig {
 	return backupConfig{
+		History:         backupstore.Policy{Days: 3},
 		UDID:            "TEST-DEVICE-ID",
 		StartTime:       "01:30",
 		EndTime:         "05:45",

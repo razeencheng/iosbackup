@@ -77,6 +77,9 @@ func (s *backupConfigStore) Load() (map[string]backupConfig, error) {
 func (s *backupConfigStore) Put(cfg backupConfig) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if cfg.History.Days == 0 {
+		cfg.History.Days = 3
+	}
 	if err := validateBackupConfig(cfg, s.allowedRoots); err != nil {
 		return err
 	}
@@ -95,6 +98,9 @@ func (s *backupConfigStore) Replace(configs map[string]backupConfig) error {
 	next := make(map[string]backupConfig, len(configs))
 	for key, cfg := range configs {
 		cfg.UDID = key
+		if cfg.History.Days == 0 {
+			cfg.History.Days = 3
+		}
 		if err := validateBackupConfig(cfg, s.allowedRoots); err != nil {
 			return fmt.Errorf("configuration %s: %w", key, err)
 		}
@@ -145,6 +151,9 @@ func (s *backupConfigStore) decode(data []byte) (map[string]backupConfig, bool, 
 func (s *backupConfigStore) validateMap(configs map[string]backupConfig) error {
 	for key, cfg := range configs {
 		cfg.UDID = key
+		if cfg.History.Days == 0 {
+			cfg.History.Days = 3
+		}
 		configs[key] = cfg
 		if err := validateBackupConfig(cfg, s.allowedRoots); err != nil {
 			return fmt.Errorf("configuration %s: %w", key, err)

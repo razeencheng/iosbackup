@@ -56,7 +56,7 @@ func (app *application) acquireDeviceOp(udid string) (device *device, dir string
 }
 
 // SetBackupEncryption 开/关设备备份加密。密码经 env BACKUP_PASSWORD（绝不进 argv/日志）。
-// 开启时把密码存入 secretStore（故需 secretStore 可用）；关闭成功后删除存储的密码。
+// 变更前保留版本化凭据；关闭成功后仅删除当前密码别名。
 func (app *application) SetBackupEncryption(ctx context.Context, udid string, enable bool, password string) error {
 	if password == "" {
 		return i18n.NewError(i18n.EncryptionPasswordRequired, nil)
@@ -78,21 +78,27 @@ func (app *application) SetBackupEncryption(ctx context.Context, udid string, en
 	}
 	app.addWarnLog(udid, fmt.Sprintf("event=encryption.started state=%s", state))
 
+	action, oldPW, newPW := "enable", "", password
+	if !enable {
+		action, oldPW, newPW = "disable", password, ""
+	}
+	generations := app.generationRegistry()
+	changeID, err := generations.begin(udid, action, oldPW, newPW)
+	if err != nil {
+		return operationError(i18n.EncryptionFailed, err, "")
+	}
+
 	env := []string{"BACKUP_PASSWORD=" + password}
 	out, err := app.runIdeviceCmdBoundedEnv(ctx, cmdKindLong, device, env, cmdIdevicebackup2, "encryption", state)
 	if err != nil {
 		return operationError(i18n.EncryptionFailed, err, cleanBackupOutput(out))
 	}
 
-	// 同步 secretStore
-	if enable {
-		if e := app.secretStore.SetBackupPassword(udid, password); e != nil {
-			message := fmt.Sprintf("event=encryption.password_store_failed Encryption enabled but password could not be stored error=%v", e)
-			app.addErrorLog(udid, message)
-			app.notifySystemEvent("encryption_password_store_failed", map[string]string{"device_name": device.Name, "diagnostics": message})
-		}
-	} else if app.secretStore != nil && app.secretStore.Available() {
-		_ = app.secretStore.DeleteBackupPassword(udid)
+	// 手机已成功时，元数据失败保留此前写入的待核对意图和旧密码。
+	if e := generations.finish(udid, changeID); e != nil {
+		message := fmt.Sprintf("event=encryption.password_store_failed Encryption changed but local generation needs reconciliation error=%v", e)
+		app.addErrorLog(udid, message)
+		app.notifySystemEvent("encryption_password_store_failed", map[string]string{"device_name": device.Name, "diagnostics": message})
 	}
 	app.addInfoLog(udid, fmt.Sprintf("event=encryption.completed state=%s", map[bool]string{true: "on", false: "off"}[enable]))
 	return nil
@@ -114,13 +120,18 @@ func (app *application) ChangeBackupPassword(ctx context.Context, udid, oldPw, n
 	defer release()
 
 	app.addWarnLog(udid, "event=encryption.password_change_started")
+	generations := app.generationRegistry()
+	changeID, err := generations.begin(udid, "change", oldPw, newPw)
+	if err != nil {
+		return operationError(i18n.PasswordChangeFailed, err, "")
+	}
 	env := []string{"BACKUP_PASSWORD=" + oldPw, "BACKUP_PASSWORD_NEW=" + newPw}
 	out, err := app.runIdeviceCmdBoundedEnv(ctx, cmdKindLong, device, env, cmdIdevicebackup2, "changepw")
 	if err != nil {
 		return operationError(i18n.PasswordChangeFailed, err, cleanBackupOutput(out))
 	}
 
-	if e := app.secretStore.SetBackupPassword(udid, newPw); e != nil {
+	if e := generations.finish(udid, changeID); e != nil {
 		message := fmt.Sprintf("event=encryption.password_store_failed Password changed but new password could not be stored error=%v", e)
 		app.addErrorLog(udid, message)
 		app.notifySystemEvent("password_store_failed", map[string]string{"device_name": device.Name, "diagnostics": message})

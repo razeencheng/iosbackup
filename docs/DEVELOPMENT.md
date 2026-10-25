@@ -29,6 +29,7 @@ go list -m all
 | `internal/config` | Startup parameter and path parsing/validation |
 | `internal/i18n` | Shared language negotiation and API message resources |
 | `internal/notification` | Notification manager, message types, channel adapters |
+| `internal/backupstore` | Independent history objects, copy/clone preparation, catalogs, read leases and recovery transactions |
 | `internal/persistence` | Atomic file writes and secret-storage support |
 | `internal/boundedio` | Bounded output and line-reading utilities |
 | `internal/buildinfo` | Build identity and version information |

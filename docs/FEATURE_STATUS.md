@@ -36,3 +36,10 @@ Core capabilities still require validation on your device and network. After cha
 The global experimental switch accepts only the strict value `true`. When false, the unpack/delete controls are hidden and their APIs return `403` before backup state or filesystem access. Enabling the switch does not remove CSRF, validation, concurrency, or confirmation checks.
 
 Do not enable restore, unpack, or delete on important data until you have an isolated test, a current copy of `/backups`, `/configs`, and `/var/lib/lockdown`, and a rollback plan.
+
+
+## Historical restore points: storage foundation only
+
+Credential generations, isolated copy preparation, durable publication and restart recovery are implemented internally. The historical backup lifecycle, retention controls, export and UI are not enabled yet. The planned default remains three calendar days, configurable, with pinned points retained separately. Ordinary backups continue to update their current backup set.
+
+Local tests cover copy isolation, interruption and transactional recovery. Linux clone support is probed on the actual target path; compatibility with a reflink-capable deployment filesystem and NAS durability still require validation. Process-exit tests do not establish power-loss durability.

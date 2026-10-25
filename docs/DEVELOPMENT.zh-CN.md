@@ -29,6 +29,7 @@ go list -m all
 | `internal/config` | 启动参数和路径解析、校验 |
 | `internal/i18n` | 共用语言解析与 API 消息资源 |
 | `internal/notification` | 通知管理器、消息类型与渠道适配器 |
+| `internal/backupstore` | 独立历史对象、复制/克隆准备、目录记录、读取占用和恢复事务 |
 | `internal/persistence` | 原子文件写入与秘密存储支持 |
 | `internal/boundedio` | 有界输出、行读取等工具 |
 | `internal/buildinfo` | 构建身份与版本信息 |

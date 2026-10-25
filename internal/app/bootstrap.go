@@ -117,6 +117,12 @@ func run(ctx context.Context, cfg runtimeConfig) error {
 		log.Printf("event=config.load_failed error=%v", err)
 	}
 
+	// 在设备调度和写入服务启动前核对已登记历史事务；不自动认领未知目录。
+	if err := app.recoverBackupStorage(ctx); err != nil {
+		return fmt.Errorf("recover backup storage: %w", err)
+	}
+	defer app.backupStorage.close()
+
 	jobs, err := openBackupJobStore(app.paths.BackupJobsDir, app.nowTime, defaultBackupJobLimits(), app.broadcastStatus)
 	if err != nil {
 		app.addErrorLog("SYSTEM", fmt.Sprintf("event=backup.records_unavailable error=%v", err))
