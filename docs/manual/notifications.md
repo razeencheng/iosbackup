@@ -59,8 +59,10 @@ To pause all delivery, turn off the master switch and save. To disable a channel
 | Event | Trigger scope |
 |---|---|
 | `backup_start` | Eligibility checks passed; the backup command is about to run. |
-| `backup_success` | The backup job completed successfully; this is not device-restoration validation. |
-| `backup_failed` | An already-started backup command failed; failures during earlier condition checks or command startup do not always trigger this event. |
+| `backup_success` | Execution completed and the final check found no attention condition; this is not device-restoration validation. |
+| `backup_failed` | An admitted backup task failed. User-requested stops do not send a failure notification. |
+| `backup_check_attention` | Execution succeeded but the automatic quick check found issues or could not complete. |
+| `backup_history_attention` | Reserved for the independent history-saving stage; no historical restore points are created by task recording. |
 | `device_online` | The app detected that a device went from offline to online. |
 | `device_offline` | The device has not been detected for longer than the applicable waiting period. |
 | `system_error` | Persistent connection-service failures, pairing issues requiring action, and explicit failures in restore, unpack, encryption or password storage operations. Error logs alone do not send notifications. |
@@ -73,11 +75,11 @@ With automatic backups enabled, due checks must explicitly report invalid pairin
 
 Choose **Notification language** in notification settings, then save. This setting controls generated titles, default bodies, channel labels and test messages even while the browser is closed. The interface language switch only changes the page. Supported values are English (`en`) and Simplified Chinese (`zh-CN`); existing configurations without `language` continue to use Simplified Chinese.
 
-To use the selected language's default body, leave that event's template blank. Existing nonempty templates, including Chinese text copied from an older example, are kept as custom content. Changing language never overwrites them; clear the relevant template and save to return to the built-in default. Device names and original diagnostic details are not automatically translated. Notification timestamps still use Beijing time with an explicit UTC offset.
+To use the selected language's default body, leave that event's template blank. Existing nonempty templates, including Chinese text copied from an older example, are kept as custom content. Changing language never overwrites them; clear the relevant template and save to return to the built-in default. Device names and original diagnostic details are not automatically translated. Notification timestamps use the deployment timezone with an explicit UTC offset.
 
 ## Body templates
 
-Each event can have a body template; blank uses the built-in default. Supported variables are `${title}` (built-in title), `${content}` (original body), `${device_name}`, `${device_udid}`, `${timestamp}` (RFC 3339 in Beijing time), `${type}`, `${level}` `${reason}` (localized failure reason) and `${diagnostics}` (original diagnostic details, when available). Unknown variables are rejected; not every event contains a device or failure reason.
+Each event can have a body template; blank uses the built-in default. Supported variables are `${title}` (built-in title), `${content}` (original body), `${device_name}`, `${device_udid}`, `${timestamp}` (RFC 3339 in the deployment timezone), `${type}`, `${level}` `${reason}` (localized failure reason) and `${diagnostics}` (original diagnostic details, when available). Unknown variables are rejected; not every event contains a device or failure reason.
 
 ```text
 [${type}] ${device_name}
@@ -122,7 +124,7 @@ Input errors are returned separately. Verify actual receipt and the response rat
 | SMTP fails | Host, port, credentials, TLS and sender/recipient | Check implicit TLS on 465 or STARTTLS under [channel fields](#channel-fields); keep certificate validation |
 | Webhook returns 401/403 | Receiver authentication requirements | Check URL/headers without exposing authorization values |
 | Private Webhook/Bark is blocked | Destination IP, HTTPS and allowed network | Add the smallest required private CIDR using the [Webhook reference](../WEBHOOK_GUIDE.en.md), then recreate the container |
-| Tests arrive but real events do not | Actual rules and whether the job really started | Eligibility or process-start failures do not always produce `backup_failed` |
+| Tests arrive but real events do not | Actual rules and whether the job really started | Requests rejected before admission do not send backup-result notifications; admitted tasks use the final-result rules |
 | Secrets fail after migration | Whether the key matches `secrets.enc` | Restore the original key and matching copy; do not delete secrets as an experiment |
 
 ```bash
@@ -130,3 +132,9 @@ docker compose logs --tail=200 iosbackup
 ```
 
 Sanitize reports using [troubleshooting](troubleshooting.md). Once configuration, test delivery and a real event are verified, continue with [automatic backups](scheduling.md).
+
+## One final backup result
+
+The start notification remains separate. After execution and the bounded automatic check finish, one final summary is sent to each selected channel. Execution, checking and history saving remain separate results. If any attention condition applies, only enabled rules for those conditions select recipients; disabling an attention rule does not fall back to a success notification. Overlapping attention rules are combined, with at most one summary per channel. Delivery remains best-effort; ambiguous sends are not replayed after a restart. Manual checks do not notify.
+
+During upgrade, missing `backup_check_attention` and `backup_history_attention` rules inherit the existing `backup_failed` channel list once and are saved. An explicit empty list stays disabled. Both rules can be edited independently. Final-result templates can also use `${execution_result}`, `${check_result}` and `${history_result}`; empty templates use the selected notification language. If several rules select the same channel, its template follows execution failure, check attention, then history attention priority, and the built-in body contains all outcomes.

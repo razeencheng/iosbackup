@@ -6,23 +6,28 @@ import (
 )
 
 type backupJobSummary struct {
-	ID             string    `json:"id"`
-	UDID           string    `json:"udid"`
-	DeviceName     string    `json:"device_name"`
-	Source         string    `json:"source"`
-	RequestedMode  string    `json:"requested_mode"`
-	ObservedMode   string    `json:"observed_mode"`
-	State          string    `json:"state"`
-	ErrorCode      string    `json:"error_code,omitempty"`
-	StartedAt      time.Time `json:"started_at"`
-	CompletedAt    time.Time `json:"completed_at,omitempty"`
-	LastActivityAt time.Time `json:"last_activity_at,omitempty"`
-	FirstCursor    uint64    `json:"first_cursor"`
-	LastCursor     uint64    `json:"last_cursor"`
-	Dropped        uint64    `json:"dropped"`
-	Truncated      bool      `json:"truncated"`
-	Persistence    string    `json:"persistence"`
-	Revision       uint64    `json:"revision"`
+	ExecutionState       string             `json:"execution_state,omitempty"`
+	HistoryState         string             `json:"history_state,omitempty"`
+	Operation            string             `json:"operation,omitempty"`
+	Check                *backupCheckResult `json:"check,omitempty"`
+	ExecutionCompletedAt time.Time          `json:"execution_completed_at,omitempty"`
+	ID                   string             `json:"id"`
+	UDID                 string             `json:"udid"`
+	DeviceName           string             `json:"device_name"`
+	Source               string             `json:"source"`
+	RequestedMode        string             `json:"requested_mode"`
+	ObservedMode         string             `json:"observed_mode"`
+	State                string             `json:"state"`
+	ErrorCode            string             `json:"error_code,omitempty"`
+	StartedAt            time.Time          `json:"started_at"`
+	CompletedAt          time.Time          `json:"completed_at,omitempty"`
+	LastActivityAt       time.Time          `json:"last_activity_at,omitempty"`
+	FirstCursor          uint64             `json:"first_cursor"`
+	LastCursor           uint64             `json:"last_cursor"`
+	Dropped              uint64             `json:"dropped"`
+	Truncated            bool               `json:"truncated"`
+	Persistence          string             `json:"persistence"`
+	Revision             uint64             `json:"revision"`
 }
 
 // 事件只包含封闭字段。原始工具输出、路径、密码及令牌没有序列化入口。
@@ -63,6 +68,21 @@ func (app *application) recordBackupActivity(id string, update backupProgressUpd
 }
 
 func validBackupJobSummary(summary backupJobSummary) bool {
+	if summary.Operation != "" && summary.Operation != "backup" && summary.Operation != "check" {
+		return false
+	}
+	switch summary.ExecutionState {
+	case "", "running", "succeeded", "failed", "stopped", "interrupted", "not_run":
+	default:
+		return false
+	}
+	if summary.HistoryState != "" && summary.HistoryState != "not_enabled" {
+		return false
+	}
+	if summary.Check != nil && !validBackupCheckResult(*summary.Check) {
+		return false
+	}
+
 	if !udidPattern.MatchString(summary.UDID) || len(summary.DeviceName) > 256 || summary.StartedAt.IsZero() {
 		return false
 	}
@@ -85,6 +105,6 @@ func validBackupJobSummary(summary backupJobSummary) bool {
 
 // 记录模块只接收不可变任务信息，不持有控制器或设备状态。
 type backupJobSeed struct {
-	ID, UDID, DeviceName, Source, RequestedMode string
-	StartedAt                                   time.Time
+	ID, UDID, DeviceName, Source, RequestedMode, Operation string
+	StartedAt                                              time.Time
 }

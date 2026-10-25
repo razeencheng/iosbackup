@@ -299,10 +299,17 @@ func streamBackupManifestFileRows(ctx context.Context, binary string, file *os.F
 		cancel()
 	}
 	waitErr := cmd.Wait()
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
 	if parseErr != nil {
 		return parseErr
 	}
 	if waitErr != nil {
+		detail := strings.TrimSpace(stderr.String())
+		if strings.Contains(detail, "database disk image is malformed") || strings.Contains(detail, "file is not a database") || strings.Contains(detail, "no such table: Files") || strings.Contains(detail, "no such column:") {
+			return plistCorrupt(waitErr)
+		}
 		return fmt.Errorf("sqlite3 could not read Manifest.db: %w (%s)", waitErr, strings.TrimSpace(stderr.String()))
 	}
 	return nil

@@ -66,7 +66,7 @@
     currentView=view;if(!view.udid)return;
     var u=view.udid,select=document.getElementById('jobSelect-'+u);if(!select)return;
     var existing=new Map(Array.from(select.options).map(function(option){return [option.value,option];}));
-    view.jobs.forEach(function(job){var option=existing.get(job.id);if(!option){option=document.createElement('option');option.value=job.id;select.appendChild(option);}option.textContent=date(job.started_at)+' · '+label('state',job.state)+' · '+label('mode',job.requested_mode);existing.delete(job.id);});
+    view.jobs.forEach(function(job){var option=existing.get(job.id);if(!option){option=document.createElement('option');option.value=job.id;select.appendChild(option);}option.textContent=date(job.started_at)+' · '+(job.operation==='check'?tr('check.title'):label('state',job.state)+' · '+label('mode',job.requested_mode));existing.delete(job.id);});
     existing.forEach(function(option){option.remove();});select.value=view.selected;
     show('jobEmpty-'+u,!view.jobs.length);show('jobDetails-'+u,!!view.job);select.disabled=!view.jobs.length;
     var warnings=[];
@@ -77,8 +77,9 @@
     text('jobWarning-'+u,warnings.join(' '));show('jobWarning-'+u,!!warnings.length);
     if(!view.job)return;
     var job=view.job;
-    text('jobResult-'+u,label('state',job.state));
-    text('jobMode-'+u,tr('jobs.modeSummary',{requested:label('mode',job.requested_mode),observed:label('mode',job.observed_mode)}));
+    text('jobResult-'+u,job.operation==='check'?tr('check.title'):label('state',job.state));
+ text('jobCheck-'+u,(job.operation==='check'?'':tr('jobs.outcomes',{execution:label('state',job.execution_state||job.state),history:label('state',job.history_state||'not_enabled')})+'\n')+(global.IOSBKChecks&&job.check?global.IOSBKChecks.summary(job.check):''));
+    text('jobMode-'+u,job.operation==='check'?'':tr('jobs.modeSummary',{requested:label('mode',job.requested_mode),observed:label('mode',job.observed_mode)}));
     text('jobSource-'+u,tr('jobs.sourceSummary',{source:label('source',job.source),time:date(job.started_at)}));
     text('jobActivity-'+u,tr('jobs.lastActivity',{time:date(job.last_activity_at)}));
     text('jobEvents-'+u,view.events.map(formatEvent).join('\n')||tr('jobs.noEvents'));
@@ -100,6 +101,7 @@
       var lines=raw.trim().split('\n').map(function(line){return JSON.parse(line);});
       var summary=lines.shift().summary;
       var heading=[summary.id+' · '+label('state',summary.state),tr('jobs.retention')];
+      if(summary.check&&global.IOSBKChecks)heading.push(global.IOSBKChecks.summary(summary.check));
       if(summary.truncated)heading.push(tr('jobs.truncated',{count:summary.dropped||0}));
       if(summary.persistence!=='saved')heading.push(tr(summary.persistence==='error'?'jobs.saveError':'jobs.saving'));
       var content=heading.concat(lines.map(formatEvent)).join('\n');

@@ -46,6 +46,14 @@ func (app *application) resolveBackupIndexSource(ctx context.Context, udid strin
 	if !knownConfig && !knownDevice {
 		return backupIndexSource{}, errDeviceNotFound
 	}
+	return resolveBackupIndexSourceAt(ctx, udid, root)
+}
+
+// 来源路径由已经准入的任务固定，后续配置编辑不能把检查切换到另一份备份。
+func resolveBackupIndexSourceAt(ctx context.Context, udid, root string) (backupIndexSource, error) {
+	if !udidPattern.MatchString(udid) {
+		return backupIndexSource{}, errBackupIndexUnsafeSource
+	}
 	absolute, err := filepath.Abs(root)
 	if err != nil {
 		return backupIndexSource{}, indexReadError(i18n.BackupIndexUnavailable, errBackupIndexUnavailable, err)

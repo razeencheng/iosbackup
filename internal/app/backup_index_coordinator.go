@@ -391,6 +391,15 @@ func (app *application) beginBackupIndexWrite(udid, root string, changed bool) *
 		<-onlineDone
 	}
 	if changed {
+		app.mu.Lock()
+		if check, ok := app.backupCheckResults[udid]; ok {
+			check.Freshness = "stale"
+			app.backupCheckResults[udid] = check
+		}
+		app.mu.Unlock()
+		if app.backupJobRecords != nil {
+			app.backupJobRecords.staleChecks(udid)
+		}
 		if err := m.store.invalidate(src, false); err != nil {
 			app.addWarnLog(udid, "event=backup_index.invalidate_failed reason=cache_write_failed")
 		}
@@ -466,6 +475,15 @@ func backupIndexAttemptToken(src backupIndexSource) string {
 	return "v1:" + src.Identity + ":" + src.Fingerprint
 }
 func (app *application) invalidateBackupIndexDevice(udid string) {
+	app.mu.Lock()
+	if check, ok := app.backupCheckResults[udid]; ok {
+		check.Freshness = "stale"
+		app.backupCheckResults[udid] = check
+	}
+	app.mu.Unlock()
+	if app.backupJobRecords != nil {
+		app.backupJobRecords.staleChecks(udid)
+	}
 	app.mu.RLock()
 	m := app.backupIndex
 	app.mu.RUnlock()
@@ -490,6 +508,11 @@ func (app *application) invalidateBackupIndexDevice(udid string) {
 func (m *backupIndexCoordinator) close() {
 	m.mu.Lock()
 	m.closed = true
+	m.app.mu.RLock()
+	for _, check := range m.app.backupChecks {
+		check.cancel()
+	}
+	m.app.mu.RUnlock()
 	for _, j := range m.jobs {
 		j.cancel()
 	}

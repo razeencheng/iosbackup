@@ -88,6 +88,7 @@ func (app *application) setupRoutes() http.Handler {
 	mux.HandleFunc("/api/restart-usbmuxd", app.handleRestartUSBMuxD)
 	mux.HandleFunc("/api/backup/", app.handleBackup)
 	mux.HandleFunc("/api/backup-jobs/", app.handleBackupJobs)
+	mux.HandleFunc("/api/backup-check/", app.handleBackupCheck)
 	mux.HandleFunc("/api/backup-job/", app.handleBackupJob)
 	mux.HandleFunc("/api/backup-stop/", app.handleBackupStop)
 	mux.HandleFunc("/api/backup-resume/", app.handleBackupResume)

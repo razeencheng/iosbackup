@@ -102,9 +102,18 @@ func (app *application) PerformBackup(udid string) error {
 func (app *application) runBackupJob(job *backupJob) (retErr error) {
 	defer func() { app.finishBackupJob(job, retErr) }()
 	udid, cfg, device := job.udid, job.config, job.device
+	var check *backupCheckResult
 	backupLog := func(message string) { app.addLog(udid, backupSessionLog(job.id, message)) }
 	defer func() {
 		app.recordBackupResult(job, retErr)
+		if app.backupJobRecords != nil {
+			state := backupStateSucceeded
+			if retErr != nil {
+				state, _ = backupFailureState(retErr)
+			}
+			app.backupJobRecords.executionFinished(job.id, state, app.nowTime())
+		}
+		app.notifyBackupOutcome(job, retErr, check)
 		if retErr == nil {
 			return
 		}
@@ -113,10 +122,7 @@ func (app *application) runBackupJob(job *backupJob) (retErr error) {
 			return
 		}
 		backupLog(fmt.Sprintf("event=backup.failed error=%v", retErr))
-		if manager := app.notificationManagerSnapshot(); manager != nil {
-			_, code := backupFailureState(retErr)
-			manager.SendBackupFailure(device.Name, udid, code, retErr.Error())
-		}
+
 	}()
 	app.broadcastStatus()
 	if err := context.Cause(job.ctx); err != nil {
@@ -167,13 +173,21 @@ func (app *application) runBackupJob(job *backupJob) (retErr error) {
 		err = context.Cause(job.ctx)
 	}
 	app.recordBackupResult(job, err)
+	executionAt := app.nowTime()
+	if app.backupJobRecords != nil {
+		state := backupStateSucceeded
+		if err != nil {
+			state, _ = backupFailureState(err)
+		}
+		app.backupJobRecords.executionFinished(job.id, state, executionAt)
+	}
 	if err != nil {
 		return err
 	}
 	// 与配置编辑串行保存成功时间，避免旧候选覆盖本次结果。
 	app.configPersistMu.Lock()
 	app.mu.Lock()
-	at := app.nowTime()
+	at := executionAt
 	if d := app.devices[udid]; d != nil {
 		d.LastBackup = at
 	}
@@ -194,9 +208,8 @@ func (app *application) runBackupJob(job *backupJob) (retErr error) {
 		backupLog(fmt.Sprintf("event=backup.metadata_save_failed error=%v", saveErr))
 	}
 	backupLog("event=backup.completed")
-	if manager := app.notificationManagerSnapshot(); manager != nil {
-		manager.SendBackupSuccess(device.Name, udid)
-	}
+	result := app.quickCheckBackup(job)
+	check = &result
 	return nil
 }
 

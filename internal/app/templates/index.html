@@ -166,6 +166,7 @@
 <script src="/static/ui-messages.js?v={{.Version}}"></script>
 <script src="/static/api-messages.js?v={{.Version}}"></script>
 <script src="/static/backup-jobs.js?v={{.Version}}"></script>
+<script src="/static/backup-checks.js?v={{.Version}}"></script>
 </head>
 <body>
 <div style="min-height:100vh;padding:22px 16px 64px">
@@ -363,6 +364,11 @@
               <div class="jobs-toolbar"><div><strong data-i18n="jobs.title">{{t $.Locale "jobs.title"}}</strong><p class="jobs-note" data-i18n="jobs.retention">{{t $.Locale "jobs.retention"}}</p></div><button id="openJobs-{{$d.UDID}}" class="jobs-button" data-job-action="open" data-udid="{{$d.UDID}}" data-i18n="jobs.open">{{t $.Locale "jobs.open"}}</button></div>
               <details class="jobs-advanced"><summary data-i18n="jobs.advanced">{{t $.Locale "jobs.advanced"}}</summary><label for="backupMode-{{$d.UDID}}" data-i18n="jobs.requestedMode">{{t $.Locale "jobs.requestedMode"}}</label> <select id="backupMode-{{$d.UDID}}" class="iosbk-in"><option value="auto" data-i18n="jobs.mode.auto">{{t $.Locale "jobs.mode.auto"}}</option><option value="full" data-i18n="jobs.mode.full">{{t $.Locale "jobs.mode.full"}}</option></select><p class="jobs-note" data-i18n="jobs.fullHint">{{t $.Locale "jobs.fullHint"}}</p></details>
 
+            <section class="jobs-summary">
+              <div class="jobs-toolbar"><strong data-i18n="check.title">{{t $.Locale "check.title"}}</strong><div><button id="backupCheckStart-{{$d.UDID}}" class="jobs-button" data-check-action="start" data-udid="{{$d.UDID}}" data-i18n="check.start" data-i18n-title="check.scope" title="{{t $.Locale "check.scope"}}">{{t $.Locale "check.start"}}</button> <button id="backupCheckCancel-{{$d.UDID}}" class="jobs-button hidden" data-check-action="cancel" data-udid="{{$d.UDID}}" data-i18n="check.cancel">{{t $.Locale "check.cancel"}}</button></div></div>
+              <p id="backupCheckResult-{{$d.UDID}}" style="white-space:pre-wrap" role="status" data-i18n="check.none">{{t $.Locale "check.none"}}</p>
+              <p class="jobs-note" data-i18n="check.scope">{{t $.Locale "check.scope"}}</p>
+            </section>
             <div id="bkOffline-{{$d.UDID}}" class="backup-offline-note{{if $d.IsOnline}} hidden{{end}}"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-info"></use></svg><span data-i18n="bindex.offlineNote">{{t $.Locale "bindex.offlineNote"}}</span></div>
             <div>
               <div class="backup-browser-heading"><div class="backup-browser-title" data-i18n="bmgmt.infoTitle">{{t $.Locale "bmgmt.infoTitle"}}</div><button id="bkRefresh-{{$d.UDID}}" class="backup-browser-link" onclick="loadBackups('{{$d.UDID}}')"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-refresh"></use></svg><span id="bkRefreshLabel-{{$d.UDID}}" data-i18n="bmgmt.infoRefresh">{{t $.Locale "bmgmt.infoRefresh"}}</span></button></div>
@@ -403,7 +409,7 @@
               <p id="jobEmpty-{{$d.UDID}}" class="jobs-note" data-i18n="jobs.empty">{{t $.Locale "jobs.empty"}}</p>
               <div id="jobWarning-{{$d.UDID}}" class="jobs-warning hidden" role="status"></div>
               <div id="jobDetails-{{$d.UDID}}" class="hidden">
-                <div class="jobs-summary"><strong id="jobResult-{{$d.UDID}}"></strong><p id="jobMode-{{$d.UDID}}"></p><p id="jobSource-{{$d.UDID}}"></p><p id="jobActivity-{{$d.UDID}}"></p></div>
+                <div class="jobs-summary"><strong id="jobResult-{{$d.UDID}}"></strong><p id="jobMode-{{$d.UDID}}"></p><p id="jobSource-{{$d.UDID}}"></p><p id="jobActivity-{{$d.UDID}}"></p><p id="jobCheck-{{$d.UDID}}" style="white-space:pre-wrap"></p></div>
                 <div class="jobs-toolbar"><p class="jobs-note" data-i18n="jobs.viewLimit">{{t $.Locale "jobs.viewLimit"}}</p><div><button class="jobs-button" data-job-action="copy" data-udid="{{$d.UDID}}" data-i18n="jobs.copy">{{t $.Locale "jobs.copy"}}</button> <a id="jobExport-{{$d.UDID}}" class="jobs-button" href="#" download data-i18n="jobs.export">{{t $.Locale "jobs.export"}}</a></div></div>
                 <pre id="jobEvents-{{$d.UDID}}" class="jobs-events" tabindex="0" data-i18n-aria="jobs.events" aria-label="{{t $.Locale "jobs.events"}}"></pre>
               </div>
@@ -1066,6 +1072,7 @@ function renderBackupProgress(d){
 }
 function rerenderBackupProgress(){ Object.keys(latestDeviceStatuses).forEach(function(udid){ renderBackupProgress(latestDeviceStatuses[udid]); }); }
 function patchDevice(d){
+  if(window.IOSBKChecks)window.IOSBKChecks.render(d);
   renderPairingResult(d);
   var u=d.udid;
   latestDeviceStatuses[u]=d;
@@ -1222,7 +1229,7 @@ let backupStopTarget=null, backupStopSubmitting=false, backupStopFocus=null;
 function renderBackupControl(d){
   var u=d.udid, pending=!!backupControlPending[u], stopping=d.backup_state==='stopping';
   var stop=document.getElementById('stopBackup-'+u);
-  if(stop){stop.classList.toggle('hidden',!d.backing_up);stop.disabled=pending||stopping||!d.backup_job_id;stop.textContent=tr(stopping?'control.stopping':'control.stop');}
+  if(stop){stop.classList.toggle('hidden',!d.backing_up||d.backup_job_active===false);stop.disabled=pending||stopping||!d.backup_job_id;stop.textContent=tr(stopping?'control.stopping':'control.stop');}
   var banner=document.getElementById('backupHold-'+u);
   if(banner)banner.classList.toggle('hidden',!d.auto_backup_hold);
   var message=document.getElementById('backupHoldMessage-'+u);
@@ -1241,7 +1248,7 @@ function renderStopBackupDialog(){
 }
 function openStopBackup(udid){
   var d=latestDeviceStatuses[udid];
-  if(!d||!d.backing_up||!d.backup_job_id||d.backup_state==='stopping'||backupControlPending[udid])return;
+  if(!d||!d.backing_up||d.backup_job_active===false||!d.backup_job_id||d.backup_state==='stopping'||backupControlPending[udid])return;
   backupStopTarget={udid:udid,jobID:d.backup_job_id};
   backupStopFocus=document.activeElement;
   backupStopSubmitting=false;

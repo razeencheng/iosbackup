@@ -109,7 +109,12 @@ func (s *backupJobStore) start(job *backupJobSeed) {
 			name = name[:len(name)-1]
 		}
 	}
-	r := &backupJobRecord{Summary: backupJobSummary{ID: job.ID, UDID: job.UDID, DeviceName: name, Source: job.Source, RequestedMode: job.RequestedMode, ObservedMode: "unknown", State: backupStateStarting, StartedAt: job.StartedAt}}
+	r := &backupJobRecord{Summary: backupJobSummary{ID: job.ID, UDID: job.UDID, DeviceName: name, Operation: job.Operation, Source: job.Source, RequestedMode: job.RequestedMode, ObservedMode: "unknown", State: backupStateStarting, StartedAt: job.StartedAt}}
+	r.Summary.ExecutionState = "running"
+	r.Summary.HistoryState = "not_enabled"
+	if job.Operation == "check" {
+		r.Summary.ExecutionState = "not_run"
+	}
 	s.records[job.ID] = r
 	s.changedUnsafe(r)
 	s.enqueueUnsafe(r, backupJobEvent{At: job.StartedAt, Code: "started"})
@@ -274,7 +279,7 @@ func (s *backupJobStore) pruneUnsafe(at time.Time) {
 	ended := make([]*backupJobRecord, 0)
 	total := s.quarantineBytes
 	for _, r := range s.records {
-		total += r.Bytes + 2048
+		total += r.Bytes + backupJobSummaryBytes(r.Summary)
 		if !r.Summary.CompletedAt.IsZero() {
 			ended = append(ended, r)
 		}
@@ -285,7 +290,7 @@ func (s *backupJobStore) pruneUnsafe(at time.Time) {
 		if count > s.limits.Jobs || total > s.limits.TotalBytes || at.Sub(r.Summary.CompletedAt) > time.Duration(s.limits.Days)*24*time.Hour {
 			delete(s.records, r.Summary.ID)
 			count--
-			total -= r.Bytes + 2048
+			total -= r.Bytes + backupJobSummaryBytes(r.Summary)
 			s.revision++
 		}
 	}
@@ -493,6 +498,14 @@ func (s *backupJobStore) load() error {
 			s.quarantine[id] = true
 			continue
 		}
+		if summary.Check != nil {
+			summary.Check.Freshness = "unknown"
+			if summary.Check.State == "running" {
+				summary.Check.State = "unavailable"
+				summary.Check.Reason = "process_restarted"
+				summary.Check.CompletedAt = s.now()
+			}
+		}
 		r := &backupJobRecord{Summary: summary, NextCursor: summary.LastCursor, Dirty: true}
 		if summary.CompletedAt.IsZero() {
 			r.Summary.State = backupStateInterrupted
@@ -581,4 +594,9 @@ func (s *backupJobStore) updateEventCursorsUnsafe(r *backupJobRecord) {
 		r.Summary.FirstCursor = r.Events[0].Cursor
 		r.Summary.LastCursor = r.Events[len(r.Events)-1].Cursor
 	}
+}
+
+func backupJobSummaryBytes(summary backupJobSummary) int {
+	data, _ := json.Marshal(summary)
+	return max(2048, len(data)+256)
 }

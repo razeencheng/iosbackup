@@ -77,6 +77,8 @@ func (h *eventHub) clientCount() int {
 // ---- 状态快照 ----
 
 type deviceStatusDTO struct {
+	BackupCheck               *backupCheckResult `json:"backup_check,omitempty"`
+	BackupCheckActive         bool               `json:"backup_check_active"`
 	RequestedMode             string             `json:"requested_mode,omitempty"`
 	ObservedMode              string             `json:"observed_mode,omitempty"`
 	BackupJobActive           bool               `json:"backup_job_active"`
@@ -212,6 +214,7 @@ func (app *application) buildStatusSnapshot() statusSnapshot {
 			jobActive = !job.finished
 		}
 		devs = append(devs, deviceStatusDTO{
+			BackupCheck: app.backupCheckSnapshotUnsafe(udid), BackupCheckActive: app.backupChecks[udid] != nil,
 			BackupIndex: indexStatus, RequestedMode: requestedMode, ObservedMode: observedMode, BackupJobActive: jobActive,
 			BackupJobID:               jobID,
 			AutoBackupHold:            hold.Held,

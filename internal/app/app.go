@@ -158,6 +158,8 @@ type application struct {
 	onboardingTemplate        *template.Template
 	backupInProgress          map[string]bool // 跟踪正在备份的设备
 	backupJobRecords          *backupJobStore
+	backupCheckResults        map[string]backupCheckResult
+	backupChecks              map[string]*backupCheckRun
 	backupJobs                map[string]*backupJob
 	backupHolds               map[string]backupHold
 	checkInProgress           map[string]bool // 跟踪正在检查备份条件的设备
