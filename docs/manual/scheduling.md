@@ -17,12 +17,12 @@ These are the defaults for a new device. For an existing device, use the values 
 | Setting | Default | Meaning |
 |---|---|---|
 | Automatic backup | Off | After you enable and save this setting, the app checks the schedule and starts eligible backups |
-| Backup window | 18:00 to 06:00 | Beijing time, across midnight; includes 18:00, excludes 06:00 |
+| Backup window | 18:00 to 06:00 | Deployment time, across midnight; includes 18:00, excludes 06:00 |
 | Backup interval | 24 hours | At least 24 hours since the last successful backup |
 | Minimum battery | 20% | A backup should not start below this level |
 | Only back up while charging | On | The device must report that it is charging |
 
-Windows use Beijing time (UTC+8), regardless of your browser's timezone. For example, 18:00 in the interface is 10:00 in a UTC+0 location. The window controls when new jobs start; a running job is not stopped merely because the window ends. Set different start and end times to avoid configuring the wrong backup window.
+Windows use the deployment `TZ` (default `Asia/Shanghai`), regardless of browser timezone or language. Changing `TZ` keeps the entered clock values and runs them in the new zone; review your windows after a change. Backup intervals measure actual elapsed hours, including across daylight-saving changes. A repeated local hour is eligible for the window in both occurrences, but the elapsed interval and active-job guard still apply. The window controls when new jobs start; a running job is not stopped merely because the window ends. Set different start and end times to avoid configuring the wrong backup window.
 
 **Battery and charging conditions also apply to “Back up now.”** Turning automatic backup off does not bypass them.
 
@@ -51,7 +51,7 @@ Windows use Beijing time (UTC+8), regardless of your browser's timezone. For exa
 
 | Symptom | Check and next action |
 |---|---|
-| No job at the expected time | Check the Beijing-time window, last success, interval, and whether the enabled switch was saved |
+| No job at the expected time | Check the deployment-time window, last success, interval, and whether the enabled switch was saved |
 | Device is offline or removed | Reconnect it; removed devices are not scheduled. See [Device management](device-storage.md) |
 | Charging or battery conditions fail | Connect power and wait for the reported state to update; “Back up now” does not bypass these settings |
 | Another operation is running | The default permits one backup job at a time. This check can be skipped and a later check can try again if eligible; there is no guaranteed queue order |

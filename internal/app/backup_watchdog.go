@@ -138,8 +138,20 @@ func (a *backupActivity) timeout(cfg runtimeConfig, at time.Time) error {
 	return fmt.Errorf("%w (phase %s, inactive for %s)", errBackupStalled, a.phase, limit)
 }
 
-func (app *application) runBackupCommand(ctx context.Context, cancel context.CancelCauseFunc, udid, sessionID, directory string, network bool) error {
-	args := []string{"-u", udid, "backup", directory}
+func (app *application) runBackupCommand(ctx context.Context, cancel context.CancelCauseFunc, udid, sessionID, directory string, network bool, requests ...backupRequest) error {
+	request := backupRequest{Mode: "auto"}
+	if len(requests) > 0 {
+		var err error
+		request, err = requests[0].normalized()
+		if err != nil {
+			return err
+		}
+	}
+	args := []string{"-u", udid}
+	if request.Mode == "full" {
+		args = append(args, "--full")
+	}
+	args = append(args, "backup", directory)
 	if network {
 		args = append([]string{"-n"}, args...)
 	}
@@ -178,6 +190,7 @@ func (app *application) runBackupCommand(ctx context.Context, cancel context.Can
 				update, internal := activity.observe(line, kind, at)
 				if update.Phase != "" || update.OverallPercent != nil || update.CurrentBytes != nil || !update.LastActivityAt.IsZero() {
 					app.applyBackupProgressUpdate(udid, update, at, sessionID)
+					app.recordBackupActivity(sessionID, update)
 				}
 				return internal
 			})

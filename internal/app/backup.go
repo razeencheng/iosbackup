@@ -5,11 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"iosbackup/internal/i18n"
 	"os"
 	"strings"
 	"time"
-
-	"iosbackup/internal/i18n"
 )
 
 // PerformBackup 执行备份
@@ -155,11 +154,17 @@ func (app *application) runBackupJob(job *backupJob) (retErr error) {
 		if app.backupJobs[udid] == job && !job.stopAccepted {
 			state := app.deviceOperationStates[udid]
 			state.BackupState = backupStateRunning
+			if app.backupJobRecords != nil {
+				app.backupJobRecords.transition(job.id, backupStateRunning)
+			}
 			app.deviceOperationStates[udid] = state
 		}
 		app.mu.Unlock()
 		app.broadcastStatus()
-		err = app.runBackupCommand(job.ctx, job.cancel, udid, job.id, backupDir, network)
+		err = app.runBackupCommand(job.ctx, job.cancel, udid, job.id, backupDir, network, job.request)
+	}
+	if (errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)) && context.Cause(job.ctx) != nil {
+		err = context.Cause(job.ctx)
 	}
 	app.recordBackupResult(job, err)
 	if err != nil {
@@ -168,7 +173,7 @@ func (app *application) runBackupJob(job *backupJob) (retErr error) {
 	// 与配置编辑串行保存成功时间，避免旧候选覆盖本次结果。
 	app.configPersistMu.Lock()
 	app.mu.Lock()
-	at := nowBeijing()
+	at := app.nowTime()
 	if d := app.devices[udid]; d != nil {
 		d.LastBackup = at
 	}
@@ -224,13 +229,13 @@ func (app *application) readBackupOutput(udid, sessionID string, pipe interface{
 			}
 		} else if logType == "STDOUT" {
 			if update, ok := parseBackupProgressLine(line); ok {
-				app.applyBackupProgressUpdate(udid, update, nowBeijing(), sessionID)
+				app.applyBackupProgressUpdate(udid, update, app.nowTime(), sessionID)
 			}
 		}
 		shouldLog := !carriageReturn
 		if carriageReturn {
 			isProgress := strings.Contains(line, "%") || strings.Contains(line, "[")
-			now := nowBeijing()
+			now := app.nowTime()
 			shouldLog = !isProgress || now.Sub(lastProgressUpdate) > 5*time.Second ||
 				strings.Contains(line, "Finished") || strings.Contains(line, "Receiving") || strings.Contains(line, "Sending")
 			if shouldLog && isProgress {

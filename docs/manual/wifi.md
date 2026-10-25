@@ -67,7 +67,7 @@ If the known IP still does not establish a connection, stop repeating the test a
 | Brief disappearance or “Waiting for the device to reconnect” | Observe the job phase and last activity. An online device does not mean backup data is still being transferred |
 | Failure, `mobilebackup2 (-4)`, or `backup_stalled` | Preserve surrounding logs and phase information, wait for the job to end, then make the USB comparison below |
 
-1. Turn automatic backup off and save, then wait for the old job's failed, interrupted, or completed state. There is no cancel button in the current version; do not repeatedly restart connection services during an active job.
+1. Turn automatic backup off and save, then wait for the old job's failed, interrupted, or completed state. You can also select **Stop backup** and wait for **Stopping** to finish; do not repeatedly restart connection services during an active job.
 2. Connect the NAS with a reliable USB data cable, respond to passcode or trust prompts, and wait for **USB connected** .
 3. Confirm the same save location and backup set, then start a new manual backup. It is a new job that may incrementally update the existing set, not a resumption of the failed Wi-Fi session.
 4. If USB succeeds but Wi-Fi repeatedly fails, use USB for now. Follow [Troubleshooting](troubleshooting.md); consult the [Wi-Fi NAT case study](wifi-nat.md) only when logs and connection checks point to a problem with an idle connection between subnets. Do not copy firewall rules for a different router without analysis.

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="{{.Locale}}">
+<html lang="{{.Locale}}" data-timezone="{{.Timezone}}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -157,12 +157,15 @@
     .device-name{max-width:70vw}.backup-progress-heading{align-items:flex-start}.backup-current-file{align-items:flex-start;flex-direction:column}.backup-current-value{padding-left:37px;white-space:normal}
   }
   @media(prefers-reduced-motion:reduce){.backup-overall-fill{transition:none}.backup-overall-track.indeterminate .backup-overall-fill{animation:none;transform:translateX(95%)}}
+
+  .jobs-button{display:inline-flex;align-items:center;padding:8px 12px;border:1px solid #D8E2EA;background:#fff;color:#2C62C6;border-radius:9px;font-family:inherit;font-size:13px;font-weight:500;cursor:pointer;text-decoration:none}.jobs-button:disabled{opacity:.5;cursor:wait}.jobs-button:focus-visible,.jobs-advanced summary:focus-visible{outline:2px solid #2C62C6;outline-offset:3px}.jobs-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:0 0 14px}.jobs-toolbar h3{margin:0;font-size:16px}.jobs-note{font-size:12px;color:#718090;line-height:1.6;margin:6px 0}.jobs-advanced{padding:12px 14px;border:1px solid #E7EDF2;border-radius:9px;margin-bottom:18px;font-size:13px}.jobs-advanced summary{cursor:pointer;margin-bottom:10px;color:#526778}.jobs-warning{padding:10px 13px;background:#FBF1E2;border:1px solid #F0DBB6;border-radius:9px;font-size:12.5px;color:#8A5A12;line-height:1.7;margin:10px 0}.backup-control-row{padding:0 20px}.jobs-select{display:block;width:100%;margin:8px 0 14px}.jobs-summary{padding:16px;border:1px solid #D8E2EA;border-radius:9px;background:#F7FAFC;margin:14px 0}.jobs-summary strong{font-size:16px;color:#213041}.jobs-summary p{font-size:12.5px;color:#607181;margin:8px 0 0}.jobs-events{white-space:pre-wrap;overflow-wrap:anywhere;max-height:360px;overflow:auto;border:1px solid #E7EDF2;background:#F7FAFC;border-radius:9px;padding:14px;font:12px/1.9 ui-monospace,monospace;color:#40566A}
 </style>
 <link rel="stylesheet" href="/static/backup-browser.css?v={{.Version}}">
 <script src="/static/backup-browser.js?v={{.Version}}"></script>
 <script src="/static/i18n.js?v={{.Version}}"></script>
 <script src="/static/ui-messages.js?v={{.Version}}"></script>
 <script src="/static/api-messages.js?v={{.Version}}"></script>
+<script src="/static/backup-jobs.js?v={{.Version}}"></script>
 </head>
 <body>
 <div style="min-height:100vh;padding:22px 16px 64px">
@@ -219,7 +222,7 @@
     </div>
     <div style="display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;margin-top:13px;padding-top:12px;border-top:1px solid #E7EDF2;font-size:12.5px;color:#6F7E8C">
       <span style="display:inline-flex;align-items:center;gap:7px"><span id="autoDot" style="width:8px;height:8px;border-radius:50%;background:#2E7D5B;animation:iosbkpulse 1.6s ease-in-out infinite"></span><span id="autoText">{{t $.Locale "header.autoOn"}}</span><button id="autoToggle" onclick="toggleAutoRefresh()" style="background:none;border:none;color:#2C62C6;font-weight:600;cursor:pointer;font-size:12.5px;font-family:inherit;padding:0 0 0 2px">{{t $.Locale "header.pauseAuto"}}</button></span>
-      <span style="display:inline-flex;align-items:center;gap:6px"><svg class="ui-icon" style="width:13px;height:13px" aria-hidden="true"><use href="/static/ui-icons.svg#icon-clock"></use></svg><span data-i18n="header.tz">{{t $.Locale "header.tz"}}</span></span>
+      <span style="display:inline-flex;align-items:center;gap:6px"><svg class="ui-icon" style="width:13px;height:13px" aria-hidden="true"><use href="/static/ui-icons.svg#icon-clock"></use></svg><span data-i18n="header.tz">{{t $.Locale "header.tz" "timezone" $.Timezone}}</span></span>
       <span style="margin-left:auto;color:#96A3AE"><span data-i18n="app.version">{{t $.Locale "app.version"}}</span> {{.Version}}</span>
     </div>
   </div>
@@ -356,6 +359,10 @@
 
           <!-- 本地备份信息独立于设备连接状态。 -->
           <div data-sec-panel="backups" data-udid="{{$d.UDID}}" class="hidden backup-browser" style="padding:20px">
+            <div id="backupOverview-{{$d.UDID}}">
+              <div class="jobs-toolbar"><div><strong data-i18n="jobs.title">{{t $.Locale "jobs.title"}}</strong><p class="jobs-note" data-i18n="jobs.retention">{{t $.Locale "jobs.retention"}}</p></div><button id="openJobs-{{$d.UDID}}" class="jobs-button" data-job-action="open" data-udid="{{$d.UDID}}" data-i18n="jobs.open">{{t $.Locale "jobs.open"}}</button></div>
+              <details class="jobs-advanced"><summary data-i18n="jobs.advanced">{{t $.Locale "jobs.advanced"}}</summary><label for="backupMode-{{$d.UDID}}" data-i18n="jobs.requestedMode">{{t $.Locale "jobs.requestedMode"}}</label> <select id="backupMode-{{$d.UDID}}" class="iosbk-in"><option value="auto" data-i18n="jobs.mode.auto">{{t $.Locale "jobs.mode.auto"}}</option><option value="full" data-i18n="jobs.mode.full">{{t $.Locale "jobs.mode.full"}}</option></select><p class="jobs-note" data-i18n="jobs.fullHint">{{t $.Locale "jobs.fullHint"}}</p></details>
+
             <div id="bkOffline-{{$d.UDID}}" class="backup-offline-note{{if $d.IsOnline}} hidden{{end}}"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-info"></use></svg><span data-i18n="bindex.offlineNote">{{t $.Locale "bindex.offlineNote"}}</span></div>
             <div>
               <div class="backup-browser-heading"><div class="backup-browser-title" data-i18n="bmgmt.infoTitle">{{t $.Locale "bmgmt.infoTitle"}}</div><button id="bkRefresh-{{$d.UDID}}" class="backup-browser-link" onclick="loadBackups('{{$d.UDID}}')"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-refresh"></use></svg><span id="bkRefreshLabel-{{$d.UDID}}" data-i18n="bmgmt.infoRefresh">{{t $.Locale "bmgmt.infoRefresh"}}</span></button></div>
@@ -387,6 +394,20 @@
               </div>
               {{end}}
             </div>
+            </div>
+            <section id="jobsPanel-{{$d.UDID}}" class="hidden" data-i18n-aria="jobs.title" aria-label="{{t $.Locale "jobs.title"}}">
+              <div class="jobs-toolbar"><h3 data-i18n="jobs.title">{{t $.Locale "jobs.title"}}</h3><button class="jobs-button" data-job-action="close" data-udid="{{$d.UDID}}" data-i18n="jobs.back">{{t $.Locale "jobs.back"}}</button></div>
+              <p class="jobs-note" data-i18n="jobs.retention">{{t $.Locale "jobs.retention"}}</p>
+              <label for="jobSelect-{{$d.UDID}}" data-i18n="jobs.choose">{{t $.Locale "jobs.choose"}}</label>
+              <select id="jobSelect-{{$d.UDID}}" class="iosbk-in jobs-select" data-job-select></select>
+              <p id="jobEmpty-{{$d.UDID}}" class="jobs-note" data-i18n="jobs.empty">{{t $.Locale "jobs.empty"}}</p>
+              <div id="jobWarning-{{$d.UDID}}" class="jobs-warning hidden" role="status"></div>
+              <div id="jobDetails-{{$d.UDID}}" class="hidden">
+                <div class="jobs-summary"><strong id="jobResult-{{$d.UDID}}"></strong><p id="jobMode-{{$d.UDID}}"></p><p id="jobSource-{{$d.UDID}}"></p><p id="jobActivity-{{$d.UDID}}"></p></div>
+                <div class="jobs-toolbar"><p class="jobs-note" data-i18n="jobs.viewLimit">{{t $.Locale "jobs.viewLimit"}}</p><div><button class="jobs-button" data-job-action="copy" data-udid="{{$d.UDID}}" data-i18n="jobs.copy">{{t $.Locale "jobs.copy"}}</button> <a id="jobExport-{{$d.UDID}}" class="jobs-button" href="#" download data-i18n="jobs.export">{{t $.Locale "jobs.export"}}</a></div></div>
+                <pre id="jobEvents-{{$d.UDID}}" class="jobs-events" tabindex="0" data-i18n-aria="jobs.events" aria-label="{{t $.Locale "jobs.events"}}"></pre>
+              </div>
+            </section>
           </div>
 
           <!-- ===== ENCRYPTION ===== -->
@@ -663,6 +684,7 @@ function toggleCard(udid){
   // single-expand: collapse others
   document.querySelectorAll('[id^="panel-"]').forEach(function(p){ if(p!==panel){ p.classList.add('hidden'); } });
   document.querySelectorAll('[id^="chev-"]').forEach(function(c){ if(c.id!=='chev-'+udid){ setSVGIcon(c,'chevron-down'); } });
+  if(window.IOSBKJobs) window.IOSBKJobs.hide();
   expandedCards.clear();
   panel.classList.toggle('hidden', !willOpen);
   setSVGIcon(document.getElementById('chev-'+udid), willOpen ? 'chevron-up' : 'chevron-down');
@@ -671,6 +693,7 @@ function toggleCard(udid){
   if(!willOpen) maybeReload(); // 收起后若有挂起的设备增减刷新，此刻执行
 }
 function switchSection(udid, sec){
+  if(sec!=='backups'&&window.IOSBKJobs) window.IOSBKJobs.close(udid,false);
   document.querySelectorAll('[data-sec-panel][data-udid="'+udid+'"]').forEach(function(p){ p.classList.toggle('hidden', p.dataset.secPanel!==sec); });
   document.querySelectorAll('.snav[data-udid="'+udid+'"]').forEach(function(b){
     var active=b.dataset.sec===sec;
@@ -921,6 +944,8 @@ function checkVersion(snap){
   }
 }
 function applyStatus(snap){
+  if(window.IOSBKJobs)window.IOSBKJobs.onStatus(snap);
+  IOSBKI18n.setTimezone(snap.timezone);
   latestConnectionSnapshot=snap;
   renderConnectionHealth();
   checkVersion(snap); // 服务端版本变了（已部署新版本）→ 提示刷新
@@ -967,6 +992,8 @@ function backupProgressMode(progress){
   if(progress.state==='interrupted') return 'interrupted';
   if(progress.state==='completed') return 'completed';
   if(progress.state==='failed') return 'failed';
+  if(progress.state==='stopping') return 'stopping';
+  if(progress.state==='stopped') return 'stopped';
   if(progress.state==='running'){
     if(progress.phase==='preparing') return 'preparing';
     if(progress.phase==='waiting_authorization') return 'waiting-authorization';
@@ -1182,10 +1209,10 @@ function gateMsg(d){
 function startBackup(udid, btn){
   btn.disabled=true; btn.style.opacity='.6';
   function fail(msg){ toast(msg,true); btn.disabled=false; btn.style.opacity=''; }
-  csrfFetch('/api/backup/'+udid,{method:'POST'}).then(function(r){return r.json();}).then(function(data){
+  csrfFetch('/api/backup/'+udid,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode:(document.getElementById('backupMode-'+udid)||{}).value||'auto'})}).then(function(r){return r.json();}).then(function(data){
     if(data.error_code || (data.error && data.code)){ fail(gateMsg(data)); }          // 被限制（未充电/电量低/离线/正忙）→ 说明原因
     else if(data.error){ fail(apiMessage(data)); }
-    else toast(tr('action.fail.backupStartedYourDeviceWill'));
+    else {toast(tr('action.fail.backupStartedYourDeviceWill'));var mode=document.getElementById('backupMode-'+udid);if(mode)mode.value='auto';}
   }).catch(function(e){ fail(tr('common.operationFailed')); });
 }
 

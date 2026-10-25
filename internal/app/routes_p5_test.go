@@ -12,6 +12,7 @@ import (
 
 // homePayload 与 handleHome 渲染用的数据结构一致。
 type homePayload struct {
+	Timezone                      string
 	Locale                        string
 	InitialStatus                 statusSnapshot
 	Devices                       []*device

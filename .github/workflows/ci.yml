@@ -55,6 +55,8 @@ jobs:
         run: node internal/app/testdata/i18n.test.js
       - name: Offline backup browser behavior checks
         run: node internal/app/testdata/backup-browser.test.js
+      - name: Backup task timeline checks
+        run: node internal/app/testdata/backup-jobs.test.js
       - name: Test
         run: go test -count=1 ./...
       - name: Race test

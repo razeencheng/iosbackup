@@ -77,6 +77,9 @@ func (h *eventHub) clientCount() int {
 // ---- 状态快照 ----
 
 type deviceStatusDTO struct {
+	RequestedMode             string             `json:"requested_mode,omitempty"`
+	ObservedMode              string             `json:"observed_mode,omitempty"`
+	BackupJobActive           bool               `json:"backup_job_active"`
 	BackupIndex               *backupIndexBrief  `json:"backup_index,omitempty"`
 	PresenceKnown             bool               `json:"presence_known"`
 	LastSeen                  string             `json:"last_seen,omitempty"`
@@ -116,6 +119,8 @@ type backupProgressDTO struct {
 }
 
 type statusSnapshot struct {
+	BackupJobsRevision uint64                 `json:"backup_jobs_revision"`
+	Timezone           string                 `json:"timezone"`
 	ConnectionServices []connectionServiceDTO `json:"connection_services"`
 	Devices            []deviceStatusDTO      `json:"devices"`
 	BackupInProgress   int                    `json:"backup_in_progress"`
@@ -173,11 +178,11 @@ func (app *application) buildStatusSnapshot() statusSnapshot {
 		if progress, ok := app.backupProgress[udid]; ok {
 			updatedAt := ""
 			if !progress.UpdatedAt.IsZero() {
-				updatedAt = toBeijingTime(progress.UpdatedAt).Format(time.RFC3339)
+				updatedAt = app.inDeploymentTime(progress.UpdatedAt).Format(time.RFC3339)
 			}
 			lastActivityAt := ""
 			if !progress.LastActivityAt.IsZero() {
-				lastActivityAt = toBeijingTime(progress.LastActivityAt).Format(time.RFC3339)
+				lastActivityAt = app.inDeploymentTime(progress.LastActivityAt).Format(time.RFC3339)
 			}
 			progressDTO = &backupProgressDTO{
 				LastActivityAt:     lastActivityAt,
@@ -197,15 +202,17 @@ func (app *application) buildStatusSnapshot() statusSnapshot {
 		}
 		lastSeen := ""
 		if !d.LastSeen.IsZero() {
-			lastSeen = toBeijingTime(d.LastSeen).Format(time.RFC3339)
+			lastSeen = app.inDeploymentTime(d.LastSeen).Format(time.RFC3339)
 		}
-		jobID := ""
+		jobID, requestedMode, observedMode := "", "", ""
+		jobActive := false
 		hold := app.backupHoldUnsafe(udid)
 		if job := app.backupJobs[udid]; job != nil {
-			jobID = job.id
+			jobID, requestedMode, observedMode = job.id, job.request.Mode, "unknown"
+			jobActive = !job.finished
 		}
 		devs = append(devs, deviceStatusDTO{
-			BackupIndex:               indexStatus,
+			BackupIndex: indexStatus, RequestedMode: requestedMode, ObservedMode: observedMode, BackupJobActive: jobActive,
 			BackupJobID:               jobID,
 			AutoBackupHold:            hold.Held,
 			AutoBackupHoldVersion:     hold.Version,
@@ -219,7 +226,7 @@ func (app *application) buildStatusSnapshot() statusSnapshot {
 			Battery:             d.BatteryLevel,
 			Charging:            d.IsCharging,
 			LastBackup:          lastBackupStr(d.LastBackup),
-			LastBackupAt:        removedDeviceTime(d.LastBackup),
+			LastBackupAt:        app.formatTimestamp(d.LastBackup),
 			BackingUp:           app.backupInProgress[udid],
 			PairingState:        operationState.PairingState,
 			PairingErrorCode:    operationState.PairingErrorCode,
@@ -239,7 +246,13 @@ func (app *application) buildStatusSnapshot() statusSnapshot {
 		}
 		return devs[i].Name < devs[j].Name
 	})
+	jobsRevision := uint64(0)
+	if app.backupJobRecords != nil {
+		jobsRevision = app.backupJobRecords.revisionNumber()
+	}
 	return statusSnapshot{
+		BackupJobsRevision: jobsRevision,
+		Timezone:           app.deploymentLocation().String(),
 		ConnectionServices: app.connectionServicesUnsafe(),
 		Devices:            devs,
 		BackupInProgress:   len(app.backupInProgress),

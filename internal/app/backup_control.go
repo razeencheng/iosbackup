@@ -12,6 +12,8 @@ var errBackupStoppedByUser = errors.New("backup stopped by user")
 
 // backupJob 的可变字段由 app.mu 保护；一次登记同时占用设备、连接与并发容量。
 type backupJob struct {
+	request                           backupRequest
+	startedAt                         time.Time
 	id, udid                          string
 	automatic                         bool
 	ctx                               context.Context
@@ -24,7 +26,15 @@ type backupJob struct {
 	commandFinished                   bool
 }
 
-func (app *application) beginBackupJob(udid, connection, sessionID string, automatic bool) (*backupJob, error) {
+func (app *application) beginBackupJob(udid, connection, sessionID string, automatic bool, requests ...backupRequest) (*backupJob, error) {
+	request := backupRequest{Mode: "auto"}
+	if len(requests) > 0 {
+		var err error
+		request, err = requests[0].normalized()
+		if err != nil {
+			return nil, err
+		}
+	}
 	app.mu.Lock()
 	if err := app.deviceRemovalBlockedUnsafe(udid); err != nil {
 		app.mu.Unlock()
@@ -83,16 +93,23 @@ func (app *application) beginBackupJob(udid, connection, sessionID string, autom
 		sessionID = newBackupSessionID()
 	}
 	ctx, cancel := context.WithCancelCause(app.rootCtx)
-	job := &backupJob{id: sessionID, udid: udid, automatic: automatic, ctx: ctx, cancel: cancel, device: d, config: cfg, release: release}
+	job := &backupJob{request: request, startedAt: app.nowTime(), id: sessionID, udid: udid, automatic: automatic, ctx: ctx, cancel: cancel, device: d, config: cfg, release: release}
 	if app.backupJobs == nil {
 		app.backupJobs = make(map[string]*backupJob)
 	}
 	app.backupJobs[udid] = job
+	if app.backupJobRecords != nil {
+		source := "manual"
+		if automatic {
+			source = "automatic"
+		}
+		app.backupJobRecords.start(&backupJobSeed{ID: job.id, UDID: udid, DeviceName: d.Name, Source: source, RequestedMode: request.Mode, StartedAt: job.startedAt})
+	}
 	app.backupInProgress[udid] = true
 	state := app.deviceOperationStates[udid]
 	state.BackupState, state.BackupErrorCode, state.LastBackupError = backupStateStarting, "", ""
 	app.deviceOperationStates[udid] = state
-	app.backupProgress[udid] = backupProgress{State: backupProgressPreparing, Phase: "preparing", UpdatedAt: nowBeijing()}
+	app.backupProgress[udid] = backupProgress{State: backupProgressPreparing, Phase: "preparing", UpdatedAt: app.nowTime()}
 	accepted = true
 	return job, nil
 }
@@ -117,7 +134,7 @@ func (app *application) finishBackupJob(job *backupJob, err error) {
 	if app.backupJobs[job.udid] == job {
 		job.finished = true
 		finished, success = true, job.result == nil
-		app.finishBackupOperationUnsafe(job.udid, job.result, nowBeijing())
+		app.finishBackupOperationUnsafe(job.udid, job.result, app.nowTime())
 	}
 	app.mu.Unlock()
 	var lease *backupIndexWrite
@@ -126,6 +143,13 @@ func (app *application) finishBackupJob(job *backupJob, err error) {
 			lease = manager.releaseWriteUnsafe(job.udid)
 		}
 		manager.mu.Unlock()
+	}
+	if finished && app.backupJobRecords != nil {
+		state, code := backupStateSucceeded, ""
+		if job.result != nil {
+			state, code = backupFailureState(job.result)
+		}
+		app.backupJobRecords.finish(job.id, state, code, app.nowTime())
 	}
 	app.afterBackupIndexWrite(manager, lease, success)
 	app.broadcastStatus()

@@ -6,9 +6,9 @@ const vm = require('node:vm');
 const root = path.resolve(__dirname, '..');
 const runtime = path.join(root, 'static/i18n.js');
 assert.ok(fs.existsSync(runtime), 'four pages need a shared locale runtime');
-function boot({stored={},cookie='',languages=['en-US'],storageThrows=false}={}) {
+function boot({stored={},cookie='',languages=['en-US'],storageThrows=false,timezone=''}={}) {
   const values={...stored}, events=[], requests=[], listeners={};
-  const document={cookie,documentElement:{lang:'',setAttribute(k,v){this[k]=v;}},querySelectorAll(){return [];}};
+  const document={cookie,documentElement:{lang:'',dataset:{timezone},setAttribute(k,v){this[k]=v;}},querySelectorAll(){return [];}};
   const window={document,navigator:{languages,language:languages[0]||''},localStorage:{getItem(k){if(storageThrows)throw Error('blocked');return values[k]||null;},setItem(k,v){if(storageThrows)throw Error('blocked');values[k]=v;},removeItem(k){delete values[k];}},dispatchEvent(e){events.push(e);(listeners[e.type]||[]).forEach(fn=>fn(e));},addEventListener(type,fn){(listeners[type]||=[]).push(fn);},fetch(url,opts){requests.push({url,opts});return Promise.resolve({});}};
   const context=vm.createContext({...window,window,CustomEvent:class{constructor(type,opts){this.type=type;this.detail=opts.detail;}},Intl,Date,Headers});
   vm.runInContext(fs.readFileSync(runtime,'utf8'),context);
@@ -41,6 +41,14 @@ assert.equal(app.events.at(-1).type,'iosbk:localechange');
 assert.equal(app.api.t('ui.only'),'Fallback');
 assert.equal(app.api.t('greeting',{name:'<script>'}),'你好，<script>');
 assert.equal(app.api.formatDate('2026-10-11T00:30:00Z'),new Intl.DateTimeFormat('zh-CN',{timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date('2026-10-11T00:30:00Z')));
+const utcApp=boot({timezone:'UTC'});
+const expectedUTC=new Intl.DateTimeFormat('en',{timeZone:'UTC',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date('2026-10-11T00:30:00Z'));
+assert.equal(utcApp.api.formatDate('2026-10-11T00:30:00Z'),expectedUTC,'dates must use the deployment timezone');
+assert.equal(utcApp.api.formatDate('2026-10-11 08:30'),expectedUTC,'legacy values remain Beijing wall clocks');
+utcApp.api.setLocale('zh-CN');
+assert.equal(utcApp.api.getTimezone(),'UTC','browser language cannot alter the timezone');
+utcApp.api.setTimezone('Mars/Olympus');
+assert.equal(utcApp.api.getTimezone(),'UTC','invalid status values cannot break date rendering');
 app.api.fetch('/api/example',{headers:{'X-Test':'value'}});
 assert.equal(new Headers(app.requests[0].opts.headers).get('Accept-Language'),'zh-CN');
 assert.equal(new Headers(app.requests[0].opts.headers).get('X-Test'),'value');

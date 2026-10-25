@@ -154,7 +154,19 @@
     "api.backup_auto_held": "Automatic backups are on hold until you resume them.",
     "api.backup_hold_save_failed": "Automatic backups remain on hold in this session, but the setting could not be saved reliably. Retry saving before restarting.",
     "api.backup_control_identity_required": "The backup task or hold identifier is missing. Refresh the page and retry.",
-    "api.backup_control_updated": "Backup control updated."
+    "api.backup_control_updated": "Backup control updated.",
+    "api.backup_hold_saved": "Automatic backup hold saved.",
+    "api.backup_plan_disabled": "Automatic backup is disabled for this device.",
+    "api.backup_job_stopping": "The backup is still stopping. Wait before resuming automatic backups.",
+    "api.backup_records_expired": "This task record has expired or been removed by the retention limits.",
+    "api.invalid_cursor": "Invalid event cursor or page size.",
+    "api.backup_auto_resumed": "Automatic backup hold cleared. The existing schedule still applies.",
+    "api.invalid_backup_mode": "Choose automatic selection or force full backup.",
+    "api.backup_records_unavailable": "Task records are currently unavailable.",
+    "api.backup_job_conflict": "This task or hold has changed. Refresh the device status and try again.",
+    "api.backup_stopped_by_user": "Backup stopped by the administrator.",
+    "api.process_restarted": "The application restarted before the task recorded its final result.",
+    "api.backup_stop_accepted": "Stop request processed. Check the task and automatic backup hold status."
   },
   "zh-CN": {
     "api.operation_failed": "操作未能完成，请重试或查看服务日志。",
@@ -311,6 +323,18 @@
     "api.backup_auto_held": "自动备份已暂缓，直到你主动恢复。",
     "api.backup_hold_save_failed": "当前进程仍暂缓自动备份，但设置未能可靠保存。请重试保存，重启后的状态尚无保证。",
     "api.backup_control_identity_required": "缺少备份任务或暂缓状态标识，请刷新页面后重试。",
-    "api.backup_control_updated": "备份控制状态已更新。"
+    "api.backup_control_updated": "备份控制状态已更新。",
+    "api.backup_hold_saved": "自动备份暂缓状态已保存。",
+    "api.backup_plan_disabled": "此设备的自动备份未开启。",
+    "api.backup_job_stopping": "备份仍在停止，请等待收尾完成后再恢复自动备份。",
+    "api.backup_records_expired": "此任务记录已过期或因保留上限被清理。",
+    "api.invalid_cursor": "事件游标或分页大小无效。",
+    "api.backup_auto_resumed": "已解除自动备份暂缓，后续按原计划条件执行。",
+    "api.invalid_backup_mode": "请选择自动选择或强制全量备份。",
+    "api.backup_records_unavailable": "任务记录暂时不可用。",
+    "api.backup_job_conflict": "任务或暂缓状态已变化，请刷新设备状态后重试。",
+    "api.backup_stopped_by_user": "备份已由管理员停止。",
+    "api.process_restarted": "应用在任务记录最终结果前重启。",
+    "api.backup_stop_accepted": "停止请求已处理，请查看任务和自动备份暂缓状态。"
   }
 }

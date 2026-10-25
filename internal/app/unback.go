@@ -120,7 +120,7 @@ func (app *application) Unback(ctx context.Context, udid string) error {
 		app.notifySystemEvent("unpack_failed", map[string]string{"device_name": udid, "diagnostics": message})
 		return operationError(i18n.UnpackFailed, err, "")
 	}
-	summary.CompletedAt = nowBeijing().Format(time.RFC3339)
+	summary.CompletedAt = app.nowTime().Format(time.RFC3339)
 	marker, err := json.MarshalIndent(summary, "", "  ")
 	if err != nil {
 		return err

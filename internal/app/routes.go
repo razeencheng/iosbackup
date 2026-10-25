@@ -87,6 +87,8 @@ func (app *application) setupRoutes() http.Handler {
 	mux.HandleFunc("/api/refresh", app.handleRefresh)
 	mux.HandleFunc("/api/restart-usbmuxd", app.handleRestartUSBMuxD)
 	mux.HandleFunc("/api/backup/", app.handleBackup)
+	mux.HandleFunc("/api/backup-jobs/", app.handleBackupJobs)
+	mux.HandleFunc("/api/backup-job/", app.handleBackupJob)
 	mux.HandleFunc("/api/backup-stop/", app.handleBackupStop)
 	mux.HandleFunc("/api/backup-resume/", app.handleBackupResume)
 	mux.HandleFunc("/api/backup-hold-retry/", app.handleBackupHoldRetry)
@@ -137,6 +139,7 @@ func (app *application) setupRoutes() http.Handler {
 
 type loginPageData struct {
 	Locale    string
+	Timezone  string
 	ErrorCode string
 	CSRFToken string
 	Next      string
@@ -200,6 +203,7 @@ func (app *application) renderLogin(w http.ResponseWriter, r *http.Request, stat
 	w.WriteHeader(status)
 	data := loginPageData{
 		Locale:    i18n.ResolveRequest(r),
+		Timezone:  app.deploymentLocation().String(),
 		ErrorCode: message,
 		CSRFToken: app.csrfManager.Token(),
 		Next:      safeLoginNext(next),
@@ -307,13 +311,6 @@ func removedDeviceDisplayName(config *backupConfig) string {
 	return config.UDID
 }
 
-func removedDeviceTime(value time.Time) string {
-	if value.IsZero() {
-		return ""
-	}
-	return toBeijingTime(value).Format(time.RFC3339)
-}
-
 func (app *application) removedDevices() []removedDeviceDTO {
 	app.mu.RLock()
 	devices := make([]removedDeviceDTO, 0)
@@ -325,8 +322,8 @@ func (app *application) removedDevices() []removedDeviceDTO {
 			UDID:            config.UDID,
 			Name:            removedDeviceDisplayName(config),
 			DeviceType:      config.DeviceType,
-			RemovedAt:       removedDeviceTime(*config.RemovedAt),
-			LastBackup:      removedDeviceTime(config.LastBackup),
+			RemovedAt:       app.formatTimestamp(*config.RemovedAt),
+			LastBackup:      app.formatTimestamp(config.LastBackup),
 			BackupPreserved: true,
 		})
 	}
@@ -398,7 +395,7 @@ func (app *application) handleRemoveDevice(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	payload := apiMessage(w, i18n.DeviceRemoved, nil, false)
-	payload["removed_at"] = removedDeviceTime(removedAt)
+	payload["removed_at"] = app.formatTimestamp(removedAt)
 	writeJSON(w, http.StatusOK, payload)
 }
 
@@ -447,9 +444,9 @@ func (app *application) handleHome(w http.ResponseWriter, r *http.Request) {
 	hasBackupInProgress := len(app.backupInProgress) > 0
 
 	for udid, device := range app.devices {
-		// 创建设备副本并确保时间是北京时间
+		// 创建设备副本并使用部署时区
 		deviceCopy := *device
-		deviceCopy.LastBackup = toBeijingTime(device.LastBackup)
+		deviceCopy.LastBackup = app.inDeploymentTime(device.LastBackup)
 		devices = append(devices, &deviceCopy)
 		if config, exists := app.configs[udid]; exists {
 			configs[udid] = cloneBackupConfig(config)
@@ -489,6 +486,7 @@ func (app *application) handleHome(w http.ResponseWriter, r *http.Request) {
 
 	data := struct {
 		Locale                        string
+		Timezone                      string
 		Devices                       []*device
 		Configs                       map[string]*backupConfig
 		BackupStatuses                map[string]bool
@@ -504,6 +502,7 @@ func (app *application) handleHome(w http.ResponseWriter, r *http.Request) {
 		AuthEnabled                   bool
 	}{
 		Locale:                        i18n.ResolveRequest(r),
+		Timezone:                      app.deploymentLocation().String(),
 		InitialStatus:                 app.buildStatusSnapshot(),
 		Devices:                       devices,
 		Configs:                       configs,
@@ -534,12 +533,14 @@ func (app *application) handleOnboarding(w http.ResponseWriter, r *http.Request)
 	}
 	data := struct {
 		Locale    string
+		Timezone  string
 		CSRFToken string
 		Version   string
 		Commit    string
 		SourceURL string
 	}{
 		Locale:    i18n.ResolveRequest(r),
+		Timezone:  app.deploymentLocation().String(),
 		CSRFToken: app.csrfManager.Token(),
 		Version:   buildinfo.Version,
 		Commit:    buildinfo.Commit,
@@ -593,9 +594,12 @@ func (app *application) handleStatus(w http.ResponseWriter, r *http.Request) {
 	// 加密能力（缺密钥时降级；UI 据此灰置加密/恢复相关控件）
 	encAvailable := app.secretStore != nil && app.secretStore.Available()
 
+	snapshot := app.buildStatusSnapshot()
 	writeJSON(w, http.StatusOK, map[string]interface{}{
 		"connection_services":       connectionServices,
-		"devices":                   app.buildStatusSnapshot().Devices,
+		"timezone":                  app.deploymentLocation().String(),
+		"devices":                   snapshot.Devices,
+		"backup_jobs_revision":      snapshot.BackupJobsRevision,
 		"backup_in_progress_count":  backupCount,
 		"backup_devices":            backupDevices,
 		"backup_udids":              backupUDIDs,
@@ -660,6 +664,12 @@ func (app *application) handleBackup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	request, err := readBackupRequest(w, r)
+	if err != nil {
+		writeOperationError(w, http.StatusBadRequest, err, i18n.InvalidJSON)
+		return
+	}
+
 	// 同步预检：被限制（离线/正忙/未充电/电量不足）时立即返回原因码，前端据此本地化提示，
 	// 避免「点了立即备份却被静默跳过」。PerformBackup 内部仍会再校验作为防御。
 	if code, batt, minB := app.backupGateReason(udid); code != "" {
@@ -669,7 +679,7 @@ func (app *application) handleBackup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	job, err := app.beginBackupJob(udid, "", "", false)
+	job, err := app.beginBackupJob(udid, "", "", false, request)
 	if err != nil {
 		payload := operationErrorPayload(w, err, i18n.OperationFailed)
 		if translated, ok := err.(*i18n.Error); ok && translated.Code == i18n.BackupBusy {
@@ -683,6 +693,7 @@ func (app *application) handleBackup(w http.ResponseWriter, r *http.Request) {
 	payload := apiMessage(w, i18n.BackupStarted, nil, false)
 	payload["backup_state"] = backupStateStarting
 	payload["backup_job_id"] = job.id
+	payload["requested_mode"] = job.request.Mode
 	writeJSON(w, http.StatusAccepted, payload)
 }
 
@@ -1051,7 +1062,7 @@ func (app *application) handleNotificationConfig(w http.ResponseWriter, r *http.
 			writeOperationError(w, http.StatusBadRequest, err, i18n.NotificationConfigInvalid)
 			return
 		}
-		notificationManager, err := newNotificationManagerFromConfig(preview, app.runtimeConfig.WebhookAllowCIDRs)
+		notificationManager, err := newNotificationManagerFromConfig(preview, app.runtimeConfig.WebhookAllowCIDRs, app.nowTime)
 		if err != nil {
 			writeOperationError(w, http.StatusBadRequest, err, i18n.NotificationConfigInvalid)
 			return
@@ -1470,12 +1481,13 @@ func (app *application) handleNotifications(w http.ResponseWriter, r *http.Reque
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	data := struct {
 		Locale      string
+		Timezone    string
 		CSRFToken   string
 		Version     string
 		Commit      string
 		SourceURL   string
 		AuthEnabled bool
-	}{i18n.ResolveRequest(r), app.csrfManager.Token(), buildinfo.Version, buildinfo.Commit, buildinfo.SourceURL, app.authManager.Enabled()}
+	}{i18n.ResolveRequest(r), app.deploymentLocation().String(), app.csrfManager.Token(), buildinfo.Version, buildinfo.Commit, buildinfo.SourceURL, app.authManager.Enabled()}
 	if err := parsed.Execute(w, data); err != nil {
 		log.Printf("event=ui.template_render_failed page=notifications error=%v", err)
 	}

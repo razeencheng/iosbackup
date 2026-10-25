@@ -58,3 +58,11 @@ Current built-in limits are:
 These limits protect NAS memory, CPU and disk use; they are not additional environment settings. Allow free space for the index as well as the original backup. A budget or storage failure does not publish a partial list as complete. Compatible previous data is kept when possible, while the page reports the failed update. The index can be regenerated from a readable unencrypted backup; an encrypted historical list may not be reproducible without another successful compatible online query.
 
 See [Encryption and credentials](encryption.md), [Devices and storage](device-storage.md), and [Instance backup and recovery](instance-recovery.md) for protecting the actual backup and its credentials. Local unpacking remains a separate [experimental operation](experimental.md).
+
+## Task records and backup mode
+
+Select **View task records** under **Backups** to inspect a job's requested mode, execution outcome, phase events and last confirmed backup activity. Records survive restarts and remain available while the device is offline. Page refreshes and connection heartbeats do not advance backup activity time.
+
+The page displays up to 1,000 recent events. **Copy logs** produces readable text; **Download logs** exports a JSONL summary and all retained events. Retention is up to 30 days, capped by 1,000 completed jobs, 10,000 events / 1 MiB per job, and a 256 MiB total budget, whichever is reached first. Active summaries are protected separately; atomic writes need temporary space. Corrupt or orphaned records also have age and capacity limits. Truncation, expiration and saving failures are shown explicitly; exporting cannot recover already-pruned events. Review device names and identifiers in the summary before sharing it.
+
+Under **Advanced options for the next manual backup**, the default **Automatic selection** lets the device and tool choose a compatible mode. You can request **Full backup** instead. The choice resets after admission and does not change the automatic schedule. Observed mode remains **Unknown** without reliable evidence. A full request still updates the current backup set, and task records do not represent historical restore points.

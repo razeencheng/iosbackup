@@ -123,7 +123,7 @@ func (m *backupIndexCoordinator) request(src backupIndexSource, force bool) bool
 	m.attempted[src.Key] = backupIndexAttemptToken(src)
 	ctx, cancel := context.WithTimeout(m.app.rootCtx, 15*time.Minute)
 	revision, _ := newBackupIndexRevision()
-	job := &backupIndexJob{source: src, epoch: m.epochs[src.UDID], cancel: cancel, done: make(chan struct{}), refresh: backupIndexRefresh{State: "queued", Revision: revision, LastAttemptAt: nowBeijing()}}
+	job := &backupIndexJob{source: src, epoch: m.epochs[src.UDID], cancel: cancel, done: make(chan struct{}), refresh: backupIndexRefresh{State: "queued", Revision: revision, LastAttemptAt: m.app.nowTime()}}
 	m.jobs[src.UDID] = job
 	m.states[src.Key] = job.refresh
 	m.setBriefUnsafe(src, revision, job.refresh, "", "")
@@ -346,7 +346,7 @@ func (m *backupIndexCoordinator) snapshot(src backupIndexSource, sourceErr error
 	}
 	m.app.mu.RLock()
 	if cfg := m.app.configs[src.UDID]; cfg != nil {
-		result.LastBackupAt = removedDeviceTime(cfg.LastBackup)
+		result.LastBackupAt = m.app.formatTimestamp(cfg.LastBackup)
 	}
 	m.app.mu.RUnlock()
 	return result, nil

@@ -61,6 +61,10 @@ func (app *application) stopBackup(udid, jobID string) error {
 		if !job.resultSet && !job.commandFinished {
 			state := app.deviceOperationStates[udid]
 			state.BackupState = backupStateStopping
+			if app.backupJobRecords != nil {
+				app.backupJobRecords.transition(job.id, backupStateStopping)
+				app.backupJobRecords.emit(job.id, backupJobEvent{At: app.nowTime(), Code: "stop_requested"})
+			}
 			app.deviceOperationStates[udid] = state
 			cancel = job.cancel
 		}
