@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"iosbackup/internal/backupstore"
 	"iosbackup/internal/i18n"
 )
 
@@ -50,13 +51,17 @@ func (app *application) Unback(ctx context.Context, udid string) error {
 	if err := requirePlainSQLiteManifest(manifestPath); err != nil {
 		return err
 	}
-	finalPath := filepath.Join(backupPath, "_unback_")
+	outputRoot, err := app.historyUnpackRoot(udid, backupPath)
+	if err != nil {
+		return err
+	}
+	finalPath := filepath.Join(outputRoot, "_unback_")
 	if _, err := os.Lstat(finalPath); err == nil {
 		return i18n.NewError(i18n.UnpackExists, map[string]any{"path": finalPath})
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return operationError(i18n.UnpackFailed, err, "")
 	}
-	stagingPath, err := os.MkdirTemp(backupPath, ".iosbackup-unback-")
+	stagingPath, err := os.MkdirTemp(outputRoot, ".iosbackup-unback-")
 	if err != nil {
 		return operationError(i18n.DirectoryCreateFailed, err, "")
 	}
@@ -160,7 +165,6 @@ func (app *application) acquireLocalBackupOp(udid string, mutates ...bool) (stri
 	if cfg := app.configs[udid]; cfg != nil && cfg.BackupDirectory != "" {
 		root = cfg.BackupDirectory
 	}
-	backupPath := filepath.Join(root, udid)
 	app.backupInProgress[udid] = true
 	app.mu.Unlock()
 	changed := len(mutates) > 0 && mutates[0]
@@ -176,6 +180,21 @@ func (app *application) acquireLocalBackupOp(udid string, mutates ...bool) (stri
 			manager.mu.Unlock()
 		}
 		app.broadcastStatus()
+	}
+	actualRoot, releaseSource, err := app.acquireHistoryRead(udid, root)
+	if err != nil {
+		release()
+		return "", nil, err
+	}
+	releaseAdmission := release
+	release = func() { releaseSource(); releaseAdmission() }
+	backupPath := filepath.Join(actualRoot, udid)
+	if changed && actualRoot != root {
+		st, e := app.backupStorage.deviceState(udid)
+		if e != nil || st.Phase != "disabled" {
+			release()
+			return "", nil, backupstore.ErrConflict
+		}
 	}
 	return backupPath, release, nil
 }

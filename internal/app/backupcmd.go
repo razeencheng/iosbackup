@@ -147,8 +147,12 @@ func (app *application) DeleteDeviceBackup(udid string) error {
 	if fi, statErr := os.Stat(path); statErr != nil || !fi.IsDir() {
 		return i18n.NewError(i18n.BackupMissing, nil)
 	}
-	if removeErr := os.RemoveAll(path); removeErr != nil {
-		return operationError(i18n.BackupDeleteFailed, removeErr, "")
+	handled, deleteErr := app.deleteHistoryCurrent(udid, path)
+	if !handled && deleteErr == nil {
+		deleteErr = os.RemoveAll(path)
+	}
+	if deleteErr != nil {
+		return operationError(i18n.BackupDeleteFailed, deleteErr, "")
 	}
 	app.finishBackupIndexWrite(udid, false, true)
 	app.mu.Lock()
@@ -208,7 +212,11 @@ func (app *application) deviceBackupPath(udid string) string {
 		dir = cfg.BackupDirectory
 	}
 	app.mu.RUnlock()
-	return filepath.Join(dir, udid)
+	actual, err := app.historySourceRoot(udid, dir)
+	if err != nil {
+		return ""
+	}
+	return filepath.Join(actual, udid)
 }
 
 // hasLocalBackup 判断该设备在磁盘上是否已有备份：检查备份目录里是否有 idevicebackup2 生成的
@@ -216,6 +224,9 @@ func (app *application) deviceBackupPath(udid string) string {
 // 提前用本检查就能给出「还没有备份」的友好提示，而不是把原始错误抛给用户。
 func (app *application) hasLocalBackup(udid string) bool {
 	base := app.deviceBackupPath(udid)
+	if base == "" {
+		return false
+	}
 	for _, name := range []string{"Manifest.plist", "Status.plist", "Info.plist"} {
 		if fi, err := os.Stat(filepath.Join(base, name)); err == nil && !fi.IsDir() {
 			return true
@@ -369,11 +380,20 @@ func (app *application) BackupInfo(ctx context.Context, udid string) ([]byte, er
 		return nil, err
 	}
 	defer release()
+	dir, releaseSource, err := app.acquireHistoryRead(udid, dir)
+	if err != nil {
+		return nil, err
+	}
+	defer releaseSource()
 	// 加密备份的 info 需要 BACKUP_PASSWORD 才能解密 manifest
 	const maxBackupInfoBytes = 1 << 20
 	out := newHeadBuffer(maxBackupInfoBytes)
 	errTail := newTailBuffer(maxCommandErrorBytes)
-	err = app.runIdeviceCmdStreamEnv(ctx, cmdKindMedium, device, app.backupPasswordEnv(udid), cmdIdevicebackup2, out, errTail, "info", dir)
+	pwEnv, err := app.backupPasswordEnvAt(udid, dir)
+	if err != nil {
+		return nil, err
+	}
+	err = app.runIdeviceCmdStreamEnv(ctx, cmdKindMedium, device, pwEnv, cmdIdevicebackup2, out, errTail, "info", dir)
 	if err != nil {
 		return out.Bytes(), operationError(i18n.BackupInfoFailed, err, errTail.String())
 	}
@@ -415,6 +435,11 @@ func (app *application) streamBackupList(ctx context.Context, udid string, onRow
 		return 0, err
 	}
 	defer release()
+	dir, releaseSource, err := app.acquireHistoryRead(udid, dir)
+	if err != nil {
+		return 0, err
+	}
+	defer releaseSource()
 	audit := &backupListCacheAudit{safe: true}
 	return app.captureOnlineBackupIndex(ctx, udid, dir, func(emit func([]string) error) (int, error) {
 		return app.streamBackupListCommand(ctx, device, dir, emit, audit)
@@ -424,7 +449,10 @@ func (app *application) streamBackupList(ctx context.Context, udid string, onRow
 func (app *application) streamBackupListCommand(ctx context.Context, device *device, dir string, onRow func([]string) error, audit ...*backupListCacheAudit) (int, error) {
 	udid := device.UDID
 	// 沿用已保存的查询环境；是否支持该加密清单由工具实际结果决定。
-	pwEnv := app.backupPasswordEnv(udid)
+	pwEnv, pwErr := app.backupPasswordEnvAt(udid, dir)
+	if pwErr != nil {
+		return 0, pwErr
+	}
 	cmdCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	stdoutR, stdoutW := io.Pipe()

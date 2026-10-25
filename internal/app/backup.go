@@ -145,6 +145,41 @@ func (app *application) runBackupJob(job *backupJob) (retErr error) {
 	if err := os.MkdirAll(backupDir, 0755); err != nil {
 		return err
 	}
+	history, historyErr := app.prepareBackupHistory(job, backupDir)
+	if historyErr != nil {
+		if (errors.Is(historyErr, context.Canceled) || errors.Is(historyErr, context.DeadlineExceeded)) && context.Cause(job.ctx) != nil {
+			historyErr = context.Cause(job.ctx)
+		}
+		if cfg.History.Enabled || job.historyState != "" {
+			state := "failed"
+			if errors.Is(historyErr, errBackupStoppedByUser) {
+				state = "not_saved"
+			}
+			app.setHistoryJobState(job, state)
+		}
+		return historyErr
+	}
+	if history != nil {
+		backupDir = history.work.Parent
+		if history.active {
+			app.setHistoryJobState(job, "preparing")
+		} else {
+			app.setHistoryJobState(job, "not_enabled")
+		}
+		defer func() {
+			if history.active && check == nil {
+				ctx, cancel := context.WithTimeout(context.Background(), historyIOTimeout)
+				defer cancel()
+				if err := history.store.AbortWork(ctx, history.work.ID); err != nil {
+					app.setHistoryJobState(job, "failed")
+					backupLog(fmt.Sprintf("event=backup.history_cleanup_failed error=%v", err))
+				} else {
+					app.setHistoryJobState(job, "not_saved")
+				}
+			}
+		}()
+	}
+	job.backupRoot = backupDir
 	if err := context.Cause(job.ctx); err != nil {
 		return err
 	}
@@ -167,7 +202,14 @@ func (app *application) runBackupJob(job *backupJob) (retErr error) {
 		}
 		app.mu.Unlock()
 		app.broadcastStatus()
-		err = app.runBackupCommand(job.ctx, job.cancel, udid, job.id, backupDir, network, job.request)
+		effectiveRequest := job.request
+		if history != nil && history.forceFull {
+			effectiveRequest.Mode = "full"
+		}
+		err = app.startHistoryCurrentWrite(job, history)
+		if err == nil {
+			err = app.runBackupCommand(job.ctx, job.cancel, udid, job.id, backupDir, network, effectiveRequest)
+		}
 	}
 	if (errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)) && context.Cause(job.ctx) != nil {
 		err = context.Cause(job.ctx)
@@ -210,6 +252,7 @@ func (app *application) runBackupJob(job *backupJob) (retErr error) {
 	backupLog("event=backup.completed")
 	result := app.quickCheckBackup(job)
 	check = &result
+	app.finishBackupHistory(job, history, check, executionAt)
 	return nil
 }
 

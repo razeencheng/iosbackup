@@ -1271,7 +1271,12 @@ func (app *application) handleBackupUnback(w http.ResponseWriter, r *http.Reques
 		writeError(w, http.StatusConflict, i18n.BackupMissing)
 		return
 	}
-	if err := requirePlainSQLiteManifest(filepath.Join(app.deviceBackupPath(udid), "Manifest.db")); err != nil {
+	backupPath := app.deviceBackupPath(udid)
+	if backupPath == "" {
+		writeError(w, http.StatusConflict, i18n.BackupMissing)
+		return
+	}
+	if err := requirePlainSQLiteManifest(filepath.Join(backupPath, "Manifest.db")); err != nil {
 		writeOperationError(w, http.StatusConflict, err, i18n.OperationFailed)
 		return
 	}

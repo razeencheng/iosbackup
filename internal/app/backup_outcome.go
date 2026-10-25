@@ -10,6 +10,9 @@ func (app *application) notifyBackupOutcome(job *backupJob, err error, check *ba
 		return
 	}
 	outcome := notificationpkg.BackupOutcome{Execution: "succeeded", History: "not_enabled"}
+	if job.historyState != "" {
+		outcome.History = job.historyState
+	}
 	if err != nil {
 		outcome.Execution = "failed"
 		_, outcome.FailureCode = backupFailureState(err)

@@ -1,6 +1,6 @@
 # Historical backup storage
 
-This internal package is the storage foundation for historical restore points. The application does not expose historical backup retention or export yet. Ordinary backups still use their existing writable location.
+This internal package stores historical restore points and plans retention. The application backend integrates isolated backup work, migration, policy changes and generation-aware reads. The history API, export and settings UI are separate follow-up stages; history remains disabled by default.
 
 ## Ownership and lifecycle
 
@@ -8,7 +8,7 @@ This internal package is the storage foundation for historical restore points. T
 - An OS file lock excludes a second writer. `Open` requires `Recover` before writes or leases. Recovery preserves unknown content and blocks mutations when its ownership cannot be established.
 - `NewWork` creates an owned transaction and a new parent directory. Device commands may write only into that work directory. The caller must stop and join all external writers before calling `Commit` or `AbortWork`.
 - A published point is never a device command destination. Copying uses independent files or a probed Linux FICLONE operation, never hard links. The application serializes preparation through one large-I/O slot.
-- `Acquire` holds a read lease until `Close`. Its root handle is for read-only callers. Recycle and store closure reject active leases. Retention policy and administrator confirmation belong in the application layer; this package additionally protects pinned/manual points and current baselines.
+- `Acquire` holds a read lease until `Close`. Its root handle is for read-only callers. Recycle and store closure reject active leases. `PlanRetention` defines calendar-day retention, and the application supplies the confirmed policy, active epoch and generation. This package additionally protects pinned/manual points, current baselines and active readers at execution time.
 
 ## Publication and recovery
 
@@ -27,3 +27,19 @@ The target must support file and directory sync, same-filesystem rename and proc
 Capacity checks reserve metadata headroom, inspect available bytes/inodes when supported and report quota knowledge separately. Actual writes must still handle ENOSPC and other storage errors. Per-file allocated-block counts are not an exclusive physical-space measurement for shared extents.
 
 Tests cover ordinary copy isolation, cancellation, insufficient capacity, partial publication/recycle faults, leases, identity mismatch, unknown data and subprocess exit recovery. Linux tmpfs tests exercise ordinary copy and unsupported-clone fallback. A supporting reflink mount and target NAS durability still need deployment validation. Process termination does not simulate power loss.
+
+## Retention and metadata changes
+
+The default window is three natural days including today, configurable from 1 to 365 days. Within each stored timezone/day bucket, the latest normal point wins. Missing days do not create synthetic points. Pinning, manual retention, old generations/epochs, the latest normal baseline and active read leases take precedence. Pending results have an independent latest-one rule within the current generation and epoch. A new result must be committed before it can supersede an older result.
+
+`PlanGC` returns the catalog revision, eligible IDs and reasons for retaining other points. `GC` rechecks the revision and leases under the catalog lock. An occupied point is skipped without blocking cleanup of other eligible points. Atomic metadata transactions keep descriptors and the catalog consistent when pinning or freezing a store; recovery can finish any interrupted step. Pinning never changes a check result or promotes a pending point to a baseline.
+
+The application persists an enable/disable epoch and source references in `history-stores.json`. Disabling first records intent, freezes all existing points as manual, then reliably prepares a separate writable current set. Re-enabling starts a new epoch and leaves those manual points protected. Shrinking an active policy requires a matching preview; revisions or affected IDs that changed require a new preview. Policy changes hold the same device admission as backups.
+
+Every historical backup follows prepare → device command → quick check → normal/pending publication → eligible cleanup. No compatible baseline means an empty work set and an explicit full request. Tool success updates LastBackup independently of check and publication status. Failures or stops clean only unpublished work after command readers have exited; uncertain commits stay available to recovery. Startup reconciles the latest normal source from committed catalog evidence. Missing registered stores block affected operations but do not stop unrelated devices from starting.
+
+Legacy directories remain untouched. A checked legacy source with a completion date in its own metadata can be adopted; a device-wide LastBackup value is not source evidence. Unknown completion time remains an explicitly marked, manually retained pending result. Existing encrypted-password aliases are copied into immutable credential references, but those candidates alone do not establish baseline compatibility. Imports cannot inherit a verified current password generation solely from an encryption flag. Reads use the source generation's credential, not a device's newer password alias. Writes to a disabled-mode current set invalidate prior completion/credential evidence before the tool starts; only a new successful checked result reinstates it.
+
+Current-backup reads resolve the saved source, with immutable read leases for external queries. Unpack output lives outside backup sets in `.iosbackup-unpacked/`. Experimental device restore receives a disposable independent work copy. The legacy delete action cannot delete an immutable point; after history is disabled it can delete the separate writable current set. Deleting that set does not delete saved points or silently recreate the deleted current data from them.
+
+Copy and lifecycle I/O phases have a six-hour cancellation bound; quick checks retain their separate 30-second bound. Recovery reports keep owned unpublished work visible rather than guessing that an orphaned external writer has exited. Full payload verification, target NAS durability, reflink-capable storage and physical-device restore remain acceptance tasks.

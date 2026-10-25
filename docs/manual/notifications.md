@@ -62,7 +62,7 @@ To pause all delivery, turn off the master switch and save. To disable a channel
 | `backup_success` | Execution completed and the final check found no attention condition; this is not device-restoration validation. |
 | `backup_failed` | An admitted backup task failed. User-requested stops do not send a failure notification. |
 | `backup_check_attention` | Execution succeeded but the automatic quick check found issues or could not complete. |
-| `backup_history_attention` | Reserved for the independent history-saving stage; no historical restore points are created by task recording. |
+| `backup_history_attention` | History publication or cleanup needs attention; task recording alone does not create a historical restore point. |
 | `device_online` | The app detected that a device went from offline to online. |
 | `device_offline` | The device has not been detected for longer than the applicable waiting period. |
 | `system_error` | Persistent connection-service failures, pairing issues requiring action, and explicit failures in restore, unpack, encryption or password storage operations. Error logs alone do not send notifications. |

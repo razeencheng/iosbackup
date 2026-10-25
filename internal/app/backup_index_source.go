@@ -46,7 +46,18 @@ func (app *application) resolveBackupIndexSource(ctx context.Context, udid strin
 	if !knownConfig && !knownDevice {
 		return backupIndexSource{}, errDeviceNotFound
 	}
-	return resolveBackupIndexSourceAt(ctx, udid, root)
+	actualRoot, releaseSource, err := app.acquireHistoryRead(udid, root)
+	if err != nil {
+		return backupIndexSource{}, err
+	}
+	defer releaseSource()
+	src, err := resolveBackupIndexSourceAt(ctx, udid, actualRoot)
+	absolute, absErr := filepath.Abs(root)
+	if absErr != nil {
+		return src, absErr
+	}
+	src.Key = indexDigest(filepath.Clean(absolute) + "\x00" + udid)
+	return src, err
 }
 
 // 来源路径由已经准入的任务固定，后续配置编辑不能把检查切换到另一份备份。

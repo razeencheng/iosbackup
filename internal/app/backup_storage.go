@@ -19,11 +19,14 @@ type historyLocation struct {
 	Path string `json:"path"`
 }
 type historyLocations struct {
-	Schema int               `json:"schema"`
-	Stores []historyLocation `json:"stores"`
+	Devices map[string]historyDeviceState `json:"devices,omitempty"`
+	Schema  int                           `json:"schema"`
+	Stores  []historyLocation             `json:"stores"`
 }
 type backupStorage struct {
+	recovery    map[string]backupstore.RecoveryReport
 	mu          sync.Mutex
+	uncertain   bool
 	registry    string
 	locations   historyLocations
 	stores      map[string]*backupstore.Store
@@ -33,7 +36,7 @@ type backupStorage struct {
 }
 
 func newBackupStorage(registry string) *backupStorage {
-	return &backupStorage{registry: registry, slot: make(chan struct{}, 1), stores: map[string]*backupstore.Store{}, unavailable: map[string]error{}, locations: historyLocations{Schema: 1}}
+	return &backupStorage{recovery: map[string]backupstore.RecoveryReport{}, registry: registry, slot: make(chan struct{}, 1), stores: map[string]*backupstore.Store{}, unavailable: map[string]error{}, locations: historyLocations{Schema: 1}}
 }
 func (m *backupStorage) load(ctx context.Context) error {
 	m.mu.Lock()
@@ -61,6 +64,63 @@ func (m *backupStorage) load(ctx context.Context) error {
 		ids[location.ID] = true
 		paths[location.Path] = true
 	}
+	for udid, st := range locations.Devices {
+		if !udidPattern.MatchString(udid) || !backupstore.ValidID(st.EpochID) || !ids[st.StoreID] || st.Days < 1 || st.Days > 365 || !filepath.IsAbs(st.Root) || filepath.Clean(st.Root) != st.Root {
+			return backupstore.ErrInvalid
+		}
+		if st.Phase != "enabling" && st.Phase != "active" && st.Phase != "disabling" && st.Phase != "disabled" {
+			return backupstore.ErrInvalid
+		}
+		if st.CurrentDeleted && st.DeletedAt.IsZero() || st.CurrentReset && !st.CurrentDeleted {
+			return backupstore.ErrInvalid
+		}
+		if st.TransitionSource != "" && st.TransitionSource != "current" && st.TransitionSource != "normal" {
+			return backupstore.ErrInvalid
+		}
+		if st.TransitionSource == "current" && (st.WritableStore == "" || st.WritableID == "") {
+			return backupstore.ErrInvalid
+		}
+		if st.WritableGeneration.ID != "" && st.WritableGeneration.Validate() != nil {
+			return backupstore.ErrInvalid
+		}
+		for _, location := range locations.Stores {
+			if location.ID == st.StoreID && location.UDID != udid {
+				return backupstore.ErrInvalid
+			}
+		}
+		for _, ref := range [][2]string{{st.LatestStore, st.LatestPoint}, {st.WritableStore, st.WritableID}} {
+			if ref[0] == "" && ref[1] == "" {
+				continue
+			}
+			if !ids[ref[0]] || !backupstore.ValidID(ref[1]) {
+				return backupstore.ErrInvalid
+			}
+			for _, location := range locations.Stores {
+				if location.ID == ref[0] && location.UDID != udid {
+					return backupstore.ErrInvalid
+				}
+			}
+		}
+	}
+	// Resolve a prior atomic-save uncertainty before permitting lifecycle changes.
+	f, err := os.Open(m.registry)
+	if err != nil {
+		return err
+	}
+	err = f.Sync()
+	f.Close()
+	if err != nil {
+		return err
+	}
+	d, err := os.Open(filepath.Dir(m.registry))
+	if err != nil {
+		return err
+	}
+	err = d.Sync()
+	d.Close()
+	if err != nil {
+		return err
+	}
 	m.locations = locations
 	for _, location := range locations.Stores {
 		if err = ctx.Err(); err != nil {
@@ -68,7 +128,9 @@ func (m *backupStorage) load(ctx context.Context) error {
 		}
 		store, err := backupstore.Open(location.Path, location.UDID, location.ID)
 		if err == nil {
-			_, err = store.Recover(ctx)
+			var report backupstore.RecoveryReport
+			report, err = store.Recover(ctx)
+			m.recovery[location.ID] = report
 		}
 		if err != nil {
 			if store != nil {
@@ -182,6 +244,9 @@ func (m *backupStorage) create(ctx context.Context, backupRoot, udid string) (st
 	return id, nil
 }
 func (m *backupStorage) prepare(ctx context.Context, id, job, baseline string, options backupstore.CopyOptions) (backupstore.Work, backupstore.CopyReport, error) {
+	return m.prepareFrom(ctx, id, job, id, baseline, options)
+}
+func (m *backupStorage) prepareFrom(ctx context.Context, id, job, sourceID, baseline string, options backupstore.CopyOptions) (backupstore.Work, backupstore.CopyReport, error) {
 	var report backupstore.CopyReport
 	// 实例共用一个大 I/O 槽；队列等待期间仍可取消。
 	select {
@@ -204,14 +269,18 @@ func (m *backupStorage) prepare(ctx context.Context, id, job, baseline string, o
 	}
 	var source *backupstore.Lease
 	if baseline != "" {
-		catalog, err := store.Snapshot()
+		sourceStore, err := m.store(sourceID)
+		if err != nil {
+			return backupstore.Work{}, report, err
+		}
+		catalog, err := sourceStore.Snapshot()
 		if err != nil {
 			return backupstore.Work{}, report, err
 		}
 		if catalog.Points[baseline].State != "normal" {
 			return backupstore.Work{}, report, backupstore.ErrInvalid
 		}
-		source, err = store.Acquire(baseline)
+		source, err = sourceStore.Acquire(baseline)
 		if err != nil {
 			return backupstore.Work{}, report, err
 		}
@@ -222,7 +291,18 @@ func (m *backupStorage) prepare(ctx context.Context, id, job, baseline string, o
 		return work, report, err
 	}
 	if source == nil {
-		err = os.Mkdir(work.Directory, 0700)
+		reserve := options.ReserveBytes
+		if reserve == 0 {
+			reserve = 16 << 20
+		}
+		var capacity backupstore.Capacity
+		capacity, err = backupstore.StorageCapacity(work.Parent)
+		if err == nil && (capacity.BytesKnown && capacity.Bytes < reserve || capacity.InodesKnown && capacity.Inodes < 33) {
+			err = backupstore.ErrCapacity
+		}
+		if err == nil {
+			err = os.Mkdir(work.Directory, 0700)
+		}
 	} else {
 		report, err = backupstore.CopyTree(ctx, source.Directory, work.Directory, options)
 	}
@@ -252,6 +332,15 @@ func (app *application) recoverBackupStorage(ctx context.Context) error {
 	if err := generations.recoverExisting(); err != nil {
 		_ = storage.close()
 		return err
+	}
+	for udid := range storage.locations.Devices {
+		if _, err := storage.reconcileHistoryLatest(udid); err != nil {
+			if storage.uncertain {
+				_ = storage.close()
+				return err
+			}
+			app.addErrorLog(udid, fmt.Sprintf("event=backup.history_reconcile_unavailable error=%v", err))
+		}
 	}
 	app.mu.Lock()
 	app.backupStorage = storage

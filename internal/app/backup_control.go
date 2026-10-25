@@ -12,6 +12,9 @@ var errBackupStoppedByUser = errors.New("backup stopped by user")
 
 // backupJob 的可变字段由 app.mu 保护；一次登记同时占用设备、连接与并发容量。
 type backupJob struct {
+	historyPolicyOnly                 bool
+	historyState                      string
+	backupRoot                        string
 	request                           backupRequest
 	startedAt                         time.Time
 	id, udid                          string

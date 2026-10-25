@@ -7,6 +7,7 @@ import (
 	"errors"
 	"regexp"
 	"time"
+	_ "time/tzdata"
 )
 
 var (
@@ -43,10 +44,11 @@ func NewID() (string, error) {
 func ValidID(id string) bool { return idPattern.MatchString(id) }
 
 type Generation struct {
-	ID            string    `json:"id"`
-	Kind          string    `json:"kind"` // unknown | encrypted | unencrypted
-	CredentialRef string    `json:"credential_ref,omitempty"`
-	CreatedAt     time.Time `json:"created_at"`
+	ID                 string    `json:"id"`
+	Kind               string    `json:"kind"` // unknown | encrypted | unencrypted
+	CredentialRef      string    `json:"credential_ref,omitempty"`
+	CredentialVerified bool      `json:"credential_verified,omitempty"`
+	CreatedAt          time.Time `json:"created_at"`
 }
 
 type Identity struct {
@@ -63,20 +65,21 @@ type Check struct {
 }
 
 type Point struct {
-	ID          string     `json:"id"`
-	StoreID     string     `json:"store_id"`
-	UDID        string     `json:"udid"`
-	Generation  Generation `json:"generation"`
-	EpochID     string     `json:"epoch_id"`
-	JobID       string     `json:"job_id"`
-	CompletedAt time.Time  `json:"completed_at"`
-	CommittedAt time.Time  `json:"committed_at"`
-	Day         string     `json:"day"`
-	Timezone    string     `json:"timezone"`
-	State       string     `json:"state"` // normal | pending
-	Check       Check      `json:"check"`
-	Pinned      bool       `json:"pinned"`
-	Manual      bool       `json:"manual"`
+	CompletionUnknown bool       `json:"completion_unknown,omitempty"`
+	ID                string     `json:"id"`
+	StoreID           string     `json:"store_id"`
+	UDID              string     `json:"udid"`
+	Generation        Generation `json:"generation"`
+	EpochID           string     `json:"epoch_id"`
+	JobID             string     `json:"job_id"`
+	CompletedAt       time.Time  `json:"completed_at"`
+	CommittedAt       time.Time  `json:"committed_at"`
+	Day               string     `json:"day"`
+	Timezone          string     `json:"timezone"`
+	State             string     `json:"state"` // normal | pending
+	Check             Check      `json:"check"`
+	Pinned            bool       `json:"pinned"`
+	Manual            bool       `json:"manual"`
 }
 
 type Catalog struct {
@@ -97,11 +100,11 @@ func (g Generation) Validate() error {
 	}
 	switch g.Kind {
 	case "unknown", "unencrypted":
-		if g.CredentialRef != "" {
+		if g.CredentialRef != "" || g.CredentialVerified {
 			return ErrInvalid
 		}
 	case "encrypted":
-		if g.CredentialRef != "" && !ValidID(g.CredentialRef) {
+		if (g.CredentialRef != "" && !ValidID(g.CredentialRef)) || (g.CredentialVerified && g.CredentialRef == "") {
 			return ErrInvalid
 		}
 	default:
@@ -122,7 +125,7 @@ func (p Point) Validate(identity Identity) error {
 	}
 	switch p.State {
 	case "normal":
-		if p.Check.State != "passed" {
+		if p.Check.State != "passed" || p.CompletionUnknown {
 			return ErrInvalid
 		}
 	case "pending":

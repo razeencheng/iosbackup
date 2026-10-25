@@ -74,6 +74,11 @@ func (s *Store) Recover(ctx context.Context) (RecoveryReport, error) {
 				return report, err
 			}
 			report.Recovered = append(report.Recovered, id)
+		case "metadata":
+			if err = s.finishMetadata(tx); err != nil {
+				return report, err
+			}
+			report.Recovered = append(report.Recovered, id)
 		case "deleting":
 			if err = s.finishRecycle(ctx, tx); err != nil {
 				return report, err

@@ -65,7 +65,10 @@
     "title.backup_final_success": "备份完成",
     "body.backup_final_success": "设备 ${device_name}\n备份执行：${execution_result}\n备份检查：${check_result}\n历史保存：${history_result}",
     "title.backup_final_failed": "备份执行失败",
-    "body.backup_final_failed": "设备 ${device_name}\n备份执行：${execution_result}\n备份检查：${check_result}\n历史保存：${history_result}\n原因：${reason}"
+    "body.backup_final_failed": "设备 ${device_name}\n备份执行：${execution_result}\n备份检查：${check_result}\n历史保存：${history_result}\n原因：${reason}",
+    "outcome.pending": "待确认",
+    "outcome.not_saved": "未保存历史点",
+    "outcome.preparing": "准备中"
   },
   "en": {
     "title.backup_start": "✅ Backup started",
@@ -133,6 +136,9 @@
     "title.backup_final_success": "Backup completed",
     "body.backup_final_success": "Device ${device_name}\nBackup execution: ${execution_result}\nBackup check: ${check_result}\nHistory saving: ${history_result}",
     "title.backup_final_failed": "Backup execution failed",
-    "body.backup_final_failed": "Device ${device_name}\nBackup execution: ${execution_result}\nBackup check: ${check_result}\nHistory saving: ${history_result}\nReason: ${reason}"
+    "body.backup_final_failed": "Device ${device_name}\nBackup execution: ${execution_result}\nBackup check: ${check_result}\nHistory saving: ${history_result}\nReason: ${reason}",
+    "outcome.pending": "pending review",
+    "outcome.not_saved": "no history point saved",
+    "outcome.preparing": "preparing"
   }
 }

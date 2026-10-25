@@ -227,6 +227,8 @@ func (s *generationStore) finish(udid, id string) error {
 	} else if err = s.secrets.DeleteBackupPassword(udid); err != nil {
 		return err
 	}
+	target.CredentialVerified = target.Kind == "encrypted"
+	state.Generations[target.ID] = target
 	state.Current = target.ID
 	state.Pending = nil
 	// 写入失败（包含 rename 后失败）仍按待核对处理；不伪造手机侧回滚。
@@ -236,7 +238,7 @@ func (s *generationStore) finish(udid, id string) error {
 // compatibleBaseline 只允许明确的同代、同凭据正常点。未知元数据需新建全量。
 func (s backupGenerations) compatibleBaseline(p backupstore.Point, metadataKnown bool) bool {
 	g, ok := s.Generations[s.Current]
-	return s.Recovered && metadataKnown && ok && s.Pending == nil && g.Kind != "unknown" && p.State == "normal" && p.Generation == g && (g.Kind != "encrypted" || g.CredentialRef != "")
+	return s.Recovered && metadataKnown && ok && s.Pending == nil && g.Kind != "unknown" && p.State == "normal" && p.Generation == g && (g.Kind != "encrypted" || g.CredentialRef != "" && g.CredentialVerified)
 }
 func (app *application) generationRegistry() *generationStore {
 	app.mu.Lock()
@@ -305,4 +307,74 @@ func (s *generationStore) recoverExisting() error {
 		}
 	}
 	return nil
+}
+
+// historyGeneration learns only the encryption flag of a newly checked backup.
+// A password is never inferred from that flag or from an unverified legacy alias.
+func (s *generationStore) historyGeneration(udid, observed string) (backupstore.Generation, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	state, err := s.loadLocked(udid)
+	if err != nil {
+		return backupstore.Generation{}, err
+	}
+	current := state.Generations[state.Current]
+	if current.ID != "" && state.Pending == nil && state.Recovered && (observed == "" || current.Kind == observed) {
+		return current, nil
+	}
+	if observed == "" && current.ID != "" {
+		return current, nil
+	}
+	kind := observed
+	if kind == "" {
+		kind = "unknown"
+	}
+	// An unresolved phone-side change must never acquire a compatible baseline.
+	if state.Pending != nil {
+		kind = "unknown"
+	}
+	if current.ID != "" && current.Kind == kind {
+		return current, nil
+	}
+	pw := ""
+	if kind == "encrypted" && s.secrets != nil && s.secrets.Available() {
+		pw, err = s.secrets.GetBackupPassword(udid)
+		if err != nil && !errors.Is(err, errPasswordNotFound) {
+			return backupstore.Generation{}, err
+		}
+	}
+	gen, err := s.generation(udid, kind, pw)
+	if err != nil {
+		return gen, err
+	}
+	state.Generations[gen.ID] = gen
+	state.Current = gen.ID
+	return gen, s.save(state)
+}
+
+// Imported encrypted data cannot be assigned to the device's current verified
+// password generation merely because both report IsEncrypted=true.
+func (s *generationStore) historyImportGeneration(udid, kind string) (backupstore.Generation, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	state, err := s.loadLocked(udid)
+	if err != nil {
+		return backupstore.Generation{}, err
+	}
+	pw := ""
+	if kind == "encrypted" && s.secrets != nil && s.secrets.Available() {
+		pw, err = s.secrets.GetBackupPassword(udid)
+		if err != nil && !errors.Is(err, errPasswordNotFound) {
+			return backupstore.Generation{}, err
+		}
+	}
+	gen, err := s.generation(udid, kind, pw)
+	if err != nil {
+		return gen, err
+	}
+	state.Generations[gen.ID] = gen
+	if state.Pending == nil && (state.Current == "" || state.Generations[state.Current].Kind == "unknown") {
+		state.Current = gen.ID
+	}
+	return gen, s.save(state)
 }

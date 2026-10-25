@@ -34,7 +34,7 @@ func validateBackupConfig(cfg backupConfig, allowedRoots []string) error {
 	if cfg.MinBatteryLevel < 0 || cfg.MinBatteryLevel > 100 {
 		return i18n.NewError(i18n.BatteryLevelRange, map[string]any{"min": 0, "max": 100})
 	}
-	if cfg.BackupDirectory == "" || !pathWithinRoots(cfg.BackupDirectory, allowedRoots) {
+	if cfg.BackupDirectory == "" || !safeBackupRoot(cfg.BackupDirectory) || !pathWithinRoots(cfg.BackupDirectory, allowedRoots) {
 		return i18n.NewError(i18n.BackupDirectoryNotAllowed, nil)
 	}
 	if cfg.NetworkAddress != "" {
@@ -110,4 +110,18 @@ func resolvePathForContainment(path string) (string, error) {
 		missing = append(missing, filepath.Base(current))
 		current = parent
 	}
+}
+
+// Managed object namespaces must never be selected as an ordinary writable root.
+func safeBackupRoot(path string) bool {
+	resolved, err := resolvePathForContainment(path)
+	if err != nil {
+		return false
+	}
+	for _, part := range strings.Split(resolved, string(filepath.Separator)) {
+		if part == ".iosbackup-history" || part == ".iosbackup-unpacked" {
+			return false
+		}
+	}
+	return true
 }

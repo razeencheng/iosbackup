@@ -12,6 +12,9 @@ import (
 func (s *Store) Recycle(ctx context.Context, id string, revision uint64) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	return s.recycleLocked(ctx, id, revision)
+}
+func (s *Store) recycleLocked(ctx context.Context, id string, revision uint64) error {
 	if err := s.checkReady(); err != nil {
 		return err
 	}

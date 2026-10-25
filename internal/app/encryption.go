@@ -149,6 +149,13 @@ func (app *application) Restore(ctx context.Context, udid, password string, opts
 	}
 	defer release()
 
+	restoreCtx, cancelRestore := context.WithTimeout(ctx, historyIOTimeout)
+	defer cancelRestore()
+	dir, cleanupSource, err := app.prepareHistoryRestore(restoreCtx, udid, dir)
+	if err != nil {
+		return err
+	}
+	defer cleanupSource()
 	args := []string{"restore", dir}
 	if opts.System {
 		args = append(args, "--system")

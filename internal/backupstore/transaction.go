@@ -13,6 +13,7 @@ import (
 )
 
 type transaction struct {
+	Previous    *Point `json:"previous,omitempty"`
 	SourceStamp string `json:"source_stamp,omitempty"`
 	Schema      int    `json:"schema"`
 	ID          string `json:"id"`
@@ -37,6 +38,15 @@ func (s *Store) readTransaction(id string) (transaction, error) {
 	switch tx.Phase {
 	case "work":
 		if tx.Point != nil {
+			return tx, ErrInvalid
+		}
+	case "metadata":
+		if tx.Previous == nil || tx.Point == nil || tx.Revision == 0 || tx.Revision == math.MaxUint64 || tx.Previous.Validate(s.identity) != nil || tx.Point.Validate(s.identity) != nil || tx.Point.ID != id {
+			return tx, ErrInvalid
+		}
+		a, b := *tx.Previous, *tx.Point
+		a.Pinned, a.Manual = b.Pinned, b.Manual
+		if a != b {
 			return tx, ErrInvalid
 		}
 	case "sealing", "ready", "deleting":

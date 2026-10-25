@@ -76,7 +76,9 @@ func validBackupJobSummary(summary backupJobSummary) bool {
 	default:
 		return false
 	}
-	if summary.HistoryState != "" && summary.HistoryState != "not_enabled" {
+	switch summary.HistoryState {
+	case "", "not_enabled", "preparing", "saved", "pending", "failed", "uncertain", "not_saved":
+	default:
 		return false
 	}
 	if summary.Check != nil && !validBackupCheckResult(*summary.Check) {

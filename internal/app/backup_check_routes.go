@@ -73,6 +73,7 @@ func (app *application) startBackupCheck(udid string) (string, error) {
 			result.CompletedAt = app.nowTime()
 		}
 		result.ID = run.id
+		app.bindCurrentHistoryCheck(udid, filepath.Dir(backupPath), &result)
 		app.mu.Lock()
 		app.markCheckSourceUnsafe(udid, &result)
 		if app.backupJobRecords != nil {
@@ -165,12 +166,16 @@ func (app *application) quickCheckBackup(job *backupJob) backupCheckResult {
 		app.backupJobRecords.setCheck(job.id, pending)
 	}
 	app.broadcastStatus()
-	root := job.config.BackupDirectory
+	root := job.backupRoot
+	if root == "" {
+		root = job.config.BackupDirectory
+	}
 	if root == "" {
 		root = app.paths.BackupsRoot
 	}
 	result := app.checkBackupSourceAt(ctx, job.udid, root, "quick")
 	result.ID = job.id
+	app.bindCurrentHistoryCheck(job.udid, root, &result)
 	app.mu.Lock()
 	if app.backupCheckResults == nil {
 		app.backupCheckResults = make(map[string]backupCheckResult)

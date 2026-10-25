@@ -110,3 +110,20 @@ func TestBackupStorageQueueCanCancel(t *testing.T) {
 	}
 	<-m.slot
 }
+
+func TestBackupStorageEmptyWorkChecksCapacity(t *testing.T) {
+	root := t.TempDir()
+	m := newBackupStorage(filepath.Join(t.TempDir(), "registry.json"))
+	defer m.close()
+	id, err := m.create(context.Background(), root, "PHONE")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err = m.prepare(context.Background(), id, "full-backup", "", backupstore.CopyOptions{ReserveBytes: ^uint64(0)}); !errors.Is(err, backupstore.ErrCapacity) {
+		t.Fatalf("empty work bypassed capacity: %v", err)
+	}
+	report, err := m.stores[id].Recover(context.Background())
+	if err != nil || len(report.Uncommitted) != 0 {
+		t.Fatalf("capacity failure left work %+v %v", report, err)
+	}
+}
