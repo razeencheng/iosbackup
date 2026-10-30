@@ -122,6 +122,7 @@ func run(ctx context.Context, cfg runtimeConfig) error {
 		return fmt.Errorf("recover backup storage: %w", err)
 	}
 	defer app.backupStorage.close()
+	defer app.closeHistoryHTTP()
 
 	jobs, err := openBackupJobStore(app.paths.BackupJobsDir, app.nowTime, defaultBackupJobLimits(), app.broadcastStatus)
 	if err != nil {

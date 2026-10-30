@@ -38,7 +38,7 @@ go list -m all
 
 The project is no longer one root-level `package main`. Target `./internal/app` for individual application tests and `./cmd/iosbackup` for the executable. `TestPackageDependencyDirection` checks dependency direction. Read existing module tests before changing behavior.
 
-Historical backup implementation notes and lifecycle contracts are in [the backupstore module](../internal/backupstore/README.md). Retention defaults to three natural days including today; policy confirmation, migration and current-source selection live in `internal/app/backup_history*.go`. The API/export and history settings UI are developed separately.
+Historical backup implementation notes and lifecycle contracts are in [the backupstore module](../internal/backupstore/README.md). Retention defaults to three natural days including today; policy confirmation, migration and current-source selection live in `internal/app/backup_history*.go`. History HTTP handlers resolve server-side point IDs, with revision checks and one-use policy previews. Exports stream under read leases and idle deadlines. See [history usage](manual/backup-history.md).
 
 ## Make a local change
 

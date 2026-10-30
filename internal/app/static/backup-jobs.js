@@ -80,13 +80,14 @@
     text('jobResult-'+u,job.operation==='check'?tr('check.title'):label('state',job.state));
  text('jobCheck-'+u,(job.operation==='check'?'':tr('jobs.outcomes',{execution:label('state',job.execution_state||job.state),history:label('state',job.history_state||'not_enabled')})+'\n')+(global.IOSBKChecks&&job.check?global.IOSBKChecks.summary(job.check):''));
     text('jobMode-'+u,job.operation==='check'?'':tr('jobs.modeSummary',{requested:label('mode',job.requested_mode),observed:label('mode',job.observed_mode)}));
-    text('jobSource-'+u,tr('jobs.sourceSummary',{source:label('source',job.source),time:date(job.started_at)}));
+    text('jobSource-'+u,tr('jobs.sourceSummary',{source:label('source',job.source),time:date(job.started_at)})+(job.point_id?' · '+tr('history.pointRecord',{id:job.point_id}):''));
     text('jobActivity-'+u,tr('jobs.lastActivity',{time:date(job.last_activity_at)}));
     text('jobEvents-'+u,view.events.map(formatEvent).join('\n')||tr('jobs.noEvents'));
     var link=document.getElementById('jobExport-'+u);if(link&&jobID.test(job.id))link.href='/api/backup-job/'+encodeURIComponent(job.id)+'/export';
   }
   var controller=createController({get:request,render:render,error:function(error){var message=global.IOSBKI18n.message(error.payload,'common.operationFailed');text('jobWarning-'+visible,message);show('jobWarning-'+visible,true);},schedule:function(fn,delay){return global.setTimeout(fn,delay);},cancel:function(id){global.clearTimeout(id);}});
   function open(udid){
+    if(global.IOSBKHistory)global.IOSBKHistory.hide();
     if(visible&&visible!==udid)close(visible);
     visible=udid;show('backupOverview-'+udid,false);show('jobsPanel-'+udid,true);controller.open(udid);
     var select=document.getElementById('jobSelect-'+udid);if(select)select.focus();

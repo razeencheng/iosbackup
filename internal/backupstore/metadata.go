@@ -112,3 +112,27 @@ func (s *Store) finishMetadata(tx transaction) error {
 	}
 	return s.syncDirs("transactions")
 }
+
+// RecordReview records new read-only evidence without promoting a pending point
+// or changing the original quick check that qualified its saved result.
+func (s *Store) RecordReview(ctx context.Context, id string, check Check, revision uint64) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if err := s.checkReady(); err != nil {
+		return err
+	}
+	if revision != s.catalog.Revision {
+		return ErrConflict
+	}
+	if !validReview(check) {
+		return ErrInvalid
+	}
+	p, ok := s.catalog.Points[id]
+	if !ok {
+		return os.ErrNotExist
+	}
+	next := p
+	next.Review = check
+	next.Review.CheckedAt = check.CheckedAt.UTC()
+	return s.updatePoint(ctx, p, next)
+}

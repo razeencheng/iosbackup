@@ -161,11 +161,14 @@
   .jobs-button{display:inline-flex;align-items:center;padding:8px 12px;border:1px solid #D8E2EA;background:#fff;color:#2C62C6;border-radius:9px;font-family:inherit;font-size:13px;font-weight:500;cursor:pointer;text-decoration:none}.jobs-button:disabled{opacity:.5;cursor:wait}.jobs-button:focus-visible,.jobs-advanced summary:focus-visible{outline:2px solid #2C62C6;outline-offset:3px}.jobs-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:0 0 14px}.jobs-toolbar h3{margin:0;font-size:16px}.jobs-note{font-size:12px;color:#718090;line-height:1.6;margin:6px 0}.jobs-advanced{padding:12px 14px;border:1px solid #E7EDF2;border-radius:9px;margin-bottom:18px;font-size:13px}.jobs-advanced summary{cursor:pointer;margin-bottom:10px;color:#526778}.jobs-warning{padding:10px 13px;background:#FBF1E2;border:1px solid #F0DBB6;border-radius:9px;font-size:12.5px;color:#8A5A12;line-height:1.7;margin:10px 0}.backup-control-row{padding:0 20px}.jobs-select{display:block;width:100%;margin:8px 0 14px}.jobs-summary{padding:16px;border:1px solid #D8E2EA;border-radius:9px;background:#F7FAFC;margin:14px 0}.jobs-summary strong{font-size:16px;color:#213041}.jobs-summary p{font-size:12.5px;color:#607181;margin:8px 0 0}.jobs-events{white-space:pre-wrap;overflow-wrap:anywhere;max-height:360px;overflow:auto;border:1px solid #E7EDF2;background:#F7FAFC;border-radius:9px;padding:14px;font:12px/1.9 ui-monospace,monospace;color:#40566A}
 </style>
 <link rel="stylesheet" href="/static/backup-browser.css?v={{.Version}}">
+<link rel="stylesheet" href="/static/backup-history.css?v={{.Version}}">
 <script src="/static/backup-browser.js?v={{.Version}}"></script>
 <script src="/static/i18n.js?v={{.Version}}"></script>
 <script src="/static/ui-messages.js?v={{.Version}}"></script>
 <script src="/static/api-messages.js?v={{.Version}}"></script>
 <script src="/static/backup-jobs.js?v={{.Version}}"></script>
+<script src="/static/backup-history.js?v={{.Version}}"></script>
+<script src="/static/term-hints.js?v={{.Version}}"></script>
 <script src="/static/backup-checks.js?v={{.Version}}"></script>
 </head>
 <body>
@@ -356,11 +359,16 @@
               </div>
               <div id="pairingResult-{{$d.UDID}}" class="hidden" role="status" aria-live="polite" style="font-size:12.5px;line-height:1.6"></div>
             </div>
+            <section id="historySettings-{{$d.UDID}}" class="history-settings" data-i18n-aria="history.policyTitle" aria-label="{{t $.Locale "history.policyTitle"}}"></section>
           </div>
 
           <!-- 本地备份信息独立于设备连接状态。 -->
           <div data-sec-panel="backups" data-udid="{{$d.UDID}}" class="hidden backup-browser" style="padding:20px">
             <div id="backupOverview-{{$d.UDID}}">
+              <section id="historySummary-{{$d.UDID}}" class="history-summary">
+                <div><strong data-i18n="history.title">{{t $.Locale "history.title"}}</strong><p id="historySummaryText-{{$d.UDID}}" class="history-note" data-i18n="history.loading">{{t $.Locale "history.loading"}}</p><p id="historyStorage-{{$d.UDID}}" class="history-note"></p></div>
+                <button id="openHistory-{{$d.UDID}}" type="button" class="history-button primary" data-history-action="open" data-udid="{{$d.UDID}}" data-i18n="history.open">{{t $.Locale "history.open"}}</button>
+              </section>
               <div class="jobs-toolbar"><div><strong data-i18n="jobs.title">{{t $.Locale "jobs.title"}}</strong><p class="jobs-note" data-i18n="jobs.retention">{{t $.Locale "jobs.retention"}}</p></div><button id="openJobs-{{$d.UDID}}" class="jobs-button" data-job-action="open" data-udid="{{$d.UDID}}" data-i18n="jobs.open">{{t $.Locale "jobs.open"}}</button></div>
               <details class="jobs-advanced"><summary data-i18n="jobs.advanced">{{t $.Locale "jobs.advanced"}}</summary><label for="backupMode-{{$d.UDID}}" data-i18n="jobs.requestedMode">{{t $.Locale "jobs.requestedMode"}}</label> <select id="backupMode-{{$d.UDID}}" class="iosbk-in"><option value="auto" data-i18n="jobs.mode.auto">{{t $.Locale "jobs.mode.auto"}}</option><option value="full" data-i18n="jobs.mode.full">{{t $.Locale "jobs.mode.full"}}</option></select><p class="jobs-note" data-i18n="jobs.fullHint">{{t $.Locale "jobs.fullHint"}}</p></details>
 
@@ -401,6 +409,11 @@
               {{end}}
             </div>
             </div>
+            <section id="historyPanel-{{$d.UDID}}" class="history-panel hidden" data-i18n-aria="history.title" aria-label="{{t $.Locale "history.title"}}">
+              <div class="history-toolbar"><div><h3 data-i18n="history.title">{{t $.Locale "history.title"}}</h3><p class="history-note" data-i18n="history.retention">{{t $.Locale "history.retention"}}</p></div><div class="history-actions"><button type="button" class="history-button" data-history-action="settings" data-i18n="history.settings">{{t $.Locale "history.settings"}}</button><button id="historyBack-{{$d.UDID}}" type="button" class="history-button" data-history-action="back" data-i18n="jobs.back">{{t $.Locale "jobs.back"}}</button></div></div>
+              <p id="historyError-{{$d.UDID}}" class="history-warning hidden" role="alert"></p><p id="historyWarning-{{$d.UDID}}" class="history-warning hidden" role="status"></p>
+              <div id="historyLayout-{{$d.UDID}}" class="history-layout"><div class="history-list-column"><div id="historyList-{{$d.UDID}}" class="history-list"></div><button id="historyMore-{{$d.UDID}}" type="button" class="history-button hidden" data-history-action="more" data-i18n="history.more">{{t $.Locale "history.more"}}</button></div><section id="historyDetail-{{$d.UDID}}" class="history-detail hidden"></section></div>
+            </section>
             <section id="jobsPanel-{{$d.UDID}}" class="hidden" data-i18n-aria="jobs.title" aria-label="{{t $.Locale "jobs.title"}}">
               <div class="jobs-toolbar"><h3 data-i18n="jobs.title">{{t $.Locale "jobs.title"}}</h3><button class="jobs-button" data-job-action="close" data-udid="{{$d.UDID}}" data-i18n="jobs.back">{{t $.Locale "jobs.back"}}</button></div>
               <p class="jobs-note" data-i18n="jobs.retention">{{t $.Locale "jobs.retention"}}</p>
@@ -625,6 +638,7 @@
   <svg id="toastIcon" class="ui-icon" style="color:#5FD0A0" aria-hidden="true"><use href="/static/ui-icons.svg#icon-check-circle"></use></svg><span id="toastMsg"></span>
 </div>
 
+<iframe name="history-download" data-i18n-title="history.downloadFrame" title="{{t $.Locale "history.downloadFrame"}}" hidden></iframe>
 <script>
 /* ============== i18n runtime ============== */
 const INITIAL_STATUS = {{.InitialStatus}};
@@ -691,10 +705,11 @@ function toggleCard(udid){
   document.querySelectorAll('[id^="panel-"]').forEach(function(p){ if(p!==panel){ p.classList.add('hidden'); } });
   document.querySelectorAll('[id^="chev-"]').forEach(function(c){ if(c.id!=='chev-'+udid){ setSVGIcon(c,'chevron-down'); } });
   if(window.IOSBKJobs) window.IOSBKJobs.hide();
+  if(window.IOSBKHistory) window.IOSBKHistory.hide();
   expandedCards.clear();
   panel.classList.toggle('hidden', !willOpen);
   setSVGIcon(document.getElementById('chev-'+udid), willOpen ? 'chevron-up' : 'chevron-down');
-  if(willOpen) expandedCards.add(udid);
+  if(willOpen) { expandedCards.add(udid); if(window.IOSBKHistory){ var active=document.querySelector('.snav.active[data-udid="'+udid+'"]');window.IOSBKHistory.section(udid,active?active.dataset.sec:'backup'); } }
   backupBrowser.visibilityChanged();
   if(!willOpen) maybeReload(); // 收起后若有挂起的设备增减刷新，此刻执行
 }
@@ -707,6 +722,7 @@ function switchSection(udid, sec){
     b.classList.toggle('active-danger', active && !!b.dataset.danger);
   });
   if(sec==='backups') backupBrowser.open(udid); else backupBrowser.close(udid);
+  if(window.IOSBKHistory) window.IOSBKHistory.section(udid,sec);
   if(sec==='enc') loadEncStatus(udid); // 进加密页时拉一次当前加密状态
 }
 
@@ -792,7 +808,9 @@ function renderRemovedDevices(devices, state){
     var button=document.createElement('button'); button.type='button'; button.className='removed-device-restore'; button.innerHTML=iconHTML('undo');
     var buttonText=document.createElement('span'); buttonText.textContent=tr('removed.restoreAction'); button.appendChild(buttonText);
     button.addEventListener('click',function(){restoreRemovedDeviceFromDrawer(device.udid,button);});
-    actions.appendChild(info); actions.appendChild(button); card.appendChild(actions); list.appendChild(card);
+    actions.appendChild(info);
+    var historyButton=document.createElement('button');historyButton.type='button';historyButton.className='history-button';historyButton.textContent=tr('history.open');historyButton.addEventListener('click',function(){if(window.IOSBKHistory)window.IOSBKHistory.openArchived(device.udid);});actions.appendChild(historyButton);
+    actions.appendChild(button); card.appendChild(actions); list.appendChild(card);
   });
 }
 function openRemovedDevicesDrawer(){
@@ -864,7 +882,7 @@ function flipToggle(btn){
 
 /* ============== unsaved (dirty) tracking ============== */
 const dirtyCards=new Set();
-function panelUdid(el){ var p=el&&el.closest?el.closest('[data-sec-panel="backup"]'):null; return p?p.getAttribute('data-udid'):null; }
+function panelUdid(el){ if(el&&el.closest&&el.closest('.history-settings'))return null; var p=el&&el.closest?el.closest('[data-sec-panel="backup"]'):null; return p?p.getAttribute('data-udid'):null; }
 function markDirty(udid){
   if(!udid) return;
   dirtyCards.add(udid);
@@ -1441,6 +1459,7 @@ function trapFocusWithin(container, event){
   event.preventDefault(); focusable[next].focus();
 }
 document.addEventListener('keydown', function(event){
+  if(document.querySelector('dialog[open]')) return;
   if(event.key==='Tab'){
     var removeModal=document.getElementById('removeDeviceModal');
     if(!removeModal.classList.contains('hidden')){ trapFocusWithin(removeModal,event); return; }

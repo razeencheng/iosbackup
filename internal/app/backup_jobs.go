@@ -1,11 +1,13 @@
 package app
 
 import (
+	"iosbackup/internal/backupstore"
 	"math"
 	"time"
 )
 
 type backupJobSummary struct {
+	PointID              string             `json:"point_id,omitempty"`
 	ExecutionState       string             `json:"execution_state,omitempty"`
 	HistoryState         string             `json:"history_state,omitempty"`
 	Operation            string             `json:"operation,omitempty"`
@@ -68,6 +70,9 @@ func (app *application) recordBackupActivity(id string, update backupProgressUpd
 }
 
 func validBackupJobSummary(summary backupJobSummary) bool {
+	if summary.PointID != "" && !backupstore.ValidID(summary.PointID) {
+		return false
+	}
 	if summary.Operation != "" && summary.Operation != "backup" && summary.Operation != "check" {
 		return false
 	}
@@ -107,6 +112,6 @@ func validBackupJobSummary(summary backupJobSummary) bool {
 
 // 记录模块只接收不可变任务信息，不持有控制器或设备状态。
 type backupJobSeed struct {
-	ID, UDID, DeviceName, Source, RequestedMode, Operation string
-	StartedAt                                              time.Time
+	ID, UDID, DeviceName, Source, RequestedMode, Operation, PointID string
+	StartedAt                                                       time.Time
 }

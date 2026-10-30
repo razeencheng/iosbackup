@@ -59,12 +59,23 @@ type Identity struct {
 }
 
 type Check struct {
-	State     string    `json:"state"`
-	Scope     string    `json:"scope"`
-	CheckedAt time.Time `json:"checked_at"`
+	Reason             string    `json:"reason,omitempty"`
+	MetadataComplete   bool      `json:"metadata_complete"`
+	ManifestComplete   bool      `json:"manifest_complete"`
+	RecordsChecked     int64     `json:"records_checked"`
+	ObjectsChecked     int64     `json:"objects_checked"`
+	MissingObjects     int64     `json:"missing_objects"`
+	InvalidRecords     int64     `json:"invalid_records"`
+	UnsupportedRecords int64     `json:"unsupported_records"`
+	State              string    `json:"state"`
+	Scope              string    `json:"scope"`
+	CheckedAt          time.Time `json:"checked_at"`
 }
 
 type Point struct {
+	Bytes             int64      `json:"bytes,omitempty"`
+	BytesKnown        bool       `json:"bytes_known,omitempty"`
+	Review            Check      `json:"review,omitempty"`
 	CompletionUnknown bool       `json:"completion_unknown,omitempty"`
 	ID                string     `json:"id"`
 	StoreID           string     `json:"store_id"`
@@ -113,6 +124,9 @@ func (g Generation) Validate() error {
 	return nil
 }
 func (p Point) Validate(identity Identity) error {
+	if p.Bytes < 0 || (!p.BytesKnown && p.Bytes != 0) || p.Review != (Check{}) && !validReview(p.Review) {
+		return ErrInvalid
+	}
 	if !ValidID(p.ID) || p.StoreID != identity.ID || p.UDID != identity.UDID || !ValidID(p.EpochID) || !jobPattern.MatchString(p.JobID) || p.Generation.Validate() != nil || p.CompletedAt.IsZero() || p.CommittedAt.Before(p.CompletedAt) || p.Check.CheckedAt.IsZero() {
 		return ErrInvalid
 	}
@@ -153,4 +167,8 @@ func (c Catalog) Validate(identity Identity) error {
 		}
 	}
 	return nil
+}
+
+func validReview(c Check) bool {
+	return (c.State == "passed" || c.State == "issues" || c.State == "unavailable") && (c.Scope == "quick" || c.Scope == "manifest") && !c.CheckedAt.IsZero()
 }

@@ -115,6 +115,7 @@ const (
 
 // App 应用结构
 type application struct {
+	historyHTTP         *historyService
 	backupIndex         *backupIndexCoordinator
 	backupIndexStatuses map[string]backupIndexBrief
 	backupIndexClosed   bool

@@ -524,6 +524,7 @@ func (m *backupIndexCoordinator) close() {
 	m.workers.Wait()
 }
 func (app *application) closeBackupIndex() {
+	app.closeHistoryHTTP()
 	app.mu.Lock()
 	app.backupIndexClosed = true
 	m := app.backupIndex

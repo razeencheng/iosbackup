@@ -39,7 +39,7 @@ go list -m all
 当前项目不再是根目录单一 `package main`。运行单个应用测试时用 `./internal/app`，运行可执行构建时用 `./cmd/iosbackup`。依赖方向由 `TestPackageDependencyDirection` 检查；查看某模块的现有测试再修改其行为。
 
 
-历史备份的生命周期和存储约定见 [backupstore 模块说明](../internal/backupstore/README.md)。默认保留含当天的 3 个自然日；策略确认、迁移与当前来源选择位于 `internal/app/backup_history*.go`。历史 API、导出与设置界面分阶段接入。
+历史备份的生命周期和存储约定见 [backupstore 模块说明](../internal/backupstore/README.md)。默认保留含当天的 3 个自然日；策略确认、迁移与当前来源选择位于 `internal/app/backup_history*.go`。历史 HTTP 接口由服务端解析点 ID，变更检查版本号，策略使用一次性预览确认。导出持有读取占用并设置写入空闲期限。使用流程见[历史恢复点](manual/backup-history.zh-CN.md)。
 
 
 ## 完成一次本地修改

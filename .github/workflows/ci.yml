@@ -59,6 +59,10 @@ jobs:
         run: node internal/app/testdata/backup-jobs.test.js
       - name: Backup check UI behavior
         run: node internal/app/testdata/backup-checks.test.js
+      - name: History and accessible term behavior
+        run: |
+          node internal/app/testdata/backup-history.test.js
+          node internal/app/testdata/term-hints.test.js
       - name: Test
         run: go test -count=1 ./...
       - name: Race test

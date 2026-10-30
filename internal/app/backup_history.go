@@ -516,7 +516,7 @@ func (app *application) historyPoint(st historyDeviceState, gen backupstore.Gene
 	if check.State == "passed" {
 		state = "normal"
 	}
-	return backupstore.Point{Generation: gen, EpochID: st.EpochID, CompletedAt: at, Day: at.In(app.deploymentLocation()).Format("2006-01-02"), Timezone: app.deploymentLocation().String(), State: state, Check: backupstore.Check{State: check.State, Scope: "quick", CheckedAt: check.CompletedAt}}
+	return backupstore.Point{Generation: gen, EpochID: st.EpochID, CompletedAt: at, Day: at.In(app.deploymentLocation()).Format("2006-01-02"), Timezone: app.deploymentLocation().String(), State: state, Check: historyCheckEvidence(check)}
 }
 func (app *application) generationForHistoryResult(ctx context.Context, udid, dir string, fallback backupstore.Generation) (backupstore.Generation, error) {
 	root, err := os.OpenRoot(dir)
@@ -976,4 +976,8 @@ func (app *application) startHistoryCurrentWrite(job *backupJob, run *backupHist
 		return err
 	}
 	return nil
+}
+
+func historyCheckEvidence(r backupCheckResult) backupstore.Check {
+	return backupstore.Check{State: r.State, Scope: r.Kind, CheckedAt: r.CompletedAt, Reason: r.Reason, MetadataComplete: r.MetadataComplete, ManifestComplete: r.ManifestComplete, RecordsChecked: r.RecordsChecked, ObjectsChecked: r.ObjectsChecked, MissingObjects: r.MissingObjects, InvalidRecords: r.InvalidRecords, UnsupportedRecords: r.UnsupportedRecords}
 }

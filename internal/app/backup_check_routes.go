@@ -213,7 +213,7 @@ func (s *backupJobStore) executionFinished(id, state string, at time.Time) {
 func (s *backupJobStore) staleChecks(udid string) {
 	s.mu.Lock()
 	for _, r := range s.records {
-		if r.Summary.UDID == udid && r.Summary.Check != nil {
+		if r.Summary.UDID == udid && r.Summary.PointID == "" && r.Summary.Check != nil {
 			copy := *r.Summary.Check
 			copy.Freshness = "stale"
 			r.Summary.Check = &copy
@@ -232,7 +232,7 @@ func (app *application) backupCheckSnapshotUnsafe(udid string) *backupCheckResul
 	}
 	if app.backupJobRecords != nil {
 		for _, job := range app.backupJobRecords.list(udid) {
-			if job.Check != nil {
+			if job.Check != nil && job.PointID == "" {
 				copy := *job.Check
 				copy.Freshness = "unknown"
 				return &copy

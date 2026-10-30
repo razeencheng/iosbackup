@@ -10,6 +10,7 @@ import (
 // This is the backend contract for the T11 policy API. The browser never supplies
 // filesystem paths or a deletion list; it confirms a server-computed preview.
 type historyPolicyPreview struct {
+	Previous     backupstore.Policy                   `json:"previous"`
 	EpochID      string                               `json:"epoch_id"`
 	Root         string                               `json:"-"`
 	GenerationID string                               `json:"generation_id"`
@@ -40,7 +41,8 @@ func (app *application) previewHistoryPolicy(ctx context.Context, udid string, p
 	if err != nil {
 		return historyPolicyPreview{}, err
 	}
-	preview := historyPolicyPreview{EpochID: st.EpochID, Root: cfg.BackupDirectory, Policy: policy, Stores: map[string]backupstore.RetentionPlan{}}
+	previous, _ := cfg.History.Normalize()
+	preview := historyPolicyPreview{Previous: previous, EpochID: st.EpochID, Root: cfg.BackupDirectory, Policy: policy, Stores: map[string]backupstore.RetentionPlan{}}
 	if st.EpochID == "" {
 		return preview, nil
 	}
@@ -76,7 +78,7 @@ func (app *application) previewHistoryPolicy(ctx context.Context, udid string, p
 	return preview, nil
 }
 func sameHistoryPreview(a, b historyPolicyPreview) bool {
-	if a.EpochID != b.EpochID || a.GenerationID != b.GenerationID || a.Policy != b.Policy || len(a.Stores) != len(b.Stores) {
+	if a.Previous != b.Previous || a.EpochID != b.EpochID || a.GenerationID != b.GenerationID || a.Policy != b.Policy || len(a.Stores) != len(b.Stores) {
 		return false
 	}
 	for id, p := range a.Stores {
@@ -138,6 +140,9 @@ func (app *application) applyHistoryPolicy(ctx context.Context, udid string, pol
 	preview, err := app.previewHistoryPolicy(ctx, udid, policy)
 	if err != nil {
 		return err
+	}
+	if confirmed != nil && (!sameHistoryPreview(preview, *confirmed) || preview.Root != confirmed.Root) {
+		return backupstore.ErrConflict
 	}
 	st, err := app.backupStorage.deviceState(udid)
 	if err != nil {

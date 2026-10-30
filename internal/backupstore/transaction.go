@@ -13,15 +13,16 @@ import (
 )
 
 type transaction struct {
-	Previous    *Point `json:"previous,omitempty"`
-	SourceStamp string `json:"source_stamp,omitempty"`
-	Schema      int    `json:"schema"`
-	ID          string `json:"id"`
-	StoreID     string `json:"store_id"`
-	JobID       string `json:"job_id"`
-	Phase       string `json:"phase"` // work | sealing | ready | deleting
-	Point       *Point `json:"point,omitempty"`
-	Revision    uint64 `json:"revision,omitempty"`
+	ExplicitDelete bool   `json:"explicit_delete,omitempty"`
+	Previous       *Point `json:"previous,omitempty"`
+	SourceStamp    string `json:"source_stamp,omitempty"`
+	Schema         int    `json:"schema"`
+	ID             string `json:"id"`
+	StoreID        string `json:"store_id"`
+	JobID          string `json:"job_id"`
+	Phase          string `json:"phase"` // work | sealing | ready | deleting
+	Point          *Point `json:"point,omitempty"`
+	Revision       uint64 `json:"revision,omitempty"`
 }
 
 func (s *Store) readTransaction(id string) (transaction, error) {
@@ -45,7 +46,7 @@ func (s *Store) readTransaction(id string) (transaction, error) {
 			return tx, ErrInvalid
 		}
 		a, b := *tx.Previous, *tx.Point
-		a.Pinned, a.Manual = b.Pinned, b.Manual
+		a.Pinned, a.Manual, a.Review = b.Pinned, b.Manual, b.Review
 		if a != b {
 			return tx, ErrInvalid
 		}
@@ -111,6 +112,16 @@ func (s *Store) Commit(ctx context.Context, workID string, point Point) (Point, 
 	if err = point.Validate(s.identity); err != nil {
 		return Point{}, err
 	}
+	root, statErr := s.root.OpenRoot(filepath.Join("work", workID, s.identity.UDID))
+	if statErr != nil {
+		return Point{}, statErr
+	}
+	stats, statErr := stampTree(ctx, root)
+	root.Close()
+	if statErr != nil {
+		return Point{}, statErr
+	}
+	point.Bytes, point.BytesKnown = stats.Bytes, true
 	tx.Point = &point
 	tx.Phase = "sealing"
 	if err = s.stage("intent", func() error { return s.saveTransaction(tx) }); err != nil {

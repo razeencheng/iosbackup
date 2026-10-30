@@ -314,10 +314,15 @@ func (m *backupStorage) prepareFrom(ctx context.Context, id, job, sourceID, base
 }
 func (m *backupStorage) close() error {
 	m.mu.Lock()
-	defer m.mu.Unlock()
+	stores := make([]*backupstore.Store, 0, len(m.stores))
+	for _, s := range m.stores {
+		stores = append(stores, s)
+	}
+	m.uncertain = true
+	m.mu.Unlock()
 	var result error
-	for _, store := range m.stores {
-		result = errors.Join(result, store.Close())
+	for _, s := range stores {
+		result = errors.Join(result, s.Close())
 	}
 	return result
 }

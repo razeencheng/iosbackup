@@ -109,7 +109,7 @@ func (s *backupJobStore) start(job *backupJobSeed) {
 			name = name[:len(name)-1]
 		}
 	}
-	r := &backupJobRecord{Summary: backupJobSummary{ID: job.ID, UDID: job.UDID, DeviceName: name, Operation: job.Operation, Source: job.Source, RequestedMode: job.RequestedMode, ObservedMode: "unknown", State: backupStateStarting, StartedAt: job.StartedAt}}
+	r := &backupJobRecord{Summary: backupJobSummary{ID: job.ID, UDID: job.UDID, PointID: job.PointID, DeviceName: name, Operation: job.Operation, Source: job.Source, RequestedMode: job.RequestedMode, ObservedMode: "unknown", State: backupStateStarting, StartedAt: job.StartedAt}}
 	r.Summary.ExecutionState = "running"
 	r.Summary.HistoryState = "not_enabled"
 	if job.Operation == "check" {
