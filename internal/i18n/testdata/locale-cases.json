@@ -1,0 +1,82 @@
+[
+  {
+    "input": "en",
+    "expected": "en"
+  },
+  {
+    "input": "en-US",
+    "expected": "en"
+  },
+  {
+    "input": " en_US ",
+    "expected": "en"
+  },
+  {
+    "input": "EN_gb",
+    "expected": "en"
+  },
+  {
+    "input": "zh",
+    "expected": "zh-CN"
+  },
+  {
+    "input": "zh-CN",
+    "expected": "zh-CN"
+  },
+  {
+    "input": "zh-SG",
+    "expected": "zh-CN"
+  },
+  {
+    "input": "zh-Hans",
+    "expected": "zh-CN"
+  },
+  {
+    "input": "zh_Hans_SG",
+    "expected": "zh-CN"
+  },
+  {
+    "input": "  zh-CN  ",
+    "expected": "zh-CN"
+  },
+  {
+    "input": "zh-TW",
+    "expected": ""
+  },
+  {
+    "input": "zh-Hant",
+    "expected": ""
+  },
+  {
+    "input": "zh-HK",
+    "expected": ""
+  },
+  {
+    "input": "fr-FR",
+    "expected": ""
+  },
+  {
+    "input": "",
+    "expected": ""
+  },
+  {
+    "input": "../en",
+    "expected": ""
+  },
+  {
+    "input": "en-<script>",
+    "expected": ""
+  },
+  {
+    "input": "en-abcdefghijkl",
+    "expected": ""
+  },
+  {
+    "input": "en--US",
+    "expected": ""
+  },
+  {
+    "input": "en-US;q=1",
+    "expected": ""
+  }
+]

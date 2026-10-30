@@ -4,6 +4,7 @@ package i18n
 import (
 	_ "embed"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"regexp"
@@ -28,7 +29,7 @@ func init() {
 
 // NormalizeLocale returns the supported locale or an empty string for an unsupported value.
 func NormalizeLocale(value string) string {
-	value = strings.ToLower(strings.TrimSpace(value))
+	value = strings.ToLower(strings.ReplaceAll(strings.TrimSpace(value), "_", "-"))
 	if !languageTagPattern.MatchString(value) {
 		return ""
 	}
@@ -112,12 +113,20 @@ func CatalogJavaScript() []byte {
 	return append(append([]byte("IOSBKI18n.register("), data...), []byte(");\n")...)
 }
 
+// MessageContext 保留可安全展示的业务上下文，不包含凭据或原始诊断。
+type MessageContext struct {
+	Kind    string `json:"kind"`
+	Channel string `json:"channel"`
+	Name    string `json:"name"`
+}
+
 // Error carries a stable code and parameters independently of operator diagnostics.
 type Error struct {
-	Code   string
-	Params map[string]any
-	Detail string
-	Cause  error
+	Code    string
+	Params  map[string]any
+	Detail  string
+	Cause   error
+	Context *MessageContext
 }
 
 func (e *Error) Unwrap() error { return e.Cause }
@@ -125,9 +134,36 @@ func (e *Error) Unwrap() error { return e.Cause }
 func NewError(code string, params map[string]any) *Error { return &Error{Code: code, Params: params} }
 
 func (e *Error) Error() string {
-	message := Text("en", e.Code, e.Params)
+	message := e.Message("en")
 	if e.Detail != "" {
 		return message + ": " + e.Detail
 	}
 	return message
+}
+
+// WithNotificationChannel 包装已知原因，保留原始错误链且不修改原错误。
+func WithNotificationChannel(err error, channel, name string) error {
+	var translated *Error
+	if !errors.As(err, &translated) {
+		return err
+	}
+	copied := *translated
+	copied.Cause = err
+	if translated.Params != nil {
+		copied.Params = make(map[string]any, len(translated.Params))
+		for key, value := range translated.Params {
+			copied.Params[key] = value
+		}
+	}
+	copied.Context = &MessageContext{Kind: "notification_channel", Channel: channel, Name: name}
+	return &copied
+}
+
+// Message 只生成用户消息；机器码、参数和诊断分别保留。
+func (e *Error) Message(locale string) string {
+	reason := Text(locale, e.Code, e.Params)
+	if e.Context == nil || e.Context.Kind != "notification_channel" {
+		return reason
+	}
+	return Text(locale, NotificationChannelContext, map[string]any{"channel": e.Context.Channel, "name": e.Context.Name, "reason": reason})
 }

@@ -69,7 +69,7 @@ func TestDeviceRemovalConfirmationDialogHasKeyboardAndFocusContract(t *testing.T
 		`function trapFocusWithin(container, event)`,
 		`if(event.key==='Tab')`,
 		`trapFocusWithin(removeModal,event)`,
-		`tr('remove.busy')`,
+		`'remove.busy' : result.data`,
 		`tr('remove.removing')`,
 	} {
 		if !strings.Contains(markup, want) {

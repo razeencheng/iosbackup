@@ -134,7 +134,7 @@ func previewTelegramSecrets(current, next *notificationConfig) error {
 		old, found := existing[cfg.Name]
 		secret, err := previewSecret(cfg.BotToken, cfg.ReplaceSecret, cfg.ClearSecret, found && old.SecretConfigured, old.BotToken)
 		if err != nil {
-			return fmt.Errorf("Telegram %s: %w", cfg.Name, err)
+			return i18n.WithNotificationChannel(err, "Telegram", cfg.Name)
 		}
 		cfg.BotToken, cfg.SecretConfigured = secret, secret != ""
 		if cfg.Enabled && secret == "" {
@@ -154,7 +154,7 @@ func previewBarkSecrets(current, next *notificationConfig) error {
 		old, found := existing[cfg.Name]
 		secret, err := previewSecret(cfg.DeviceKey, cfg.ReplaceSecret, cfg.ClearSecret, found && old.SecretConfigured, old.DeviceKey)
 		if err != nil {
-			return fmt.Errorf("Bark %s: %w", cfg.Name, err)
+			return i18n.WithNotificationChannel(err, "Bark", cfg.Name)
 		}
 		cfg.DeviceKey, cfg.SecretConfigured = secret, secret != ""
 		if cfg.Enabled && secret == "" {
@@ -173,7 +173,7 @@ func previewEmailSecrets(current, next *notificationConfig) error {
 		old, found := existing[cfg.Name]
 		secret, err := previewSecret(cfg.Password, cfg.ReplaceSecret, cfg.ClearSecret, found && old.SecretConfigured, old.Password)
 		if err != nil {
-			return fmt.Errorf("Email %s: %w", cfg.Name, err)
+			return i18n.WithNotificationChannel(err, "Email", cfg.Name)
 		}
 		cfg.Password, cfg.SecretConfigured = secret, secret != ""
 		if cfg.Enabled && secret == "" {
@@ -193,7 +193,7 @@ func previewWecomSecrets(current, next *notificationConfig) error {
 		old, found := existing[cfg.Name]
 		secret, err := previewSecret(cfg.WebhookURL, cfg.ReplaceSecret, cfg.ClearSecret, found && old.SecretConfigured, old.WebhookURL)
 		if err != nil {
-			return fmt.Errorf("WeCom %s: %w", cfg.Name, err)
+			return i18n.WithNotificationChannel(err, "WeCom", cfg.Name)
 		}
 		cfg.WebhookURL, cfg.SecretConfigured = secret, secret != ""
 		if cfg.Enabled && secret == "" {
@@ -213,7 +213,7 @@ func previewWebhookSecrets(current, next *notificationConfig) error {
 		old, found := existing[cfg.Name]
 		secret, err := previewSecret(cfg.URL, cfg.ReplaceSecret, cfg.ClearSecret, found && old.SecretConfigured, old.URL)
 		if err != nil {
-			return fmt.Errorf("Webhook %s: %w", cfg.Name, err)
+			return i18n.WithNotificationChannel(err, "Webhook", cfg.Name)
 		}
 		if !cfg.ReplaceSecret && !cfg.ClearSecret && found && old.SecretConfigured {
 			cfg.Headers = cloneStringMap(old.Headers)
@@ -335,7 +335,7 @@ func (s *notificationConfigStore) applyBarkUpdates(current, next *notificationCo
 		}
 		configured, err := s.applySecretUpdate(notificationSecretKey("bark", cfg.Name, "device_key"), cfg.DeviceKey, cfg.ReplaceSecret, cfg.ClearSecret, ok && old.SecretConfigured, deletes)
 		if err != nil {
-			return fmt.Errorf("Bark %s: %w", cfg.Name, err)
+			return i18n.WithNotificationChannel(err, "Bark", cfg.Name)
 		}
 		cfg.SecretConfigured = configured
 		if cfg.Enabled && !configured {
@@ -515,7 +515,7 @@ func (s *notificationConfigStore) applyTelegramUpdates(current, next *notificati
 		}
 		configured, err := s.applySecretUpdate(notificationSecretKey("telegram", cfg.Name, "token"), cfg.BotToken, cfg.ReplaceSecret, cfg.ClearSecret, ok && old.SecretConfigured, deletes)
 		if err != nil {
-			return fmt.Errorf("Telegram %s: %w", cfg.Name, err)
+			return i18n.WithNotificationChannel(err, "Telegram", cfg.Name)
 		}
 		cfg.SecretConfigured = configured
 		if cfg.Enabled && !configured {
@@ -545,7 +545,7 @@ func (s *notificationConfigStore) applyEmailUpdates(current, next *notificationC
 		}
 		configured, err := s.applySecretUpdate(notificationSecretKey("email", cfg.Name, "password"), cfg.Password, cfg.ReplaceSecret, cfg.ClearSecret, ok && old.SecretConfigured, deletes)
 		if err != nil {
-			return fmt.Errorf("Email %s: %w", cfg.Name, err)
+			return i18n.WithNotificationChannel(err, "Email", cfg.Name)
 		}
 		cfg.SecretConfigured = configured
 		if cfg.Enabled && !configured {
@@ -575,7 +575,7 @@ func (s *notificationConfigStore) applyWecomUpdates(current, next *notificationC
 		}
 		configured, err := s.applySecretUpdate(notificationSecretKey("wecom", cfg.Name, "url"), cfg.WebhookURL, cfg.ReplaceSecret, cfg.ClearSecret, ok && old.SecretConfigured, deletes)
 		if err != nil {
-			return fmt.Errorf("WeCom %s: %w", cfg.Name, err)
+			return i18n.WithNotificationChannel(err, "WeCom", cfg.Name)
 		}
 		cfg.SecretConfigured = configured
 		if cfg.Enabled && !configured {
@@ -604,16 +604,16 @@ func (s *notificationConfigStore) applyWebhookUpdates(current, next *notificatio
 			return i18n.NewError(i18n.NotificationRenamedSecretRequired, map[string]any{"channel": "Webhook", "name": cfg.Name})
 		}
 		if cfg.ReplaceSecret && cfg.URL == "" {
-			return i18n.NewError(i18n.NotificationReplacementURLRequired, map[string]any{"name": cfg.Name})
+			return i18n.WithNotificationChannel(i18n.NewError(i18n.NotificationReplacementURLRequired, map[string]any{"name": cfg.Name}), "Webhook", cfg.Name)
 		}
 		configured, err := s.applySecretUpdate(notificationSecretKey("webhook", cfg.Name, "url"), cfg.URL, cfg.ReplaceSecret, cfg.ClearSecret, ok && old.SecretConfigured, deletes)
 		if err != nil {
-			return err
+			return i18n.WithNotificationChannel(err, "Webhook", cfg.Name)
 		}
 		if cfg.ReplaceSecret {
 			headers, _ := json.Marshal(cfg.Headers)
 			if err := s.setSecret(notificationSecretKey("webhook", cfg.Name, "headers"), string(headers)); err != nil {
-				return err
+				return i18n.WithNotificationChannel(err, "Webhook", cfg.Name)
 			}
 		}
 		if cfg.ClearSecret {

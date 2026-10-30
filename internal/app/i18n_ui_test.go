@@ -117,7 +117,7 @@ func frontendI18nProgram(t *testing.T) string {
 	if response.Code != http.StatusOK {
 		t.Fatalf("API catalog status: %d", response.Code)
 	}
-	return `const window={document:{cookie:'',documentElement:{}},navigator:{languages:['zh-CN']},localStorage:{getItem(){return null;},setItem(){}},dispatchEvent(){},fetch(...args){return fetch(...args);}};class CustomEvent {constructor(type,options){this.type=type;this.detail=options.detail;}};` + string(runtime) + `const IOSBKI18n=window.IOSBKI18n;function tr(key,params){return IOSBKI18n.t(key,params);}function apiMessage(payload,fallback){return IOSBKI18n.message(payload,fallback);}` + messages.Body.String() + response.Body.String() + "\n"
+	return `const window={document:{cookie:'',documentElement:{}},navigator:{languages:['zh-CN']},localStorage:{getItem(){return null;},setItem(){}},dispatchEvent(){},addEventListener(){},fetch(...args){return fetch(...args);}};class CustomEvent {constructor(type,options){this.type=type;this.detail=options.detail;}};` + string(runtime) + `const IOSBKI18n=window.IOSBKI18n;function tr(key,params){return IOSBKI18n.t(key,params);}function apiMessage(payload,fallback){return IOSBKI18n.message(payload,fallback);}` + messages.Body.String() + response.Body.String() + "\n"
 }
 
 func TestSharedI18nBehaviors(t *testing.T) {

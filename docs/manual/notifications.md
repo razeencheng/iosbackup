@@ -24,13 +24,15 @@ Log in using the [installation guide](installation.md) and protect default `secr
 2. Click “Add” under the chosen channel type. Use a recognizable name unique within that type, enter its destination and credentials, and enable it.
 3. Under “Notification rules”, select that channel for “Backup started”, “Backup succeeded” and “Backup failed”. Enabling a channel without assigning an event rule does not deliver that event.
 4. Start with default templates; customize “Message templates” later using [body templates](#body-templates) on this page.
-5. Click “Save” and confirm “Saved”. Reload and check switches, names and rules. Secret fields showing “Configured; leave blank to keep” are expected; stored secrets are not returned to the browser.
+5. Click “Save” and wait for confirmation. If you edit while saving, the newer changes remain unsaved; save them before testing. Once no changes are pending, reload if needed and check switches, names and rules. Secret fields showing “Configured; leave blank to keep” are expected; stored secrets are not returned to the browser.
+
+Settings become editable after the first successful load. If that initial load fails, reload before editing. A failed save keeps your draft; after the initial load, edits made during later loads or saves are also preserved, and older responses cannot overwrite them. If confirmation fails after saving, you can keep editing and save again. Testing stays blocked until the saved settings are confirmed and no unsaved changes remain. Reload deliberately replaces the draft when you have made no newer edits during that request.
 
 ![Notification settings](images/11-iosbk-notice.png)
 
 ## Check test delivery, then a real event
 
-1. In “Test”, choose “Backup succeeded” and click “Send test”. This actually sends messages to the channels assigned to that event.
+1. Save your changes first. The test button is unavailable until settings load successfully and while loading, saving or unsaved changes remain; the page explains why. Saving does not send a message. Once ready, choose “Backup succeeded” in “Test” and click “Send test”. This actually sends using the saved language, templates and channels assigned to that event.
 2. **At the receiver** , look for the test message and verify destination and time. The UI distinguishes no matching channel, complete failure, partial delivery and success. It summarizes delivery counts; inspect the response for per-channel results and confirm receipt at each destination.
 3. Check each configured destination. For failures, inspect logs and [failure branches](#when-messages-do-not-arrive) below. If necessary, use browser developer tools to inspect the per-channel results in that `/api/notifications/test` response using [test responses](#test-responses). Do not share credential or CSRF request headers.
 4. **On the device page** , start one permitted real backup following [first USB backup](usb-backup.md). Confirm the start event, then the success event after completion. Do not disconnect or manufacture data errors to test failures; use the test event to validate failure-message formatting.
@@ -73,11 +75,11 @@ With automatic backups enabled, due checks must explicitly report invalid pairin
 
 Choose **Notification language** in notification settings, then save. This setting controls generated titles, default bodies, channel labels and test messages even while the browser is closed. The interface language switch only changes the page. Supported values are English (`en`) and Simplified Chinese (`zh-CN`); existing configurations without `language` continue to use Simplified Chinese.
 
-To use the selected language's default body, leave that event's template blank. Existing nonempty templates, including Chinese text copied from an older example, are kept as custom content. Changing language never overwrites them; clear the relevant template and save to return to the built-in default. Device names and original diagnostic details are not automatically translated. Notification timestamps still use Beijing time with an explicit UTC offset.
+To use the selected language's default body, leave that event's template blank. Existing nonempty templates, including Chinese text copied from an older example, are kept as custom content. Changing language never overwrites them; clear the relevant template and save to return to the built-in default. Device names and original diagnostic details are not automatically translated. Interface language, notification language and scheduling are independent: changing either language does not change backup times. Scheduling, notification timestamps and UI date display currently use `Asia/Shanghai` (Beijing time); notification timestamps include the `+08:00` offset.
 
 ## Body templates
 
-Each event can have a body template; blank uses the built-in default. Supported variables are `${title}` (built-in title), `${content}` (original body), `${device_name}`, `${device_udid}`, `${timestamp}` (RFC 3339 in Beijing time), `${type}`, `${level}` `${reason}` (localized failure reason) and `${diagnostics}` (original diagnostic details, when available). Unknown variables are rejected; not every event contains a device or failure reason.
+Each event can have a body template; blank uses the built-in default. Supported variables are `${title}` (built-in title), `${content}` (original body), `${device_name}`, `${device_udid}`, `${timestamp}` (RFC 3339 in Beijing time), `${type}`, `${level}`, `${reason}` (localized failure reason) and `${diagnostics}` (original diagnostic details, when available). Unknown variables are rejected; not every event contains a device or failure reason.
 
 ```text
 [${type}] ${device_name}
@@ -111,12 +113,13 @@ Output can still disclose destination names, accounts and rules; sanitize it bef
 | `502` | All attempted deliveries failed |
 | `409` | No channel was attempted |
 
-Input errors are returned separately. Verify actual receipt and the response rather than relying only on the current UI toast. Notifications for real events enter a queue with limited capacity and are then sent in the background. Messages can be dropped when the queue is full, and shutdown can affect delivery. Pending messages are not saved persistently.
+Input errors are returned separately. Verify actual receipt and the response rather than relying only on the current UI toast. Notifications for real events enter a queue with limited capacity and are then sent in the background. Each queued message captures its language and rendered content; changing saved settings does not translate it again. Messages can be dropped when the queue is full, and shutdown or configuration changes can affect pending delivery. Pending messages are not saved persistently.
 
 ## When messages do not arrive
 
 | Symptom | Check first | Next action |
 |---|---|---|
+| Test button is unavailable | Saved-settings load, unsaved edits and save status | Wait for loading/saving to finish; save edits or retry a failed load before testing |
 | Test attempted no deliveries | Master switch, channel switch, selected event rule | Save and retry once; no selected notifier may return `409` |
 | Only some channels fail | Actual receipt at every destination | Inspect `deliveries` or container logs and resolve individually |
 | SMTP fails | Host, port, credentials, TLS and sender/recipient | Check implicit TLS on 465 or STARTTLS under [channel fields](#channel-fields); keep certificate validation |

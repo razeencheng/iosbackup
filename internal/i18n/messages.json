@@ -154,7 +154,8 @@
     "api.backup_auto_held": "Automatic backups are on hold until you resume them.",
     "api.backup_hold_save_failed": "Automatic backups remain on hold in this session, but the setting could not be saved reliably. Retry saving before restarting.",
     "api.backup_control_identity_required": "The backup task or hold identifier is missing. Refresh the page and retry.",
-    "api.backup_control_updated": "Backup control updated."
+    "api.backup_control_updated": "Backup control updated.",
+    "api.notification_channel_context": "Notification channel “{name}” ({channel}): {reason}"
   },
   "zh-CN": {
     "api.operation_failed": "操作未能完成，请重试或查看服务日志。",
@@ -311,6 +312,7 @@
     "api.backup_auto_held": "自动备份已暂缓，直到你主动恢复。",
     "api.backup_hold_save_failed": "当前进程仍暂缓自动备份，但设置未能可靠保存。请重试保存，重启后的状态尚无保证。",
     "api.backup_control_identity_required": "缺少备份任务或暂缓状态标识，请刷新页面后重试。",
-    "api.backup_control_updated": "备份控制状态已更新。"
+    "api.backup_control_updated": "备份控制状态已更新。",
+    "api.notification_channel_context": "通知渠道“{name}”（{channel}）：{reason}"
   }
 }

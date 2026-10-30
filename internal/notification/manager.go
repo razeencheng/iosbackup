@@ -501,7 +501,7 @@ func NewManagerFromConfig(config *Config, allowPrivate []netip.Prefix, options O
 		if item.Enabled {
 			if err := manager.AddNotifier(NewTelegramNotifier(item)); err != nil {
 				manager.Close()
-				return nil, err
+				return nil, i18n.WithNotificationChannel(err, "Telegram", item.Name)
 			}
 		}
 	}
@@ -509,7 +509,7 @@ func NewManagerFromConfig(config *Config, allowPrivate []netip.Prefix, options O
 		if item.Enabled {
 			if err := manager.AddNotifier(NewEmailNotifier(item)); err != nil {
 				manager.Close()
-				return nil, err
+				return nil, i18n.WithNotificationChannel(err, "Email", item.Name)
 			}
 		}
 	}
@@ -517,7 +517,7 @@ func NewManagerFromConfig(config *Config, allowPrivate []netip.Prefix, options O
 		if item.Enabled {
 			if err := manager.AddNotifier(NewWecomNotifier(item)); err != nil {
 				manager.Close()
-				return nil, err
+				return nil, i18n.WithNotificationChannel(err, "WeCom", item.Name)
 			}
 		}
 	}
@@ -525,7 +525,7 @@ func NewManagerFromConfig(config *Config, allowPrivate []netip.Prefix, options O
 		if item.Enabled {
 			if err := manager.AddNotifier(NewBarkNotifierWithAllowlist(item, allowPrivate)); err != nil {
 				manager.Close()
-				return nil, err
+				return nil, i18n.WithNotificationChannel(err, "Bark", item.Name)
 			}
 		}
 	}
@@ -533,7 +533,7 @@ func NewManagerFromConfig(config *Config, allowPrivate []netip.Prefix, options O
 		if item.Enabled {
 			if err := manager.AddNotifier(NewWebhookNotifierWithAllowlist(item, allowPrivate)); err != nil {
 				manager.Close()
-				return nil, err
+				return nil, i18n.WithNotificationChannel(err, "Webhook", item.Name)
 			}
 		}
 	}

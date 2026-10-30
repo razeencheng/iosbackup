@@ -101,6 +101,8 @@ type deviceStatusDTO struct {
 	AutoBackupHoldPersistence string             `json:"auto_backup_hold_persistence"`
 	LastBackupErrorCode       string             `json:"last_backup_error_code"`
 	LastBackupError           string             `json:"last_backup_error"`
+	LastBackupMessageCode     string             `json:"last_backup_message_code,omitempty"`
+	LastBackupMessageParams   map[string]any     `json:"last_backup_message_params,omitempty"`
 	BackupProgress            *backupProgressDTO `json:"backup_progress,omitempty"`
 }
 
@@ -211,23 +213,25 @@ func (app *application) buildStatusSnapshot() statusSnapshot {
 			AutoBackupHoldVersion:     hold.Version,
 			AutoBackupHoldPersistence: hold.Persistence,
 			PresenceKnown:             !d.PresenceUnknown, LastSeen: lastSeen, OperationsAvailable: d.IsOnline && app.connectionAdmissionUnsafe(d) == nil,
-			UDID:                udid,
-			Name:                d.Name,
-			DeviceType:          d.DeviceType,
-			Conn:                connCode(d),
-			Online:              d.IsOnline,
-			Battery:             d.BatteryLevel,
-			Charging:            d.IsCharging,
-			LastBackup:          lastBackupStr(d.LastBackup),
-			LastBackupAt:        removedDeviceTime(d.LastBackup),
-			BackingUp:           app.backupInProgress[udid],
-			PairingState:        operationState.PairingState,
-			PairingErrorCode:    operationState.PairingErrorCode,
-			PairingError:        operationState.PairingError,
-			BackupState:         operationState.BackupState,
-			LastBackupErrorCode: operationState.BackupErrorCode,
-			LastBackupError:     operationState.LastBackupError,
-			BackupProgress:      progressDTO,
+			UDID:                    udid,
+			Name:                    d.Name,
+			DeviceType:              d.DeviceType,
+			Conn:                    connCode(d),
+			Online:                  d.IsOnline,
+			Battery:                 d.BatteryLevel,
+			Charging:                d.IsCharging,
+			LastBackup:              lastBackupStr(d.LastBackup),
+			LastBackupAt:            removedDeviceTime(d.LastBackup),
+			BackingUp:               app.backupInProgress[udid],
+			PairingState:            operationState.PairingState,
+			PairingErrorCode:        operationState.PairingErrorCode,
+			PairingError:            operationState.PairingError,
+			BackupState:             operationState.BackupState,
+			LastBackupErrorCode:     operationState.BackupErrorCode,
+			LastBackupError:         operationState.LastBackupError,
+			LastBackupMessageCode:   operationState.LastBackupMessageCode,
+			LastBackupMessageParams: cloneBackupMessageParams(operationState.LastBackupMessageParams),
+			BackupProgress:          progressDTO,
 		})
 	}
 	sort.Slice(devs, func(i, j int) bool {

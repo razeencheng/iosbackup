@@ -32,9 +32,7 @@ func (app *application) beginBackupJob(udid, connection, sessionID string, autom
 	}
 	d := cloneDevice(app.devices[udid])
 	if d == nil {
-		state := app.deviceOperationStates[udid]
-		state.BackupState, state.BackupErrorCode, state.LastBackupError = backupStateFailed, "backup_failed", errDeviceNotFound.Error()
-		app.deviceOperationStates[udid] = state
+		app.finishBackupStateUnsafe(udid, errDeviceNotFound)
 		app.mu.Unlock()
 		app.broadcastStatus()
 		return nil, errDeviceNotFound
@@ -91,6 +89,7 @@ func (app *application) beginBackupJob(udid, connection, sessionID string, autom
 	app.backupInProgress[udid] = true
 	state := app.deviceOperationStates[udid]
 	state.BackupState, state.BackupErrorCode, state.LastBackupError = backupStateStarting, "", ""
+	state.LastBackupMessageCode, state.LastBackupMessageParams = "", nil
 	app.deviceOperationStates[udid] = state
 	app.backupProgress[udid] = backupProgress{State: backupProgressPreparing, Phase: "preparing", UpdatedAt: nowBeijing()}
 	accepted = true
@@ -133,12 +132,6 @@ func (app *application) finishBackupJob(job *backupJob, err error) {
 
 func (app *application) finishBackupOperationUnsafe(udid string, err error, at time.Time) {
 	app.finishBackupProgressUnsafe(udid, err, at)
-	state := app.deviceOperationStates[udid]
-	state.BackupState, state.BackupErrorCode, state.LastBackupError = backupStateSucceeded, "", ""
-	if err != nil {
-		state.BackupState, state.BackupErrorCode = backupFailureState(err)
-		state.LastBackupError = err.Error()
-	}
-	app.deviceOperationStates[udid] = state
+	app.finishBackupStateUnsafe(udid, err)
 	delete(app.backupInProgress, udid)
 }

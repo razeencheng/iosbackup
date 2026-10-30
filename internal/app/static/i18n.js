@@ -2,28 +2,34 @@
   'use strict';
   var catalogs = { en: {}, 'zh-CN': {} };
   function canonical(value) {
-    value = String(value || '').replace(/_/g, '-').toLowerCase();
+    value = String(value || '').trim().replace(/_/g, '-').toLowerCase();
+    if (!/^[a-z]{2,8}(?:-[a-z0-9]{1,8})*$/.test(value)) return '';
     if (value === 'zh' || value === 'zh-cn' || value === 'zh-sg' || value === 'zh-hans' || value.indexOf('zh-hans-') === 0) return 'zh-CN';
     if (value === 'en' || value.indexOf('en-') === 0) return 'en';
     return '';
   }
-  function readStorage(key) { try { return global.localStorage.getItem(key); } catch (_) { return null; } }
+  function storageValue(key) { try { return { available: true, value: global.localStorage.getItem(key) }; } catch (_) { return { available: false, value: null }; } }
+  function readStorage(key) { return storageValue(key).value; }
   function writeStorage(key, value) { try { global.localStorage.setItem(key, value); } catch (_) {} }
   function readCookie() {
     try { var match = global.document.cookie.match(/(?:^|;\s*)iosbk_lang=([^;]*)/); return match ? decodeURIComponent(match[1]) : ''; } catch (_) { return ''; }
   }
   function resolveLocale() {
-    var selected = canonical(readStorage('iosbk_lang')) || canonical(readCookie()) || canonical(readStorage('iosbk_guide_lang'));
+    var selected = canonical(readCookie()) || canonical(readStorage('iosbk_lang')) || canonical(readStorage('iosbk_guide_lang'));
     if (selected) return selected;
     var languages = global.navigator.languages || [global.navigator.language];
     for (var i = 0; i < languages.length; i++) { selected = canonical(languages[i]); if (selected) return selected; }
     return 'en';
   }
-  var locale = resolveLocale();
-  function persist() {
-    writeStorage('iosbk_lang', locale);
+  var locale = resolveLocale(), observedCookie = '', observedStorage = null;
+  function persist(writePreference) {
+    if (writePreference !== false && readStorage('iosbk_lang') !== locale) writeStorage('iosbk_lang', locale);
     global.document.documentElement.lang = locale;
-    try { global.document.cookie = 'iosbk_lang=' + locale + '; Path=/; Max-Age=31536000; SameSite=Lax' + (global.location && global.location.protocol === 'https:' ? '; Secure' : ''); } catch (_) {}
+    if (readCookie() !== locale) {
+      try { global.document.cookie = 'iosbk_lang=' + locale + '; Path=/; Max-Age=31536000; SameSite=Lax' + (global.location && global.location.protocol === 'https:' ? '; Secure' : ''); } catch (_) {}
+    }
+    // 写入失败也记录已观察值，避免页面恢复焦点时撤销本页刚作出的选择。
+    observedCookie = readCookie(); observedStorage = readStorage('iosbk_lang');
   }
   function register(resources) {
     Object.keys(resources).forEach(function (language) {
@@ -40,7 +46,12 @@
   }
   function message(payload, fallbackKey) {
     var key = payload && (has(payload.message_code) ? payload.message_code : payload.code);
-    return t(key && has(key) ? key : (fallbackKey || 'common.operationFailed'), payload && payload.params);
+    var reason = t(key && has(key) ? key : (fallbackKey || 'common.operationFailed'), payload && payload.params);
+    var context = payload && payload.message_context;
+    if (context && context.kind === 'notification_channel' && typeof context.channel === 'string' && typeof context.name === 'string') {
+      return t('api.notification_channel_context', { channel: context.channel, name: context.name, reason: reason });
+    }
+    return reason;
   }
   function tree(prefix) {
     var result = {};
@@ -68,10 +79,35 @@
       button.classList.toggle('active', selected); button.setAttribute('aria-pressed', selected ? 'true' : 'false');
     });
   }
-  function setLocale(value) {
-    locale = canonical(value) || 'en'; persist();
-    global.dispatchEvent(new CustomEvent('iosbk:localechange', { detail: { locale: locale } }));
+  function selectLocale(selected, writePreference) {
+    var changed = selected !== locale;
+    locale = selected; persist(writePreference);
+    if (changed) global.dispatchEvent(new CustomEvent('iosbk:localechange', { detail: { locale: locale } }));
+    return true;
   }
+  function setLocale(value) {
+    var selected = canonical(value);
+    return selected ? selectLocale(selected, true) : false;
+  }
+  function syncPreferences() {
+    var cookie = readCookie(), stored = readStorage('iosbk_lang');
+    var selected = cookie !== observedCookie ? canonical(cookie) : '';
+    if (!selected && stored !== observedStorage) selected = canonical(stored);
+    if (selected) selectLocale(selected, true);
+    else { observedCookie = cookie; observedStorage = stored; }
+  }
+  global.addEventListener('storage', function (event) {
+    if (event.key !== 'iosbk_lang') return;
+    try { if (event.storageArea && event.storageArea !== global.localStorage) return; } catch (_) { return; }
+    var selected = canonical(event.newValue), stored = storageValue('iosbk_lang');
+    if (!selected) return;
+    // 缺失键不能为旧事件作证；读取受阻时仅接受与共享 cookie 一致的事件。
+    if (stored.available ? canonical(stored.value) !== selected : canonical(readCookie()) !== selected) return;
+    // 事件的写入已经完成；只同步内存与 cookie，不向其他页面重复广播。
+    selectLocale(selected, false);
+  });
+  global.addEventListener('pageshow', syncPreferences);
+  global.addEventListener('focus', syncPreferences);
   function formatDate(value) {
     if (!value) return '';
     // Older API snapshots used a Beijing wall clock without an offset.

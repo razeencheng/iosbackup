@@ -41,6 +41,11 @@ func operationErrorPayload(w http.ResponseWriter, err error, fallbackCode string
 	var translated *i18n.Error
 	if errors.As(err, &translated) {
 		payload := apiMessage(w, translated.Code, translated.Params, true)
+		if translated.Context != nil {
+			contextCopy := *translated.Context
+			payload["message_context"] = &contextCopy
+			payload["error"] = translated.Message(w.Header().Get("Content-Language"))
+		}
 		if translated.Detail != "" {
 			payload["detail"] = translated.Detail
 		}
