@@ -1,0 +1,12 @@
+'use strict';
+const assert=require('node:assert/strict');
+const {boot,catalogs,apiCatalog}=require('./i18n-test-helpers');
+const app=boot(); app.api.register(catalogs); app.api.register(apiCatalog);
+const name='Family {reason} <script> 邮箱';
+const payload={code:'api.notification_smtp_port',message_code:'api.notification_smtp_port',params:{},message_context:{kind:'notification_channel',channel:'Email',name}};
+assert.equal(app.api.message(payload),`Notification channel “${name}” (Email): Set smtp_port to an integer from 1 to 65535.`);
+app.api.setLocale('zh-CN');
+assert.equal(app.api.message(payload),`通知渠道“${name}”（Email）：${apiCatalog['zh-CN']['api.notification_smtp_port']}`);
+assert.equal(app.api.message({...payload,message_context:{kind:'unknown',name}}),apiCatalog['zh-CN']['api.notification_smtp_port']);
+assert.equal(app.api.message({...payload,message_context:null}),apiCatalog['zh-CN']['api.notification_smtp_port']);
+console.log('notification channel context preserves codes and literal user names');

@@ -13,6 +13,7 @@
   body{background:#EDF2F6;color:#213041;font-family:system-ui,-apple-system,'PingFang SC','Microsoft YaHei',sans-serif;-webkit-font-smoothing:antialiased}
   @keyframes iosbktoast{from{opacity:0;transform:translate(-50%,-8px)}to{opacity:1;transform:translate(-50%,0)}}
   .hidden{display:none !important}
+  #notifTestBtn:disabled,#notifSaveBtn:disabled,#notifBottomSaveBtn:disabled,#notifReloadBtn:disabled{opacity:.55;cursor:not-allowed}
   .ui-icon{width:16px;height:16px;display:inline-block;flex:none;vertical-align:-3px;overflow:visible;color:inherit}
   .iosbk-brand-logo{position:relative;display:block;width:42px;height:42px;flex:none;overflow:hidden;border:1px solid #c5daf6;border-radius:var(--iosbk-radius);background:#eef5ff;box-shadow:0 6px 16px rgba(44,98,198,.16)}
   .iosbk-brand-logo img{position:absolute;display:block;width:128%;height:128%;max-width:none;left:-14%;top:-14%;object-fit:contain}
@@ -51,11 +52,12 @@
       </div>
       <a data-back-control href="/" style="display:inline-flex;align-items:center;gap:7px;padding:9px 14px;background:#fff;color:#27384A;border:1px solid #D8E2EA;border-radius:var(--iosbk-radius);font-size:13.5px;font-weight:600;text-decoration:none;font-family:inherit"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-arrow-left"></use></svg><span data-i18n="notif.back">{{t $.Locale "notif.back"}}</span></a>
       <span id="notifDirty" class="dirty-hint hidden"><span class="ddot"></span><span data-i18n="notif.unsaved">{{t $.Locale "notif.unsaved"}}</span></span>
-      <button onclick="reloadConfig()" style="display:inline-flex;align-items:center;gap:7px;padding:9px 14px;background:#fff;color:#27384A;border:1px solid #D8E2EA;border-radius:var(--iosbk-radius);font-size:13.5px;font-weight:500;cursor:pointer;font-family:inherit"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-refresh"></use></svg><span data-i18n="notif.reload">{{t $.Locale "notif.reload"}}</span></button>
+      <button id="notifReloadBtn" onclick="reloadConfig()" style="display:inline-flex;align-items:center;gap:7px;padding:9px 14px;background:#fff;color:#27384A;border:1px solid #D8E2EA;border-radius:var(--iosbk-radius);font-size:13.5px;font-weight:500;cursor:pointer;font-family:inherit"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-refresh"></use></svg><span data-i18n="notif.reload">{{t $.Locale "notif.reload"}}</span></button>
       <button id="notifSaveBtn" onclick="saveConfig()" style="display:inline-flex;align-items:center;gap:7px;padding:9px 16px;background:#2C62C6;color:#fff;border:none;border-radius:var(--iosbk-radius);font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-save"></use></svg><span data-i18n="notif.save">{{t $.Locale "notif.save"}}</span></button>
     </div>
   </div>
 
+  <fieldset id="notifSettings" disabled style="border:0;margin:0;padding:0;min-width:0">
   <!-- master switch -->
   <div style="background:#fff;border:1px solid #D8E2EA;border-radius:var(--iosbk-radius);padding:16px 18px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;gap:14px">
     <div><div style="font-size:15px;font-weight:600" data-i18n="notif.masterTitle">{{t $.Locale "notif.masterTitle"}}</div><div style="font-size:12.5px;color:#6F7E8C;margin-top:3px" data-i18n="notif.masterBody">{{t $.Locale "notif.masterBody"}}</div></div>
@@ -64,7 +66,7 @@
 
   <div style="margin-bottom:18px;padding:14px 18px;border:1px solid #D8E2EA;border-radius:var(--iosbk-radius);background:#fff">
     <label for="notificationLanguage" data-i18n="notif.language" style="display:block;font-weight:600;margin-bottom:8px">{{t $.Locale "notif.language"}}</label>
-    <select id="notificationLanguage" class="iosbk-in" onchange="cfg.language=this.value;markNotifDirty()"><option value="en" lang="en">English</option><option value="zh-CN" lang="zh-CN">简体中文</option></select>
+    <select id="notificationLanguage" class="iosbk-in" onchange="setNotificationLanguage(this.value)"><option value="en" lang="en">English</option><option value="zh-CN" lang="zh-CN">简体中文</option></select>
     <p data-i18n="notif.languageHint" style="font-size:12.5px;color:#6F7E8C;margin:8px 0 0">{{t $.Locale "notif.languageHint"}}</p>
   </div>
   <div id="channelsArea">
@@ -86,10 +88,10 @@
 
     <!-- test -->
     <div style="background:#fff;border:1px solid #D8E2EA;border-radius:var(--iosbk-radius);padding:18px;display:flex;flex-wrap:wrap;gap:14px;align-items:center;justify-content:space-between">
-      <div style="flex:1;min-width:200px"><div style="font-size:15px;font-weight:600" data-i18n="notif.testTitle">{{t $.Locale "notif.testTitle"}}</div><div style="font-size:12.5px;color:#6F7E8C;margin-top:3px" data-i18n="notif.testBody">{{t $.Locale "notif.testBody"}}</div></div>
+      <div style="flex:1;min-width:200px"><div style="font-size:15px;font-weight:600" data-i18n="notif.testTitle">{{t $.Locale "notif.testTitle"}}</div><div style="font-size:12.5px;color:#6F7E8C;margin-top:3px" data-i18n="notif.testUsesSaved">{{t $.Locale "notif.testUsesSaved"}}</div><div id="notifTestHint" role="status" aria-live="polite" style="font-size:12.5px;color:#6F7E8C;margin-top:5px">{{t $.Locale "notif.loading"}}</div></div>
       <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
         <select id="testType" class="iosbk-in" style="width:auto;min-width:150px"><option value="backup_start" data-i18n="notif.evtStart">{{t $.Locale "notif.evtStart"}}</option><option value="backup_success" data-i18n="notif.evtSuccess">{{t $.Locale "notif.evtSuccess"}}</option><option value="backup_failed" data-i18n="notif.evtFailed">{{t $.Locale "notif.evtFailed"}}</option><option value="device_online" data-i18n="notif.evtOnline">{{t $.Locale "notif.evtOnline"}}</option><option value="device_offline" data-i18n="notif.evtOffline">{{t $.Locale "notif.evtOffline"}}</option><option value="system_error" data-i18n="notif.evtError">{{t $.Locale "notif.evtError"}}</option></select>
-        <button onclick="testNotification()" style="display:inline-flex;align-items:center;gap:8px;padding:9px 16px;background:#2E7D5B;color:#fff;border:none;border-radius:var(--iosbk-radius);font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-send"></use></svg><span data-i18n="notif.test">{{t $.Locale "notif.test"}}</span></button>
+        <button id="notifTestBtn" disabled aria-describedby="notifTestHint" onclick="testNotification()" style="display:inline-flex;align-items:center;gap:8px;padding:9px 16px;background:#2E7D5B;color:#fff;border:none;border-radius:var(--iosbk-radius);font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-send"></use></svg><span data-i18n="notif.test">{{t $.Locale "notif.test"}}</span></button>
       </div>
     </div>
 
@@ -98,6 +100,8 @@
       <button id="notifBottomSaveBtn" onclick="saveConfig()" style="display:inline-flex;align-items:center;gap:7px;padding:9px 16px;background:#2C62C6;color:#fff;border:none;border-radius:var(--iosbk-radius);font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-save"></use></svg><span data-i18n="notif.save">{{t $.Locale "notif.save"}}</span></button>
     </div>
   </div>
+
+  </fieldset>
 
   <div style="text-align:center;margin-top:24px"><a href="/" style="display:inline-flex;align-items:center;gap:5px;color:#6F7E8C;text-decoration:none;font-size:12.5px"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-arrow-left"></use></svg><span data-i18n="common.console">{{t $.Locale "common.console"}}</span></a></div>
 
@@ -116,11 +120,39 @@ function tr(key, params){ return IOSBKI18n.t(key, params); }
 function apiMessage(payload, fallbackKey){ return IOSBKI18n.message(payload, fallbackKey); }
 function applyI18n(){ IOSBKI18n.apply(); }
 function setLang(l){ IOSBKI18n.setLocale(l); }
-window.addEventListener('iosbk:localechange', function(){ applyI18n(); render(); document.getElementById('toast').classList.add('hidden'); });
+window.addEventListener('iosbk:localechange', function(){
+  applyI18n();
+  CHANNELS.forEach(function(ch){ (cfg[ch.key]||[]).forEach(function(_,i){ syncNotifierNameUI(ch.key,i); }); });
+  renderRules();
+  renderTestAvailability();
+  renderToast();
+});
 
-let toastTimer;
+let toastTimer, toastState=null, toastSequence=0;
 function iconHTML(name){ return '<svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-'+name+'"></use></svg>'; }
-function toast(msg,isErr){ var box=document.getElementById('toast'),icon=document.getElementById('toastIcon'),use=icon.querySelector('use'); document.getElementById('toastMsg').textContent=msg; if(use) use.setAttribute('href','/static/ui-icons.svg#icon-'+(isErr?'alert':'check-circle')); icon.style.color=isErr?'#FF8A80':'#5FD0A0'; box.classList.remove('hidden'); box.style.animation='iosbktoast .25s ease'; clearTimeout(toastTimer); toastTimer=setTimeout(function(){ box.classList.add('hidden'); },2600); }
+function renderToast(){
+  var box=document.getElementById('toast');
+  if(!toastState || Date.now()>=toastState.expiresAt){ box.classList.add('hidden'); return; }
+  var payload=toastState.payload;
+  if(payload.message_code==='notif.testPartial'){
+    var numbers=new Intl.NumberFormat(IOSBKI18n.getLocale());
+    payload=Object.assign({},payload,{params:{succeeded:numbers.format(payload.params.succeeded),failed:numbers.format(payload.params.failed)}});
+  }
+  document.getElementById('toastMsg').textContent=apiMessage(payload,toastState.fallbackKey);
+  var icon=document.getElementById('toastIcon'),use=icon.querySelector('use');
+  if(use) use.setAttribute('href','/static/ui-icons.svg#icon-'+(toastState.isError?'alert':'check-circle'));
+  icon.style.color=toastState.isError?'#FF8A80':'#5FD0A0';
+  box.classList.remove('hidden');
+}
+function toast(payload,isErr,params){
+  var sequence=++toastSequence;
+  // 保存消息描述和原到期时刻，切换语言只重新渲染。
+  toastState={payload:typeof payload==='string'?{message_code:payload,params:params||{}}:payload,fallbackKey:'common.operationFailed',isError:!!isErr,expiresAt:Date.now()+2600,sequence:sequence};
+  renderToast();
+  document.getElementById('toast').style.animation='iosbktoast .25s ease';
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(function(){ if(toastState && toastState.sequence===sequence){ toastState=null; document.getElementById('toast').classList.add('hidden'); } },2600);
+}
 
 const IOSBK_CSRF=(document.querySelector('meta[name="iosbk-csrf"]')||{}).content||'';
 function csrfFetch(url,opts){ opts=opts||{}; opts.headers=Object.assign({'X-IOSBK-CSRF':IOSBK_CSRF},opts.headers||{}); return IOSBKI18n.fetch(url,opts); }
@@ -158,18 +190,37 @@ function notifierNames(){
 }
 
 /* ============== unsaved (dirty) tracking ============== */
-let notifDirty=false;
-function markNotifDirty(){ notifDirty=true; ['notifDirty','notifBottomDirty'].forEach(function(id){ var h=document.getElementById(id); if(h) h.classList.remove('hidden'); }); ['notifSaveBtn','notifBottomSaveBtn'].forEach(function(id){ var b=document.getElementById(id); if(b) b.classList.add('save-dirty'); }); }
-function clearNotifDirty(){ notifDirty=false; ['notifDirty','notifBottomDirty'].forEach(function(id){ var h=document.getElementById(id); if(h) h.classList.add('hidden'); }); ['notifSaveBtn','notifBottomSaveBtn'].forEach(function(id){ var b=document.getElementById(id); if(b) b.classList.remove('save-dirty'); }); }
+let notifDirty=false, notifLoaded=false, notifLoading=false, notifSaving=false, notifLoadFailed=false;
+let notifRevision=0, notifLoadSequence=0;
+function testBlockedReason(){
+  if(notifSaving) return 'notif.saving';
+  if(notifLoading) return 'notif.loading';
+  if(!notifLoaded) return notifLoadFailed?'notif.loadFailed':'notif.loading';
+  if(notifLoadFailed) return 'notif.confirmFailed';
+  if(notifDirty) return 'notif.saveBeforeTest';
+  return '';
+}
+function renderTestAvailability(){
+  var settings=document.getElementById('notifSettings'); if(settings) settings.disabled=!notifLoaded;
+  var reason=testBlockedReason(),button=document.getElementById('notifTestBtn'),hint=document.getElementById('notifTestHint');
+  if(button) button.disabled=!!reason;
+  if(hint){ hint.textContent=reason?tr(reason):''; hint.hidden=!reason; }
+  ['notifSaveBtn','notifBottomSaveBtn'].forEach(function(id){ var button=document.getElementById(id); if(button) button.disabled=notifSaving||notifLoading||!notifLoaded; });
+  var reload=document.getElementById('notifReloadBtn'); if(reload) reload.disabled=notifSaving||notifLoading;
+}
+function markNotifDirty(){ notifRevision++; notifDirty=true; ['notifDirty','notifBottomDirty'].forEach(function(id){ var h=document.getElementById(id); if(h) h.classList.remove('hidden'); }); ['notifSaveBtn','notifBottomSaveBtn'].forEach(function(id){ var b=document.getElementById(id); if(b) b.classList.add('save-dirty'); }); renderTestAvailability(); }
+function clearNotifDirty(){ notifDirty=false; ['notifDirty','notifBottomDirty'].forEach(function(id){ var h=document.getElementById(id); if(h) h.classList.add('hidden'); }); ['notifSaveBtn','notifBottomSaveBtn'].forEach(function(id){ var b=document.getElementById(id); if(b) b.classList.remove('save-dirty'); }); renderTestAvailability(); }
 
 /* ============== mutations ============== */
-function addEntry(key, dn){ cfg[key]=(cfg[key]||[]).concat([{ name:dn, enabled:true }]); markNotifDirty(); render(); }
-function removeEntry(key, i){ if(!confirm(tr('notif.removeConfirm'))) return; cfg[key]=cfg[key].filter(function(_,idx){return idx!==i;}); markNotifDirty(); render(); }
-function toggleEntry(key, i){ cfg[key]=cfg[key].map(function(e,idx){ return idx===i?Object.assign({},e,{enabled:!e.enabled}):e; }); markNotifDirty(); render(); }
-function setField(key, i, fk, val, isSecret){ var e=cfg[key][i]; if(!e) return; e[fk]=(fk==='smtp_port')?(parseInt(val)||0):val; if(isSecret){ e.replace_secret=val!==''; e.clear_secret=false; } markNotifDirty(); if(fk==='name') syncNotifierNameUI(key,i); }
-function clearEntrySecret(key,i){ var e=cfg[key][i]; if(!e) return; e.clear_secret=true; e.replace_secret=false; e.enabled=false; ['bot_token','password','webhook_url','device_key','url'].forEach(function(k){if(k in e)e[k]='';}); e.configured=false; markNotifDirty(); render(); }
-function toggleMaster(){ cfg.enabled=!cfg.enabled; markNotifDirty(); render(); }
-function toggleRule(rk, name){ var cur=cfg.notification_rules[rk]||[]; cfg.notification_rules[rk]=cur.indexOf(name)>=0?cur.filter(function(n){return n!==name;}):cur.concat([name]); markNotifDirty(); render(); }
+// 接纳首次配置前不能编辑，避免用空默认值覆盖已有设置。
+function setNotificationLanguage(value){ if(!notifLoaded) return; cfg.language=value; markNotifDirty(); }
+function addEntry(key, dn){ if(!notifLoaded) return; cfg[key]=(cfg[key]||[]).concat([{ name:dn, enabled:true }]); markNotifDirty(); render(); }
+function removeEntry(key, i){ if(!notifLoaded) return; if(!confirm(tr('notif.removeConfirm'))) return; cfg[key]=cfg[key].filter(function(_,idx){return idx!==i;}); markNotifDirty(); render(); }
+function toggleEntry(key, i){ if(!notifLoaded) return; cfg[key]=cfg[key].map(function(e,idx){ return idx===i?Object.assign({},e,{enabled:!e.enabled}):e; }); markNotifDirty(); render(); }
+function setField(key, i, fk, val, isSecret){ if(!notifLoaded) return; var e=cfg[key][i]; if(!e) return; e[fk]=(fk==='smtp_port')?(parseInt(val)||0):val; if(isSecret){ e.replace_secret=val!==''; e.clear_secret=false; } markNotifDirty(); if(fk==='name') syncNotifierNameUI(key,i); }
+function clearEntrySecret(key,i){ if(!notifLoaded) return; var e=cfg[key][i]; if(!e) return; e.clear_secret=true; e.replace_secret=false; e.enabled=false; ['bot_token','password','webhook_url','device_key','url'].forEach(function(k){if(k in e)e[k]='';}); e.configured=false; markNotifDirty(); render(); }
+function toggleMaster(){ if(!notifLoaded) return; cfg.enabled=!cfg.enabled; markNotifDirty(); render(); }
+function toggleRule(rk, name){ if(!notifLoaded) return; var cur=cfg.notification_rules[rk]||[]; cfg.notification_rules[rk]=cur.indexOf(name)>=0?cur.filter(function(n){return n!==name;}):cur.concat([name]); markNotifDirty(); render(); }
 
 function syncNotifierNameUI(key,i){
   var e=cfg[key]&&cfg[key][i], ch=null;
@@ -197,14 +248,14 @@ function renderRules(){
   document.getElementById('rules').innerHTML = rules_html;
 }
 
-function setTemplate(eventType, value){ cfg.notification_templates[eventType]=value; markNotifDirty(); }
+function setTemplate(eventType, value){ if(!notifLoaded) return; cfg.notification_templates[eventType]=value; markNotifDirty(); }
 
 function renderTemplates(){
   var templates=cfg.notification_templates||{};
   var html=RULE_DEFS.map(function(rd){
     var value=templates[rd.rk]||'';
     return '<label style="border:1px solid #E7EDF2;border-radius:var(--iosbk-radius);padding:13px;background:#FBFCFD">'+
-      '<span style="display:block;font-size:13px;font-weight:600;color:#213041;margin-bottom:8px">'+tr(rd.lbl)+'</span>'+
+      '<span data-i18n="'+rd.lbl+'" style="display:block;font-size:13px;font-weight:600;color:#213041;margin-bottom:8px">'+tr(rd.lbl)+'</span>'+
       '<textarea class="iosbk-in" rows="3" oninput="setTemplate(\''+rd.rk+'\',this.value)" style="resize:vertical;line-height:1.5">'+esc(value)+'</textarea>'+
     '</label>';
   }).join('');
@@ -215,7 +266,7 @@ function renderTemplates(){
 function render(){
   document.getElementById('notificationLanguage').value=cfg.language||'zh-CN';
   document.getElementById('masterToggle').outerHTML =
-    '<button aria-label="'+esc(tr('notif.masterTitle'))+'" id="masterToggle" onclick="toggleMaster()" style="width:46px;height:26px;flex:none;border-radius:999px;border:none;cursor:pointer;padding:0;position:relative;background:'+(cfg.enabled?'#2C62C6':'#CAD5DE')+'"><span style="position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(35,52,68,.3);transition:transform .15s;transform:translateX('+(cfg.enabled?'20px':'0')+')"></span></button>';
+    '<button data-i18n-aria="notif.masterTitle" aria-label="'+esc(tr('notif.masterTitle'))+'" id="masterToggle" onclick="toggleMaster()" style="width:46px;height:26px;flex:none;border-radius:999px;border:none;cursor:pointer;padding:0;position:relative;background:'+(cfg.enabled?'#2C62C6':'#CAD5DE')+'"><span style="position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(35,52,68,.3);transition:transform .15s;transform:translateX('+(cfg.enabled?'20px':'0')+')"></span></button>';
   document.getElementById('channelsArea').style.cssText = cfg.enabled ? '' : 'opacity:.5;pointer-events:none;';
 
   var ch_html = CHANNELS.map(function(ch){
@@ -223,80 +274,105 @@ function render(){
     var entriesHtml = entries.map(function(e,i){
       var fields = ch.fields.map(function(f){
 		var ph=(f.secret&&e.configured)?tr('action.render.configuredLeaveBlankToKeep'):(f.ph||'');
-        return '<div><label style="display:block;font-size:11.5px;color:#6F7E8C;margin-bottom:4px;font-weight:500">'+tr(f.lbl)+'</label>'+
-		  '<input type="'+f.type+'" value="'+esc(e[f.k])+'" placeholder="'+esc(ph)+'" oninput="setField(\''+ch.key+'\','+i+',\''+f.k+'\',this.value,'+(f.secret?'true':'false')+')" class="iosbk-in"></div>';
+        return '<div><label data-i18n="'+f.lbl+'" style="display:block;font-size:11.5px;color:#6F7E8C;margin-bottom:4px;font-weight:500">'+tr(f.lbl)+'</label>'+
+		  '<input type="'+f.type+'" value="'+esc(e[f.k])+'" placeholder="'+esc(ph)+'"'+(f.secret&&e.configured?' data-i18n-ph="action.render.configuredLeaveBlankToKeep"':'')+' oninput="setField(\''+ch.key+'\','+i+',\''+f.k+'\',this.value,'+(f.secret?'true':'false')+')" class="iosbk-in"></div>';
       }).join('');
-      var tg='<button aria-label="'+esc(tr('notif.enableChannel'))+'" onclick="toggleEntry(\''+ch.key+'\','+i+')" style="width:42px;height:24px;flex:none;border-radius:999px;border:none;cursor:pointer;padding:0;position:relative;background:'+(e.enabled?'#2E7D5B':'#CAD5DE')+'"><span style="position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(35,52,68,.3);transition:transform .15s;transform:translateX('+(e.enabled?'18px':'0')+')"></span></button>';
+      var tg='<button data-i18n-aria="notif.enableChannel" aria-label="'+esc(tr('notif.enableChannel'))+'" onclick="toggleEntry(\''+ch.key+'\','+i+')" style="width:42px;height:24px;flex:none;border-radius:999px;border:none;cursor:pointer;padding:0;position:relative;background:'+(e.enabled?'#2E7D5B':'#CAD5DE')+'"><span style="position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(35,52,68,.3);transition:transform .15s;transform:translateX('+(e.enabled?'18px':'0')+')"></span></button>';
       return '<div style="border:1px solid #E7EDF2;border-radius:var(--iosbk-radius);padding:14px;margin-top:12px;background:#FBFCFD">'+
         '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">'+
           '<span id="channelTitle-'+ch.key+'-'+i+'" style="font-size:12.5px;font-weight:600;color:#607181">'+esc(tr(ch.titleKey)+' · '+(e.name||('#'+(i+1))))+'</span>'+
-		  '<div style="display:flex;align-items:center;gap:12px">'+(e.configured?'<button onclick="clearEntrySecret(\''+ch.key+'\','+i+')" style="background:none;border:none;color:#B45309;cursor:pointer;font-size:12px">'+tr('action.render.clearSecret')+'</button>':'')+tg+
-            '<button aria-label="'+esc(tr('notif.deleteChannel'))+'" onclick="removeEntry(\''+ch.key+'\','+i+')" style="display:inline-flex;align-items:center;justify-content:center;background:none;border:none;color:#BD2C24;cursor:pointer;padding:4px">'+iconHTML('trash')+'</button>'+
+		  '<div style="display:flex;align-items:center;gap:12px">'+(e.configured?'<button onclick="clearEntrySecret(\''+ch.key+'\','+i+')" style="background:none;border:none;color:#B45309;cursor:pointer;font-size:12px" data-i18n="action.render.clearSecret">'+tr('action.render.clearSecret')+'</button>':'')+tg+
+            '<button data-i18n-aria="notif.deleteChannel" aria-label="'+esc(tr('notif.deleteChannel'))+'" onclick="removeEntry(\''+ch.key+'\','+i+')" style="display:inline-flex;align-items:center;justify-content:center;background:none;border:none;color:#BD2C24;cursor:pointer;padding:4px">'+iconHTML('trash')+'</button>'+
           '</div>'+
         '</div>'+
         '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px">'+fields+'</div>'+
       '</div>';
     }).join('');
-    var emptyHtml = entries.length===0 ? '<div style="font-size:12.5px;color:#ADB9C2;font-style:italic;padding:12px 2px 2px">'+tr('action.render.noneYetTapAdd')+'</div>' : '';
+    var emptyHtml = entries.length===0 ? '<div data-i18n="action.render.noneYetTapAdd" style="font-size:12.5px;color:#ADB9C2;font-style:italic;padding:12px 2px 2px">'+tr('action.render.noneYetTapAdd')+'</div>' : '';
     return '<div style="background:#fff;border:1px solid #D8E2EA;border-radius:var(--iosbk-radius);padding:16px 18px;margin-bottom:14px">'+
       '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:4px">'+
         '<div style="display:flex;align-items:center;gap:12px">'+
           '<span style="width:38px;height:38px;flex:none;border-radius:var(--iosbk-radius);display:flex;align-items:center;justify-content:center;background:'+ch.soft+';border:1px solid '+ch.border+';color:'+ch.color+'">'+iconHTML(ch.icon)+'</span>'+
-          '<div><div style="font-size:15px;font-weight:600">'+tr(ch.titleKey)+'</div><div style="font-size:12.5px;color:#6F7E8C">'+tr(ch.descKey)+'</div></div>'+
+          '<div><div data-i18n="'+ch.titleKey+'" style="font-size:15px;font-weight:600">'+tr(ch.titleKey)+'</div><div data-i18n="'+ch.descKey+'" style="font-size:12.5px;color:#6F7E8C">'+tr(ch.descKey)+'</div></div>'+
         '</div>'+
-        '<button onclick="addEntry(\''+ch.key+'\',\''+ch.dn+'\')" style="display:inline-flex;align-items:center;gap:7px;padding:8px 13px;background:#EAF1FC;color:#2356B8;border:1px solid #C5DAF6;border-radius:var(--iosbk-radius);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">'+iconHTML('plus')+tr('notif.add')+'</button>'+
+        '<button onclick="addEntry(\''+ch.key+'\',\''+ch.dn+'\')" style="display:inline-flex;align-items:center;gap:7px;padding:8px 13px;background:#EAF1FC;color:#2356B8;border:1px solid #C5DAF6;border-radius:var(--iosbk-radius);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">'+iconHTML('plus')+'<span data-i18n="notif.add">'+tr('notif.add')+'</span></button>'+
       '</div>'+entriesHtml+emptyHtml+
     '</div>';
   }).join('');
   document.getElementById('channels').innerHTML = ch_html;
   renderRules();
   renderTemplates();
+  renderTestAvailability();
 }
 
 /* ============== load / save / test ============== */
-function loadConfig(){
-  IOSBKI18n.fetch('/api/notifications/config').then(function(r){return r.json();}).then(function(data){
-    if(data && !data.error){
-      cfg = {
-        enabled: data.enabled!==false,
-        language: data.language==='en'?'en':'zh-CN',
-        telegram_configs: data.telegram_configs||[],
-        email_configs: data.email_configs||[],
-        wecom_configs: data.wecom_configs||[],
-        bark_configs: data.bark_configs||[],
-        webhook_configs: data.webhook_configs||[],
-        notification_rules: data.notification_rules || {},
-        notification_templates: data.notification_templates || {}
-      };
-    }
-    clearNotifDirty(); // 刚从服务端载入 = 干净状态
-    render();
-  }).catch(function(){ render(); });
+function configFromResponse(data){
+  return {
+    enabled:data.enabled!==false, language:data.language==='en'?'en':'zh-CN',
+    telegram_configs:data.telegram_configs||[], email_configs:data.email_configs||[],
+    wecom_configs:data.wecom_configs||[], bark_configs:data.bark_configs||[], webhook_configs:data.webhook_configs||[],
+    notification_rules:data.notification_rules||{}, notification_templates:data.notification_templates||{}
+  };
 }
-function reloadConfig(){ loadConfig(); toast(tr('action.reloadConfig.reloaded')); }
+function loadConfig(options){
+  options=options||{};
+  if(notifSaving && !options.afterSave) return Promise.resolve(false);
+  var sequence=++notifLoadSequence,revision=options.revision==null?notifRevision:options.revision;
+  notifLoading=true;
+  renderTestAvailability();
+  return IOSBKI18n.fetch('/api/notifications/config').then(function(response){
+    return response.json().then(function(data){ if(response.ok===false||!data||data.error) throw new Error('load_failed'); return data; });
+  }).then(function(data){
+    if(sequence!==notifLoadSequence) return false;
+    notifLoading=false; notifLoadFailed=false;
+    // 保存或加载期间的新编辑属于新草稿，旧响应不得覆盖。未接纳响应不能标记已加载。
+    if(revision!==notifRevision){ if(!notifLoaded) notifLoadFailed=true; renderTestAvailability(); return false; }
+    cfg=configFromResponse(data);
+    notifLoaded=true;
+    clearNotifDirty(); render();
+    return true;
+  }).catch(function(){
+    if(sequence!==notifLoadSequence) return false;
+    // 已有配置基线时保留草稿和再次保存能力，确认成功前仍禁止测试。
+    notifLoading=false; notifLoadFailed=true;
+    renderTestAvailability(); toast(notifLoaded?'notif.confirmFailed':'notif.loadFailed',true);
+    return false;
+  });
+}
+function reloadConfig(){
+  if(notifSaving) return Promise.resolve(false);
+  return loadConfig().then(function(applied){ if(applied) toast('action.reloadConfig.reloaded'); return applied; });
+}
 function saveConfig(){
-  csrfFetch('/api/notifications/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(cfg)})
-    .then(function(r){return r.json();}).then(function(data){ if(data.error){ toast(apiMessage(data),true); } else { clearNotifDirty(); toast(tr('notif.saved')); loadConfig(); } }).catch(function(e){ toast(tr('common.operationFailed'),true); });
+  if(notifSaving) return Promise.resolve(false);
+  if(!notifLoaded||notifLoading){ toast(testBlockedReason(),true); return Promise.resolve(false); }
+  var revision=notifRevision,body=JSON.stringify(cfg);
+  notifSaving=true; notifLoadSequence++;
+  renderTestAvailability();
+  return csrfFetch('/api/notifications/config',{method:'POST',headers:{'Content-Type':'application/json'},body:body}).then(function(response){
+    return response.json().then(function(data){return {ok:response.ok!==false,data:data};});
+  }).then(function(result){
+    if(!result.ok||!result.data||result.data.error){ toast(result.data||{message_code:'common.operationFailed'},true); return false; }
+    return loadConfig({afterSave:true,revision:revision}).then(function(applied){ if(applied) toast('notif.saved'); return applied; });
+  }).catch(function(){ toast('common.operationFailed',true); return false; }).finally(function(){ notifSaving=false; renderTestAvailability(); });
 }
 function testNotification(){
+  var blocked=testBlockedReason();
+  if(blocked){ renderTestAvailability(); toast(blocked,true); return Promise.resolve(false); }
   var mt=document.getElementById('testType').value;
   return csrfFetch('/api/notifications/test',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message_type:mt})})
     .then(function(response){return response.json().then(function(data){return {ok:response.ok,data:data};});})
     .then(function(result){
       var data=result.data;
-      if(data.error){ toast(apiMessage(data),true); return; }
-      if(data.attempted===0){ toast(tr('notif.testNoTargets'),true); return; }
-      if(data.succeeded>0 && data.failed>0){
-        var numbers=new Intl.NumberFormat(IOSBKI18n.getLocale());
-        toast(tr('notif.testPartial',{succeeded:numbers.format(data.succeeded),failed:numbers.format(data.failed)}),true);
-        return;
-      }
-      if(result.ok && data.attempted>0 && data.succeeded===data.attempted && data.failed===0){ toast(tr('notif.testSent')); return; }
-      toast(tr('notif.testFailed'),true);
-    }).catch(function(){ toast(tr('notif.testFailed'),true); });
+      if(data.error){ toast(data,true); return; }
+      if(data.attempted===0){ toast('notif.testNoTargets',true); return; }
+      if(data.succeeded>0 && data.failed>0){ toast('notif.testPartial',true,{succeeded:data.succeeded,failed:data.failed}); return; }
+      if(result.ok && data.attempted>0 && data.succeeded===data.attempted && data.failed===0){ toast('notif.testSent'); return; }
+      toast('notif.testFailed',true);
+    }).catch(function(){ toast('notif.testFailed',true); });
 }
 
-window.addEventListener('DOMContentLoaded', function(){ applyI18n(); loadConfig(); });
+window.addEventListener('DOMContentLoaded', function(){ applyI18n(); renderTestAvailability(); loadConfig(); });
 window.addEventListener('beforeunload', function(e){ if(notifDirty){ e.preventDefault(); e.returnValue=''; } });
 </script>
 </body>

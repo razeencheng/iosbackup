@@ -90,6 +90,7 @@ const (
 	NotificationBarkKeyInvalid            = "api.notification_bark_key_invalid"
 	NotificationBarkKeyRequired           = "api.notification_bark_key_required"
 	NotificationBarkURL                   = "api.notification_bark_url"
+	NotificationChannelContext            = "api.notification_channel_context"
 	NotificationConfigInvalid             = "api.notification_config_invalid"
 	NotificationConfigLoadFailed          = "api.notification_config_load_failed"
 	NotificationConfigRequired            = "api.notification_config_required"
