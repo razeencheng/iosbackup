@@ -21,7 +21,12 @@ func historyTestApp(t *testing.T) *application {
 	if err := app.recoverBackupStorage(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _ = app.backupStorage.close() })
+	t.Cleanup(func() {
+		app.closeBackupIndex()
+		if err := app.backupStorage.close(); err != nil {
+			t.Error(err)
+		}
+	})
 	app.configs["CONTROL"].History = backupstore.Policy{Enabled: true, Days: 3}
 	return app
 }
@@ -268,6 +273,7 @@ func TestBackupHistoryRestartReconcilesCommittedPoint(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	app.closeBackupIndex()
 	if err = app.backupStorage.close(); err != nil {
 		t.Fatal(err)
 	}
