@@ -60,15 +60,15 @@ func TestBackupNotificationPreservesSpecificFailureReason(t *testing.T) {
 						t.Fatalf("错误没有经过真实备份条件校验: %v", err)
 					}
 					got := recorder.WaitForSends(t, 1)
-					if got.Locale != language || got.ReasonCode != "backup_failed" || got.EventCode != "backup_failed" || got.Type != notificationBackupFailed || got.Level != notificationLevelError || got.DeviceName != deviceName || got.DeviceUDID != "CONTROL" {
+					if got.Locale != language || got.ReasonCode != "backup_failed" || got.EventCode != "backup_final_failed" || got.Type != notificationBackupFailed || got.Level != notificationLevelError || got.DeviceName != deviceName || got.DeviceUDID != "CONTROL" {
 						t.Fatalf("通知公开字段改变: %+v", got)
 					}
 					if got.ExtraFields["reason"] != wantReason || got.ExtraFields["diagnostics"] != err.Error() {
 						t.Errorf("具体失败原因丢失或诊断被改写: reason=%q diagnostics=%q，期望 reason=%q diagnostics=%q", got.ExtraFields["reason"], got.ExtraFields["diagnostics"], wantReason, err.Error())
 					}
-					wantBody := "Backup failed for device " + deviceName + "\nReason: " + wantReason
+					wantBody := "Device " + deviceName + "\nBackup execution: failed\nBackup check: not run\nHistory saving: not enabled\nReason: " + wantReason
 					if language == "zh-CN" {
-						wantBody = "设备 " + deviceName + " 备份失败\n原因: " + wantReason
+						wantBody = "设备 " + deviceName + "\n备份执行：失败\n备份检查：未运行\n历史保存：未启用\n原因：" + wantReason
 					}
 					if custom {
 						wantBody = "用户模板 " + deviceName + " | " + wantReason + " | " + err.Error()

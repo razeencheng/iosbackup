@@ -135,7 +135,7 @@ func TestPrimaryInterfaceIconsUseReadableVisualScale(t *testing.T) {
 func TestPrimaryPagesUseSemanticSVGIconSprite(t *testing.T) {
 	wants := map[string][]string{
 		"index.html": {
-			`#icon-guide`, `#icon-bell`, `#icon-settings`, `#icon-backup-settings`,
+			`#icon-guide`, `#icon-bell`, `#icon-settings`, `#icon-settings`,
 			`#icon-backup-library`, `#icon-lock`, `#icon-restore`, `#icon-folder-check`,
 			`#icon-network-check`, `#icon-pair`, `#icon-unpack`, `['lock-open','enc.stateOff'`,
 			`#icon-shield-unlock`,

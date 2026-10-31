@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="{{.Locale}}">
+<html lang="{{.Locale}}" data-timezone="{{.Timezone}}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -157,16 +157,25 @@
     .device-name{max-width:70vw}.backup-progress-heading{align-items:flex-start}.backup-current-file{align-items:flex-start;flex-direction:column}.backup-current-value{padding-left:37px;white-space:normal}
   }
   @media(prefers-reduced-motion:reduce){.backup-overall-fill{transition:none}.backup-overall-track.indeterminate .backup-overall-fill{animation:none;transform:translateX(95%)}}
+
+  .jobs-button{display:inline-flex;align-items:center;padding:8px 12px;border:1px solid #D8E2EA;background:#fff;color:#2C62C6;border-radius:9px;font-family:inherit;font-size:13px;font-weight:500;cursor:pointer;text-decoration:none}.jobs-button:disabled{opacity:.5;cursor:wait}.jobs-button:focus-visible,.jobs-advanced summary:focus-visible{outline:2px solid #2C62C6;outline-offset:3px}.jobs-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:0 0 14px}.jobs-toolbar h3{margin:0;font-size:16px}.jobs-note{font-size:12px;color:#718090;line-height:1.6;margin:6px 0}.jobs-advanced{padding:12px 14px;border:1px solid #E7EDF2;border-radius:9px;margin-bottom:18px;font-size:13px}.jobs-advanced summary{cursor:pointer;margin-bottom:10px;color:#526778}.jobs-warning{padding:10px 13px;background:#FBF1E2;border:1px solid #F0DBB6;border-radius:9px;font-size:12.5px;color:#8A5A12;line-height:1.7;margin:10px 0}.backup-control-row{padding:0 20px}.jobs-select{display:block;width:100%;margin:8px 0 14px}.jobs-summary{padding:16px;border:1px solid #D8E2EA;border-radius:9px;background:#F7FAFC;margin:14px 0}.jobs-summary strong{font-size:16px;color:#213041}.jobs-summary p{font-size:12.5px;color:#607181;margin:8px 0 0}.jobs-events{white-space:pre-wrap;overflow-wrap:anywhere;max-height:360px;overflow:auto;border:1px solid #E7EDF2;background:#F7FAFC;border-radius:9px;padding:14px;font:12px/1.9 ui-monospace,monospace;color:#40566A}
 </style>
 <link rel="stylesheet" href="/static/backup-browser.css?v={{.Version}}">
+<link rel="stylesheet" href="/static/backup-history.css?v={{.Version}}">
 <script src="/static/backup-browser.js?v={{.Version}}"></script>
 <script src="/static/i18n.js?v={{.Version}}"></script>
 <script src="/static/ui-messages.js?v={{.Version}}"></script>
 <script src="/static/api-messages.js?v={{.Version}}"></script>
+<script src="/static/backup-jobs.js?v={{.Version}}"></script>
+<script src="/static/backup-console.js?v={{.Version}}"></script>
+<link rel="stylesheet" href="/static/backup-console.css?v={{.Version}}">
+<script src="/static/backup-history.js?v={{.Version}}"></script>
+<script src="/static/term-hints.js?v={{.Version}}"></script>
+<script src="/static/backup-checks.js?v={{.Version}}"></script>
 </head>
 <body>
 <div style="min-height:100vh;padding:22px 16px 64px">
-<div style="max-width:940px;margin:0 auto">
+<div style="max-width:1120px;margin:0 auto">
 
   <!-- ===================== TOP BAR ===================== -->
   <div style="background:#fff;border:1px solid #D8E2EA;border-radius:var(--iosbk-radius);box-shadow:0 1px 2px rgba(35,52,68,.04);padding:16px 18px;margin-bottom:14px">
@@ -191,6 +200,7 @@
               <span style="min-width:0"><span style="font-size:13.5px;font-weight:600;display:block" data-i18n="removed.title">{{t $.Locale "removed.title"}}</span><span style="font-size:11.5px;color:#718090;line-height:1.4;display:block;margin-top:2px" data-i18n="removed.menuHint">{{t $.Locale "removed.menuHint"}}</span></span>
               <span id="removedDeviceCountBadge" class="menu-count hidden">0</span>
             </button>
+            <button type="button" class="menu-item" data-console-action="deployment"><span data-i18n="console.deployment">{{t $.Locale "console.deployment"}}</span></button>
             <a href="/onboarding" class="menu-item">
               <span style="width:30px;height:30px;flex:none;border-radius:var(--iosbk-radius);display:flex;align-items:center;justify-content:center;background:#EAF1FC;color:#2356B8"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-guide"></use></svg></span>
               <span><span style="font-size:13.5px;font-weight:600;display:block" data-i18n="menu.onboarding">{{t $.Locale "menu.onboarding"}}</span><span style="font-size:11.5px;color:#718090;line-height:1.4;display:block;margin-top:2px" data-i18n="menu.onboardingHint">{{t $.Locale "menu.onboardingHint"}}</span></span>
@@ -219,7 +229,7 @@
     </div>
     <div style="display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;margin-top:13px;padding-top:12px;border-top:1px solid #E7EDF2;font-size:12.5px;color:#6F7E8C">
       <span style="display:inline-flex;align-items:center;gap:7px"><span id="autoDot" style="width:8px;height:8px;border-radius:50%;background:#2E7D5B;animation:iosbkpulse 1.6s ease-in-out infinite"></span><span id="autoText">{{t $.Locale "header.autoOn"}}</span><button id="autoToggle" onclick="toggleAutoRefresh()" style="background:none;border:none;color:#2C62C6;font-weight:600;cursor:pointer;font-size:12.5px;font-family:inherit;padding:0 0 0 2px">{{t $.Locale "header.pauseAuto"}}</button></span>
-      <span style="display:inline-flex;align-items:center;gap:6px"><svg class="ui-icon" style="width:13px;height:13px" aria-hidden="true"><use href="/static/ui-icons.svg#icon-clock"></use></svg><span data-i18n="header.tz">{{t $.Locale "header.tz"}}</span></span>
+      <span style="display:inline-flex;align-items:center;gap:6px"><svg class="ui-icon" style="width:13px;height:13px" aria-hidden="true"><use href="/static/ui-icons.svg#icon-clock"></use></svg><span data-i18n="header.tz">{{t $.Locale "header.tz" "timezone" $.Timezone}}</span></span>
       <span style="margin-left:auto;color:#96A3AE"><span data-i18n="app.version">{{t $.Locale "app.version"}}</span> {{.Version}}</span>
     </div>
   </div>
@@ -232,6 +242,8 @@
     {{range $d := .Devices}}
     {{$cfg := index $.Configs $d.UDID}}
     {{$backingUp := index $.BackupStatuses $d.UDID}}
+    {{$operation := ""}}{{if $.ActiveOperations}}{{$operation = index $.ActiveOperations $d.UDID}}{{end}}
+    {{$busyKey := "device.backingUp"}}{{if eq $operation "check"}}{{$busyKey = "console.checkingBackup"}}{{else if eq $operation "local"}}{{$busyKey = "console.deviceBusy"}}{{end}}
     {{$disc := index $.DiscoveredIPs $d.UDID}}
     {{$conn := "offline"}}{{if $d.IsOnline}}{{if eq $d.Connection "usb"}}{{$conn = "usb"}}{{else}}{{$conn = "wifi"}}{{end}}{{end}}
     {{if $d.PresenceUnknown}}{{$conn = "unknown"}}{{end}}
@@ -239,7 +251,7 @@
       <div data-udid-card="{{$d.UDID}}" style="background:#fff;border:1px solid #D8E2EA;border-radius:var(--iosbk-radius);box-shadow:0 1px 2px rgba(35,52,68,.04),0 18px 36px -28px rgba(35,52,68,.22);overflow:hidden">
 
         <!-- ----- COLLAPSED HEADER ----- -->
-        <div onclick="toggleCard('{{$d.UDID}}')" style="padding:18px 20px;cursor:pointer;display:flex;flex-wrap:wrap;gap:16px;align-items:center">
+        <div data-card-toggle="{{$d.UDID}}" role="button" tabindex="0" aria-expanded="false" onclick="toggleCard('{{$d.UDID}}')" onkeydown="if(event.target===this && (event.key==='Enter'||event.key===' ')){event.preventDefault();toggleCard('{{$d.UDID}}')}" style="padding:18px 20px;cursor:pointer;display:flex;flex-wrap:wrap;gap:16px;align-items:center">
           <div id="itile-{{$d.UDID}}" class="device-icon-tile" style="{{if eq $conn "usb"}}background:#EAF1FC;border:1px solid #C5DAF6;color:#2356B8;{{else if eq $conn "wifi"}}background:#E2F3EF;border:1px solid #B9E2DA;color:#0B7565;{{else}}background:#F3F7FA;border:1px solid #D8E2EA;color:#96A3AE;{{end}}"><svg class="device-icon-svg" viewBox="0 0 28 28" aria-hidden="true">{{if $isPad}}<rect x="4.5" y="2.5" width="19" height="23" rx="2.8" fill="none" stroke="currentColor" stroke-width="2.2"></rect><circle cx="14" cy="22.3" r="1" fill="currentColor"></circle>{{else}}<rect x="7" y="2.5" width="14" height="23" rx="3" fill="none" stroke="currentColor" stroke-width="2.2"></rect><path d="M11.3 5.4h5.4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path><circle cx="14" cy="22.3" r="1" fill="currentColor"></circle>{{end}}</svg></div>
           <div style="flex:1;min-width:180px">
             <div class="device-heading-row">
@@ -256,7 +268,8 @@
               {{else if eq $conn "wifi"}}<span class="connection-badge" style="gap:7px;padding:5px 11px;background:#E2F3EF;color:#0B7565;border:1px solid #B9E2DA;font-size:12.5px;font-weight:600;white-space:nowrap"><svg class="connection-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M3 7.6a10.7 10.7 0 0 1 14 0M5.7 10.5a6.7 6.7 0 0 1 8.6 0M8.4 13.3a2.7 2.7 0 0 1 3.2 0" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path><circle cx="10" cy="16" r="1.25" fill="currentColor"></circle></svg><span data-i18n="status.wifi">{{t $.Locale "status.wifi"}}</span></span>
               {{else}}<span class="connection-badge" style="gap:7px;padding:5px 11px;background:#F3F7FA;color:#718090;border:1px solid #D8E2EA;font-size:12.5px;font-weight:600;white-space:nowrap"><svg class="connection-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2.6v6.1M5.5 5.7a6.2 6.2 0 1 0 9 0" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path></svg><span data-i18n="status.offline">{{t $.Locale "status.offline"}}</span></span>{{end}}
             </div>
-            <button id="backupBtn-{{$d.UDID}}" class="backup-action" onclick="event.stopPropagation();startBackup('{{$d.UDID}}',this)" {{if or (eq $conn "offline") $backingUp}}disabled{{end}} style="gap:9px;padding:10px 17px;font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit;border:none;white-space:nowrap;min-width:132px;{{if or (eq $conn "offline") $backingUp}}background:#F3F7FA;color:#ADB9C2;cursor:not-allowed;{{else}}background:#2C62C6;color:#fff;{{end}}">{{if $backingUp}}<span data-i18n="device.backingUp">{{t $.Locale "device.backingUp"}}</span>{{else}}<span data-i18n="device.backupNow">{{t $.Locale "device.backupNow"}}</span>{{end}}</button>
+            <button id="backupBtn-{{$d.UDID}}" class="backup-action" onclick="event.stopPropagation();startBackup('{{$d.UDID}}',this)" {{if or (eq $conn "offline") $backingUp}}disabled{{end}} style="gap:9px;padding:10px 17px;font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit;border:none;white-space:nowrap;min-width:132px;{{if or (eq $conn "offline") $backingUp}}background:#F3F7FA;color:#ADB9C2;cursor:not-allowed;{{else}}background:#2C62C6;color:#fff;{{end}}">{{if $backingUp}}<span data-i18n="{{$busyKey}}">{{t $.Locale $busyKey}}</span>{{else}}<span data-i18n="device.backupNow">{{t $.Locale "device.backupNow"}}</span>{{end}}</button>
+            <button id="backupAdvanced-{{$d.UDID}}" type="button" class="backup-control-button backup-advanced" {{if or (eq $conn "offline") $backingUp}}disabled{{end}} onclick="event.stopPropagation();IOSBKConsole.backup('{{$d.UDID}}')" data-i18n-title="console.advancedBackup" data-i18n-aria="console.advancedBackup" title="{{t $.Locale "console.advancedBackup"}}" aria-label="{{t $.Locale "console.advancedBackup"}}">⋯</button>
             <button id="stopBackup-{{$d.UDID}}" type="button" class="backup-control-button stop hidden" disabled onclick="event.stopPropagation();openStopBackup('{{$d.UDID}}')" data-i18n="control.stop">{{t $.Locale "control.stop"}}</button>
             <svg id="chev-{{$d.UDID}}" class="ui-icon" style="color:#ADB9C2;width:15px;height:15px" aria-hidden="true"><use href="/static/ui-icons.svg#icon-chevron-down"></use></svg>
           </div>
@@ -267,7 +280,7 @@
           <button id="retryHold-{{$d.UDID}}" type="button" class="backup-control-button hidden" onclick="retryBackupHold('{{$d.UDID}}')" data-i18n="control.retrySave">{{t $.Locale "control.retrySave"}}</button>
           <button id="resumeBackup-{{$d.UDID}}" type="button" class="backup-control-button" disabled onclick="resumeAutomaticBackup('{{$d.UDID}}')" data-i18n="control.resume">{{t $.Locale "control.resume"}}</button>
         </div>
-        <div id="bkbar-{{$d.UDID}}" class="backup-progress-panel{{if not $backingUp}} hidden{{end}}" data-progress-mode="preparing">
+        <div id="bkbar-{{$d.UDID}}" class="backup-progress-panel{{if or (not $backingUp) (eq $operation "check") (eq $operation "local")}} hidden{{end}}" data-progress-mode="preparing">
           <div class="backup-progress-heading">
             <div class="backup-progress-heading-copy"><strong id="bkprogress-title-{{$d.UDID}}" data-i18n="progress.preparingTitle">{{t $.Locale "progress.preparingTitle"}}</strong><span id="bkprogress-subtitle-{{$d.UDID}}" data-i18n="progress.preparingSubtitle">{{t $.Locale "progress.preparingSubtitle"}}</span></div>
             <span id="bkprogress-value-{{$d.UDID}}" class="backup-progress-value">—</span>
@@ -293,50 +306,51 @@
 
         <!-- ----- EXPANDED PANEL ----- -->
         <div id="panel-{{$d.UDID}}" class="hidden" style="border-top:1px solid #E7EDF2;background:#FBFCFD">
-          <div style="display:flex;flex-wrap:wrap;gap:7px;padding:14px 20px 0">
-            <button class="snav active" data-udid="{{$d.UDID}}" data-sec="backup" onclick="switchSection('{{$d.UDID}}','backup')"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-backup-settings"></use></svg><span data-i18n="sec.backup">{{t $.Locale "sec.backup"}}</span></button>
-            <button class="snav" data-udid="{{$d.UDID}}" data-sec="backups" onclick="switchSection('{{$d.UDID}}','backups')"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-backup-library"></use></svg><span data-i18n="sec.backups">{{t $.Locale "sec.backups"}}</span></button>
-            <button class="snav" data-udid="{{$d.UDID}}" data-sec="enc" onclick="switchSection('{{$d.UDID}}','enc')"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-lock"></use></svg><span data-i18n="sec.encryption">{{t $.Locale "sec.encryption"}}</span></button>
-            <button class="snav" data-udid="{{$d.UDID}}" data-sec="danger" onclick="switchSection('{{$d.UDID}}','danger')"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-restore"></use></svg><span data-i18n="sec.danger">{{t $.Locale "sec.danger"}}</span></button>
-            <button class="snav remove-tab" data-danger="true" data-udid="{{$d.UDID}}" data-sec="remove" onclick="switchSection('{{$d.UDID}}','remove')"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-device-remove"></use></svg><span data-i18n="sec.remove">{{t $.Locale "sec.remove"}}</span></button>
-          </div>
+<div class="console-tabs" role="tablist">
+<button class="snav active" role="tab" aria-selected="true" data-udid="{{$d.UDID}}" data-sec="backups" onclick="switchSection('{{$d.UDID}}','backups')"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-backup-library"></use></svg><span data-i18n="console.backups">{{t $.Locale "console.backups"}}</span></button>
+<button class="snav" role="tab" aria-selected="false" data-udid="{{$d.UDID}}" data-sec="jobs" onclick="switchSection('{{$d.UDID}}','jobs')"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-clock"></use></svg><span data-i18n="jobs.title">{{t $.Locale "jobs.title"}}</span></button>
+<button class="snav" role="tab" aria-selected="false" data-udid="{{$d.UDID}}" data-sec="settings" onclick="switchSection('{{$d.UDID}}','settings')"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-settings"></use></svg><span data-i18n="console.settings">{{t $.Locale "console.settings"}}</span></button>
+</div>
 
           <!-- ===== BACKUP SETTINGS ===== -->
-          <div data-sec-panel="backup" data-udid="{{$d.UDID}}" style="padding:20px">
-            <div style="display:flex;flex-direction:column;gap:18px">
+<div data-sec-panel="settings" data-udid="{{$d.UDID}}" class="hidden console-content">
+<h3><span data-i18n="console.settings">{{t $.Locale "console.settings"}}</span></h3><p class="history-note"><span data-i18n="console.settingsHint">{{t $.Locale "console.settingsHint"}}</span></p>
+<div class="console-settings-list"><div class="console-setting-row"><div><h4><span data-i18n="console.setting.schedule">{{t $.Locale "console.setting.schedule"}}</span></h4><p id="scheduleSummary-{{$d.UDID}}" class="history-note"><span data-i18n="console.scheduleHint">{{t $.Locale "console.scheduleHint"}}</span></p></div><button type="button" class="history-button" data-console-action="settings" data-udid="{{$d.UDID}}" data-group="schedule"><span data-i18n="console.edit">{{t $.Locale "console.edit"}}</span></button></div><div class="console-setting-row"><div><h4><span data-i18n="console.setting.history">{{t $.Locale "console.setting.history"}}</span></h4><p id="historyPolicySummary-{{$d.UDID}}" class="history-note"><span data-i18n="history.cost">{{t $.Locale "history.cost"}}</span></p></div><button type="button" class="history-button" data-console-action="settings" data-udid="{{$d.UDID}}" data-group="history"><span data-i18n="console.edit">{{t $.Locale "console.edit"}}</span></button></div><div class="console-setting-row"><div><h4><span data-i18n="console.setting.encryption">{{t $.Locale "console.setting.encryption"}}</span></h4><p id="encryptionSummary-{{$d.UDID}}" class="history-note"><span data-i18n="enc.warn">{{t $.Locale "enc.warn"}}</span></p></div><button type="button" class="history-button" data-console-action="settings" data-udid="{{$d.UDID}}" data-group="encryption"><span data-i18n="console.edit">{{t $.Locale "console.edit"}}</span></button></div><div class="console-setting-row"><div><h4><span data-i18n="console.setting.connection">{{t $.Locale "console.setting.connection"}}</span></h4><p id="connectionSummary-{{$d.UDID}}" class="history-note"><span data-i18n="console.pathHint">{{t $.Locale "console.pathHint"}}</span></p></div><button type="button" class="history-button" data-console-action="settings" data-udid="{{$d.UDID}}" data-group="connection"><span data-i18n="console.edit">{{t $.Locale "console.edit"}}</span></button></div></div><details class="console-advanced"><summary><span data-i18n="console.advanced">{{t $.Locale "console.advanced"}}</span></summary><div class="history-actions">{{if $.ExperimentalOperationsEnabled}}<button type="button" class="history-button" data-console-action="settings" data-udid="{{$d.UDID}}" data-group="restore"><span data-i18n="sec.danger">{{t $.Locale "sec.danger"}}</span></button>{{end}}<button type="button" class="history-button" data-console-action="settings" data-udid="{{$d.UDID}}" data-group="remove"><span data-i18n="sec.remove">{{t $.Locale "sec.remove"}}</span></button></div></details></div>
+<section id="setting-schedule-{{$d.UDID}}" data-settings-group="schedule" data-udid="{{$d.UDID}}" class="hidden console-layer-body console-settings-form"><p class="history-note" data-i18n="header.tz">{{t $.Locale "header.tz" "timezone" $.Timezone}}</p>
               <div style="display:flex;flex-wrap:wrap;gap:6px 18px;align-items:center">
                 <div style="width:170px;min-width:140px"><div style="font-size:13.5px;font-weight:600" data-i18n="bset.window">{{t $.Locale "bset.window"}}</div><div style="font-size:11.5px;color:#718090;margin-top:2px;line-height:1.4" data-i18n="bset.windowHint">{{t $.Locale "bset.windowHint"}}</div></div>
-                <div style="display:flex;align-items:center;gap:9px"><input type="time" value="{{$cfg.StartTime}}" id="startTime-{{$d.UDID}}" class="iosbk-in" style="width:120px"><span style="color:#718090;font-size:13px" data-i18n="bset.to">{{t $.Locale "bset.to"}}</span><input type="time" value="{{$cfg.EndTime}}" id="endTime-{{$d.UDID}}" class="iosbk-in" style="width:120px"></div>
+                <div style="display:flex;align-items:center;gap:9px"><input type="time" value="{{$cfg.StartTime}}" id="startTime-{{$d.UDID}}" aria-label="{{t $.Locale "bset.window"}}" data-i18n-aria="bset.window" class="iosbk-in" style="width:120px"><span style="color:#718090;font-size:13px" data-i18n="bset.to">{{t $.Locale "bset.to"}}</span><input type="time" value="{{$cfg.EndTime}}" id="endTime-{{$d.UDID}}" aria-label="{{t $.Locale "bset.to"}}" data-i18n-aria="bset.to" class="iosbk-in" style="width:120px"></div>
               </div>
               <div style="display:flex;flex-wrap:wrap;gap:6px 18px;align-items:center">
                 <div style="width:170px;min-width:140px;font-size:13.5px;font-weight:600" data-i18n="bset.interval">{{t $.Locale "bset.interval"}}</div>
-                <select class="iosbk-in" id="backupInterval-{{$d.UDID}}" style="min-width:150px"><option value="6" {{if eq $cfg.BackupInterval 6}}selected{{end}} data-i18n="bset.h6">{{t $.Locale "bset.h6"}}</option><option value="12" {{if eq $cfg.BackupInterval 12}}selected{{end}} data-i18n="bset.h12">{{t $.Locale "bset.h12"}}</option><option value="24" {{if eq $cfg.BackupInterval 24}}selected{{end}} data-i18n="bset.h24">{{t $.Locale "bset.h24"}}</option><option value="48" {{if eq $cfg.BackupInterval 48}}selected{{end}} data-i18n="bset.h48">{{t $.Locale "bset.h48"}}</option></select>
+                <select class="iosbk-in" id="backupInterval-{{$d.UDID}}" aria-label="{{t $.Locale "bset.interval"}}" data-i18n-aria="bset.interval" style="min-width:150px"><option value="6" {{if eq $cfg.BackupInterval 6}}selected{{end}} data-i18n="bset.h6">{{t $.Locale "bset.h6"}}</option><option value="12" {{if eq $cfg.BackupInterval 12}}selected{{end}} data-i18n="bset.h12">{{t $.Locale "bset.h12"}}</option><option value="24" {{if eq $cfg.BackupInterval 24}}selected{{end}} data-i18n="bset.h24">{{t $.Locale "bset.h24"}}</option><option value="48" {{if eq $cfg.BackupInterval 48}}selected{{end}} data-i18n="bset.h48">{{t $.Locale "bset.h48"}}</option></select>
               </div>
               <div style="display:flex;flex-wrap:wrap;gap:6px 18px;align-items:center">
                 <div style="width:170px;min-width:140px"><div style="font-size:13.5px;font-weight:600" data-i18n="bset.minBattery">{{t $.Locale "bset.minBattery"}}</div><div style="font-size:11.5px;color:#718090;margin-top:2px;line-height:1.4" data-i18n="bset.minBatteryHint">{{t $.Locale "bset.minBatteryHint"}}</div></div>
-                <div style="flex:1;min-width:200px;max-width:340px;display:flex;align-items:center;gap:13px"><input type="range" min="0" max="100" value="{{$cfg.MinBatteryLevel}}" id="minBattery-{{$d.UDID}}" oninput="document.getElementById('minBatLabel-{{$d.UDID}}').textContent=this.value+'%'" class="iosbk-range"><span id="minBatLabel-{{$d.UDID}}" style="font-size:13px;font-weight:600;color:#2C62C6;width:42px;text-align:right">{{$cfg.MinBatteryLevel}}%</span></div>
+                <div style="flex:1;min-width:200px;max-width:340px;display:flex;align-items:center;gap:13px"><input type="range" min="0" max="100" value="{{$cfg.MinBatteryLevel}}" id="minBattery-{{$d.UDID}}" aria-label="{{t $.Locale "bset.minBattery"}}" data-i18n-aria="bset.minBattery" oninput="document.getElementById('minBatLabel-{{$d.UDID}}').textContent=this.value+'%'" class="iosbk-range"><span id="minBatLabel-{{$d.UDID}}" style="font-size:13px;font-weight:600;color:#2C62C6;width:42px;text-align:right">{{$cfg.MinBatteryLevel}}%</span></div>
               </div>
               <div style="display:flex;gap:18px;align-items:center;padding-top:2px">
                 <div style="width:170px;min-width:140px;font-size:13.5px;font-weight:600" data-i18n="bset.onlyCharging">{{t $.Locale "bset.onlyCharging"}}</div>
-                <button id="chargingToggle-{{$d.UDID}}" class="tgl g {{if $cfg.OnlyWhenCharging}}on{{end}}" onclick="flipToggle(this)"><span class="tgl-knob"></span></button>
+                <button id="chargingToggle-{{$d.UDID}}" aria-label="{{t $.Locale "bset.onlyCharging"}}" data-i18n-aria="bset.onlyCharging" class="tgl g {{if $cfg.OnlyWhenCharging}}on{{end}}" onclick="flipToggle(this)"><span class="tgl-knob"></span></button>
               </div>
               <div>
                 <div style="display:flex;gap:18px;align-items:center">
                   <div style="width:170px;min-width:140px"><div style="font-size:13.5px;font-weight:600" data-i18n="bset.autoBackup">{{t $.Locale "bset.autoBackup"}}</div><div style="font-size:11.5px;color:#718090;margin-top:2px;line-height:1.4" data-i18n="bset.autoBackupHint">{{t $.Locale "bset.autoBackupHint"}}</div></div>
-                  <button id="autoBackupToggle-{{$d.UDID}}" class="tgl b {{if $cfg.AutoBackupEnabled}}on{{end}}" onclick="flipToggle(this)"><span class="tgl-knob"></span></button>
+                  <button id="autoBackupToggle-{{$d.UDID}}" aria-label="{{t $.Locale "bset.autoBackup"}}" data-i18n-aria="bset.autoBackup" class="tgl b {{if $cfg.AutoBackupEnabled}}on{{end}}" onclick="flipToggle(this)"><span class="tgl-knob"></span></button>
                 </div>
                 <div id="autoNote-{{$d.UDID}}" class="{{if not $cfg.AutoBackupEnabled}}hidden{{end}}" style="margin-top:11px;display:flex;gap:9px;align-items:flex-start;background:#FBF1E2;border:1px solid #F0DBB6;border-radius:var(--iosbk-radius);padding:10px 12px;font-size:12px;color:#8A5A12;line-height:1.6"><svg class="ui-icon" style="margin-top:2px" aria-hidden="true"><use href="/static/ui-icons.svg#icon-key"></use></svg><span data-i18n="bset.passcodeNote">{{t $.Locale "bset.passcodeNote"}}</span></div>
               </div>
-              <div style="display:flex;flex-wrap:wrap;gap:6px 18px;align-items:center">
+<p data-group-dirty class="dirty-hint hidden" data-i18n="bset.unsaved">{{t $.Locale "bset.unsaved"}}</p><p data-group-error role="alert" class="console-error"></p><div class="history-actions"><button class="history-button" data-group-cancel><span data-i18n="history.cancel">{{t $.Locale "history.cancel"}}</span></button><button class="history-button primary" data-group-save><span data-i18n="bset.save">{{t $.Locale "bset.save"}}</span></button></div></section>
+<section id="setting-connection-{{$d.UDID}}" data-settings-group="connection" data-udid="{{$d.UDID}}" class="hidden console-layer-body console-settings-form"><p class="history-warning" data-i18n="console.pathHint">{{t $.Locale "console.pathHint"}}</p>              <div style="display:flex;flex-wrap:wrap;gap:6px 18px;align-items:center">
                 <div style="width:170px;min-width:140px"><div style="font-size:13.5px;font-weight:600" data-i18n="bset.dir">{{t $.Locale "bset.dir"}}</div><div style="font-size:11.5px;color:#718090;margin-top:2px;line-height:1.4" data-i18n="bset.dirHint">{{t $.Locale "bset.dirHint"}}</div></div>
-                <input type="text" value="{{$cfg.BackupDirectory}}" id="backupDir-{{$d.UDID}}" class="iosbk-in" style="flex:1;min-width:180px;font-family:'IBM Plex Mono',monospace;font-size:13px">
+                <input type="text" value="{{$cfg.BackupDirectory}}" id="backupDir-{{$d.UDID}}" aria-label="{{t $.Locale "bset.dir"}}" data-i18n-aria="bset.dir" class="iosbk-in" style="flex:1;min-width:180px;font-family:'IBM Plex Mono',monospace;font-size:13px">
                 <button onclick="checkBackupDir('{{$d.UDID}}')" style="display:inline-flex;align-items:center;justify-content:center;min-width:104px;gap:7px;padding:9px 14px;background:#fff;color:#27384A;border:1px solid #D8E2EA;border-radius:var(--iosbk-radius);font-size:13px;font-weight:500;cursor:pointer;font-family:inherit;white-space:nowrap"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-folder-check"></use></svg><span data-i18n="bset.checkDir">{{t $.Locale "bset.checkDir"}}</span></button>
               </div>
               <div id="dirResult-{{$d.UDID}}" class="hidden" style="font-size:12px;margin-top:7px;line-height:1.5;font-weight:500"></div>
               <div>
                 <div style="display:flex;flex-wrap:wrap;gap:6px 18px;align-items:center">
                   <div style="width:170px;min-width:140px;font-size:13.5px;font-weight:600"><span data-i18n="bset.ip">{{t $.Locale "bset.ip"}}</span> <span style="font-weight:400;color:#96A3AE;font-size:12px">(<span data-i18n="bset.ipOptional">{{t $.Locale "bset.ipOptional"}}</span>)</span></div>
-                  <input type="text" value="{{$cfg.NetworkAddress}}" id="networkAddress-{{$d.UDID}}" data-i18n-ph="bset.ipPlaceholder" class="iosbk-in" style="flex:1;min-width:200px;font-family:'IBM Plex Mono',monospace;font-size:13px" placeholder="{{t $.Locale "bset.ipPlaceholder"}}">
+                  <input type="text" value="{{$cfg.NetworkAddress}}" id="networkAddress-{{$d.UDID}}" aria-label="{{t $.Locale "bset.ip"}}" data-i18n-aria="bset.ip" data-i18n-ph="bset.ipPlaceholder" class="iosbk-in" style="flex:1;min-width:200px;font-family:'IBM Plex Mono',monospace;font-size:13px" placeholder="{{t $.Locale "bset.ipPlaceholder"}}">
                   <button id="testIPBtn-{{$d.UDID}}" onclick="testDeviceIP('{{$d.UDID}}')" style="display:inline-flex;align-items:center;justify-content:center;min-width:104px;gap:7px;padding:9px 14px;background:#fff;color:#27384A;border:1px solid #D8E2EA;border-radius:var(--iosbk-radius);font-size:13px;font-weight:500;cursor:pointer;font-family:inherit;white-space:nowrap"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-network-check"></use></svg><span data-i18n="bset.testConn">{{t $.Locale "bset.testConn"}}</span></button>
                 </div>
                 <div id="ipResult-{{$d.UDID}}" class="hidden" style="font-size:12px;margin-top:7px;line-height:1.5;font-weight:500"></div>
@@ -345,17 +359,20 @@
                 {{if not $d.IsOnline}}<div id="offlineHelp-{{$d.UDID}}" style="margin-top:9px;display:flex;gap:9px;align-items:flex-start;background:#FBF1E2;border:1px solid #F0DBB6;border-radius:var(--iosbk-radius);padding:10px 12px;font-size:12px;color:#8A5A12;line-height:1.6"><svg class="ui-icon" style="margin-top:2px" aria-hidden="true"><use href="/static/ui-icons.svg#icon-info"></use></svg><span data-i18n="bset.offlineHelp">{{t $.Locale "bset.offlineHelp"}}</span></div>{{end}}
               </div>
               <div style="display:flex;gap:9px;align-items:flex-start;font-size:12px;color:#6F7E8C;background:#fff;border:1px dashed #D8E2EA;border-radius:var(--iosbk-radius);padding:11px 13px;line-height:1.5"><svg class="ui-icon" style="color:#2C62C6;margin-top:2px" aria-hidden="true"><use href="/static/ui-icons.svg#icon-pair"></use></svg><span data-i18n="bset.pairHint">{{t $.Locale "bset.pairHint"}}</span></div>
-              <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:flex-end;padding-top:2px">
-                <span id="dirty-{{$d.UDID}}" class="dirty-hint hidden" style="margin-right:auto"><span class="ddot"></span><span data-i18n="bset.unsaved">{{t $.Locale "bset.unsaved"}}</span></span>
                 <button id="pairBtn-{{$d.UDID}}" onclick="pairDevice('{{$d.UDID}}')" style="display:inline-flex;align-items:center;gap:8px;padding:10px 16px;background:#fff;color:#27384A;border:1px solid #D8E2EA;border-radius:var(--iosbk-radius);font-size:13.5px;font-weight:500;cursor:pointer;font-family:inherit"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-pair"></use></svg><span data-i18n="{{if $d.IsOnline}}bset.repair{{else}}bset.pair{{end}}"></span></button>
-                <button id="saveBtn-{{$d.UDID}}" onclick="saveConfig('{{$d.UDID}}')" style="display:inline-flex;align-items:center;gap:8px;padding:10px 18px;background:#2C62C6;color:#fff;border:none;border-radius:var(--iosbk-radius);font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-save"></use></svg><span data-i18n="bset.save">{{t $.Locale "bset.save"}}</span></button>
-              </div>
-              <div id="pairingResult-{{$d.UDID}}" class="hidden" role="status" aria-live="polite" style="font-size:12.5px;line-height:1.6"></div>
-            </div>
-          </div>
-
+<div id="pairingResult-{{$d.UDID}}" class="hidden" role="status" aria-live="polite"></div><p data-group-dirty class="dirty-hint hidden" data-i18n="bset.unsaved">{{t $.Locale "bset.unsaved"}}</p><p data-group-error role="alert" class="console-error"></p><div class="history-actions"><button class="history-button" data-group-cancel><span data-i18n="history.cancel">{{t $.Locale "history.cancel"}}</span></button><button class="history-button primary" data-group-save><span data-i18n="bset.save">{{t $.Locale "bset.save"}}</span></button></div></section>
+<section id="setting-history-{{$d.UDID}}" class="hidden console-layer-body"><section id="historySettings-{{$d.UDID}}" class="history-settings" aria-label="{{t $.Locale "history.policyTitle"}}"></section></section>
           <!-- 本地备份信息独立于设备连接状态。 -->
-          <div data-sec-panel="backups" data-udid="{{$d.UDID}}" class="hidden backup-browser" style="padding:20px">
+          <div data-sec-panel="backups" data-udid="{{$d.UDID}}" class="backup-browser console-content">
+<p id="consoleRecent-{{$d.UDID}}" class="history-warning hidden" role="status"></p>
+<section id="historySummary-{{$d.UDID}}" class="console-summary"><div><span class="console-eyebrow"><span data-i18n="console.latest">{{t $.Locale "console.latest"}}</span></span><strong id="consoleLatest-{{$d.UDID}}">—</strong></div><div><span class="console-eyebrow"><span data-i18n="console.retained">{{t $.Locale "console.retained"}}</span></span><strong id="consoleCount-{{$d.UDID}}">—</strong></div><div><span class="console-eyebrow"><span data-i18n="console.logicalSize">{{t $.Locale "console.logicalSize"}}</span></span><strong id="consoleSize-{{$d.UDID}}">—</strong><small id="consoleFree-{{$d.UDID}}"></small></div><div><button type="button" class="history-button" data-console-action="storage" data-udid="{{$d.UDID}}" ><span data-i18n="console.storage">{{t $.Locale "console.storage"}}</span></button></div></section>
+<section id="currentBackup-{{$d.UDID}}" class="console-current hidden"><div><strong><span data-i18n="console.currentSet">{{t $.Locale "console.currentSet"}}</span></strong><p id="currentBackupState-{{$d.UDID}}" class="history-note"></p></div><button type="button" class="history-button" data-console-action="current" data-udid="{{$d.UDID}}" ><span data-i18n="console.currentDetails">{{t $.Locale "console.currentDetails"}}</span></button></section>
+<div id="backupOverview-{{$d.UDID}}" class="hidden console-layer-body">
+            <section id="currentCheck-{{$d.UDID}}" class="jobs-summary">
+              <div class="jobs-toolbar"><strong data-i18n="check.title">{{t $.Locale "check.title"}}</strong><div><button id="backupCheckStart-{{$d.UDID}}" class="jobs-button" data-check-action="start" data-udid="{{$d.UDID}}" data-i18n="check.start" data-i18n-title="check.scope" title="{{t $.Locale "check.scope"}}">{{t $.Locale "check.start"}}</button> <button id="backupCheckCancel-{{$d.UDID}}" class="jobs-button hidden" data-check-action="cancel" data-udid="{{$d.UDID}}" data-i18n="check.cancel">{{t $.Locale "check.cancel"}}</button></div></div>
+              <p id="backupCheckResult-{{$d.UDID}}" style="white-space:pre-wrap" role="status" data-i18n="check.none">{{t $.Locale "check.none"}}</p>
+              <p class="jobs-note" data-i18n="check.scope">{{t $.Locale "check.scope"}}</p>
+            </section>
             <div id="bkOffline-{{$d.UDID}}" class="backup-offline-note{{if $d.IsOnline}} hidden{{end}}"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-info"></use></svg><span data-i18n="bindex.offlineNote">{{t $.Locale "bindex.offlineNote"}}</span></div>
             <div>
               <div class="backup-browser-heading"><div class="backup-browser-title" data-i18n="bmgmt.infoTitle">{{t $.Locale "bmgmt.infoTitle"}}</div><button id="bkRefresh-{{$d.UDID}}" class="backup-browser-link" onclick="loadBackups('{{$d.UDID}}')"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-refresh"></use></svg><span id="bkRefreshLabel-{{$d.UDID}}" data-i18n="bmgmt.infoRefresh">{{t $.Locale "bmgmt.infoRefresh"}}</span></button></div>
@@ -387,10 +404,26 @@
               </div>
               {{end}}
             </div>
+            </div>
+            <section id="historyPanel-{{$d.UDID}}" class="history-panel" data-i18n-aria="history.title" aria-label="{{t $.Locale "history.title"}}">
+<div class="history-toolbar"><div><h3><span data-i18n="console.savedBackups">{{t $.Locale "console.savedBackups"}}</span></h3><p id="historySummaryText-{{$d.UDID}}" class="history-note"></p><span id="historyStorage-{{$d.UDID}}" class="hidden"></span></div><button type="button" class="history-button" data-console-action="settings" data-udid="{{$d.UDID}}" data-group="history"><span data-i18n="history.settings">{{t $.Locale "history.settings"}}</span></button></div>
+              <p id="historyError-{{$d.UDID}}" class="history-warning hidden" role="alert"></p><p id="historyWarning-{{$d.UDID}}" class="history-warning hidden" role="status"></p>
+              <div id="historyLayout-{{$d.UDID}}" class="history-layout"><div class="history-list-column"><div id="historyList-{{$d.UDID}}" class="history-list"></div><button id="historyMore-{{$d.UDID}}" type="button" class="history-button hidden" data-history-action="more" data-i18n="history.more">{{t $.Locale "history.more"}}</button></div><section id="historyDetail-{{$d.UDID}}" class="history-detail hidden"></section></div>
+            </section>
+
           </div>
 
+            <section id="jobsPanel-{{$d.UDID}}" class="hidden console-content" data-sec-panel="jobs" data-udid="{{$d.UDID}}" data-i18n-aria="jobs.title" aria-label="{{t $.Locale "jobs.title"}}">
+<div class="jobs-toolbar"><div><h3><span data-i18n="jobs.title">{{t $.Locale "jobs.title"}}</span></h3><p class="jobs-note"><span data-i18n="jobs.retention">{{t $.Locale "jobs.retention"}}</span></p></div><div class="console-filters"><select class="iosbk-in" data-job-filter="type" data-udid="{{$d.UDID}}" aria-label="{{t $.Locale "console.filter.type"}}"><option value="all" data-i18n="console.allTypes">{{t $.Locale "console.allTypes"}}</option><option value="backup" data-i18n="console.backups">{{t $.Locale "console.backups"}}</option><option value="check" data-i18n="check.title">{{t $.Locale "check.title"}}</option></select><select class="iosbk-in" data-job-filter="result" data-udid="{{$d.UDID}}" aria-label="{{t $.Locale "console.filter.result"}}"><option value="all" data-i18n="console.allResults">{{t $.Locale "console.allResults"}}</option><option value="attention" data-i18n="console.attention">{{t $.Locale "console.attention"}}</option><option value="succeeded" data-i18n="jobs.state.succeeded">{{t $.Locale "jobs.state.succeeded"}}</option><option value="failed" data-i18n="jobs.state.failed">{{t $.Locale "jobs.state.failed"}}</option><option value="stopped" data-i18n="jobs.state.stopped">{{t $.Locale "jobs.state.stopped"}}</option><option value="running" data-i18n="jobs.state.running">{{t $.Locale "jobs.state.running"}}</option></select></div></div><div id="jobList-{{$d.UDID}}" class="console-task-list"></div>              <p id="jobEmpty-{{$d.UDID}}" class="jobs-note" data-i18n="jobs.empty">{{t $.Locale "jobs.empty"}}</p>
+              <div id="jobWarning-{{$d.UDID}}" class="jobs-warning hidden" role="status"></div>
+              <div id="jobDetails-{{$d.UDID}}" class="hidden console-layer-body">
+                <div class="jobs-summary"><p id="jobDevice-{{$d.UDID}}"></p><strong id="jobResult-{{$d.UDID}}"></strong><p id="jobMode-{{$d.UDID}}"></p><p id="jobSource-{{$d.UDID}}"></p><p id="jobActivity-{{$d.UDID}}"></p><p id="jobDetailWarning-{{$d.UDID}}" class="jobs-warning hidden" role="status"></p><div id="jobOutcomes-{{$d.UDID}}" class="console-outcomes"></div><p id="jobCheck-{{$d.UDID}}" style="white-space:pre-wrap"></p></div>
+                <div id="jobPoint-{{$d.UDID}}" class="console-job-point"></div><div class="jobs-toolbar"><p class="jobs-note" data-i18n="jobs.viewLimit">{{t $.Locale "jobs.viewLimit"}}</p><div><button class="jobs-button" data-job-action="copy" data-udid="{{$d.UDID}}" data-i18n="jobs.copy">{{t $.Locale "jobs.copy"}}</button> <a id="jobExport-{{$d.UDID}}" class="jobs-button" href="#" download data-i18n="jobs.export">{{t $.Locale "jobs.export"}}</a></div></div>
+                <pre id="jobEvents-{{$d.UDID}}" class="jobs-events" tabindex="0" data-i18n-aria="jobs.events" aria-label="{{t $.Locale "jobs.events"}}"></pre>
+              </div>
+            </section>
           <!-- ===== ENCRYPTION ===== -->
-          <div data-sec-panel="enc" data-udid="{{$d.UDID}}" class="hidden" style="padding:20px">
+          <div id="setting-encryption-{{$d.UDID}}" data-udid="{{$d.UDID}}" class="hidden" style="padding:20px">
             {{if not $.EncryptionAvailable}}
             <div style="background:#FBF1E2;border:1px solid #F0DBB6;border-radius:var(--iosbk-radius);padding:15px 16px;margin-bottom:16px">
               <div style="font-size:14px;font-weight:700;color:#8A5A12;display:flex;align-items:center;gap:8px"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-key"></use></svg><span data-i18n="enc.unavailTitle">{{t $.Locale "enc.unavailTitle"}}</span></div>
@@ -424,7 +457,7 @@
           </div>
 
           <!-- ===== DANGER ZONE ===== -->
-          <div data-sec-panel="danger" data-udid="{{$d.UDID}}" class="hidden" style="padding:20px">
+          <div id="setting-restore-{{$d.UDID}}" data-udid="{{$d.UDID}}" class="hidden" style="padding:20px">
             <div style="border:1px solid #F1C9C5;border-radius:var(--iosbk-radius);overflow:hidden">
               <div style="background:#FBEBE9;padding:13px 16px;display:flex;align-items:center;gap:9px;border-bottom:1px solid #F1C9C5"><span style="width:28px;height:28px;border-radius:var(--iosbk-radius);background:#BD2C24;color:#fff;display:flex;align-items:center;justify-content:center"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-alert"></use></svg></span><div style="font-size:14px;font-weight:700;color:#9F231C" data-i18n="danger.title">{{t $.Locale "danger.title"}}</div></div>
               <div style="padding:16px">
@@ -450,7 +483,7 @@
           </div>
 
           <!-- ===== REMOVE DEVICE ===== -->
-          <div data-sec-panel="remove" data-udid="{{$d.UDID}}" class="hidden" style="padding:20px">
+          <div id="setting-remove-{{$d.UDID}}" data-udid="{{$d.UDID}}" class="hidden" style="padding:20px">
             <div class="remove-panel-head">
               <div><div style="font-size:16px;font-weight:700" data-i18n="remove.title">{{t $.Locale "remove.title"}}</div><div style="font-size:12.5px;color:#718090;line-height:1.55;margin-top:5px" data-i18n="remove.intro">{{t $.Locale "remove.intro"}}</div></div>
               <span class="reversible-tag"><svg class="removal-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-undo"></use></svg><span data-i18n="remove.reversible">{{t $.Locale "remove.reversible"}}</span></span>
@@ -506,7 +539,13 @@
   {{end}}
 
 </div>
-<footer style="max-width:940px;margin:22px auto 0;text-align:center;color:#718090;font-size:12px">
+<template id="archivedJobTemplate"><section class="hidden" style="display:none"><div id="jobList-archived"></div><p id="jobEmpty-archived"></p><p id="jobWarning-archived"></p>              <div id="jobDetails-archived" class="hidden console-layer-body">
+                <div class="jobs-summary"><p id="jobDevice-archived"></p><strong id="jobResult-archived"></strong><p id="jobMode-archived"></p><p id="jobSource-archived"></p><p id="jobActivity-archived"></p><p id="jobDetailWarning-archived" class="jobs-warning hidden" role="status"></p><div id="jobOutcomes-archived" class="console-outcomes"></div><p id="jobCheck-archived" style="white-space:pre-wrap"></p></div>
+                <div id="jobPoint-archived" class="console-job-point"></div><div class="jobs-toolbar"><p class="jobs-note" data-i18n="jobs.viewLimit">{{t $.Locale "jobs.viewLimit"}}</p><div><button class="jobs-button" data-job-action="copy" data-udid="archived" data-i18n="jobs.copy">{{t $.Locale "jobs.copy"}}</button> <a id="jobExport-archived" class="jobs-button" href="#" download data-i18n="jobs.export">{{t $.Locale "jobs.export"}}</a></div></div>
+                <pre id="jobEvents-archived" class="jobs-events" tabindex="0" data-i18n-aria="jobs.events" aria-label="{{t $.Locale "jobs.events"}}"></pre>
+              </div>
+</section></template>
+<footer style="max-width:1120px;margin:22px auto 0;text-align:center;color:#718090;font-size:12px">
   iOS Backup {{.Version}} · <a href="{{.SourceURL}}/tree/{{.Commit}}" rel="noreferrer" style="color:#5B6F91"><span data-i18n="common.source">{{t $.Locale "common.source"}}</span> {{.Commit}}</a> · AGPL-3.0-only
 </footer>
 </div>
@@ -595,9 +634,10 @@
 
 <!-- ===================== TOAST ===================== -->
 <div id="toast" class="hidden" style="position:fixed;left:50%;top:14px;transform:translateX(-50%);z-index:75;background:#213041;color:#fff;padding:12px 18px;border-radius:var(--iosbk-radius);font-size:13.5px;font-weight:500;box-shadow:0 14px 30px -10px rgba(35,52,68,.5);display:flex;align-items:center;gap:9px;max-width:90vw">
-  <svg id="toastIcon" class="ui-icon" style="color:#5FD0A0" aria-hidden="true"><use href="/static/ui-icons.svg#icon-check-circle"></use></svg><span id="toastMsg"></span>
+  <svg id="toastIcon" class="ui-icon" style="color:#5FD0A0" aria-hidden="true"><use href="/static/ui-icons.svg#icon-check-circle"></use></svg><span id="toastMsg" data-toast-message></span>
 </div>
 
+<iframe id="historyDownloadFrame" name="history-download" data-i18n-title="history.downloadFrame" title="{{t $.Locale "history.downloadFrame"}}" hidden></iframe>
 <script>
 /* ============== i18n runtime ============== */
 const INITIAL_STATUS = {{.InitialStatus}};
@@ -628,7 +668,7 @@ function setLang(l){ IOSBKI18n.setLocale(l); }
 window.addEventListener('iosbk:localechange', applyI18n);
 
 /* ============== toast ============== */
-let toastTimer;
+let toastTimer, floatingToast=null;
 let toastState=null, toastSequence=0;
 const inlineResults={};
 function iconHTML(name, extraClass){ return '<svg class="ui-icon'+(extraClass?' '+extraClass:'')+'" aria-hidden="true"><use href="/static/ui-icons.svg#icon-'+name+'"></use></svg>'; }
@@ -643,21 +683,35 @@ function showInlineResult(box, ok, payload, fallbackKey){
   box.style.color=ok===null?'#718090':(ok?'#2E7D5B':'#BD2C24');
 }
 function toastText(payload, fallbackKey){ return typeof payload==='string'?tr(payload):apiMessage(payload,fallbackKey); }
+function hideToast(){
+  document.getElementById('toast').classList.add('hidden');
+  if(floatingToast){floatingToast.remove();floatingToast=null;}
+  toastState=null;
+}
 function renderToast(){
   if(!toastState) return;
-  var box=document.getElementById('toast');
-  if(Date.now()>=toastState.expiresAt){ box.classList.add('hidden'); toastState=null; return; }
-  document.getElementById('toastMsg').textContent=toastText(toastState.payload,toastState.fallbackKey);
+  if(Date.now()>=toastState.expiresAt){hideToast();return;}
+  var message=toastText(toastState.payload,toastState.fallbackKey);
+  document.getElementById('toastMsg').textContent=message;
+  if(floatingToast)floatingToast.querySelector('[data-toast-message]').textContent=message;
 }
 function toast(payload, isErr, fallbackKey){
+  if(floatingToast){floatingToast.remove();floatingToast=null;}
   var msg=toastText(payload,fallbackKey), duration=msg.length>16?4600:2600, sequence=++toastSequence;
   toastState={payload:payload,fallbackKey:fallbackKey,isError:!!isErr,expiresAt:Date.now()+duration,sequence:sequence};
   var box=document.getElementById('toast'), icon=document.getElementById('toastIcon');
   document.getElementById('toastMsg').textContent=msg;
   setSVGIcon(icon, isErr ? 'alert' : 'check-circle');
   icon.style.color = isErr ? '#FF8A80' : '#5FD0A0';
+  var dialogs=document.querySelectorAll('dialog[open]');
+  if(dialogs.length){
+    box.classList.add('hidden');
+    floatingToast=box.cloneNode(true);floatingToast.removeAttribute('id');
+    floatingToast.querySelectorAll('[id]').forEach(function(n){n.removeAttribute('id');});
+    dialogs[dialogs.length-1].appendChild(floatingToast);box=floatingToast;
+  }
   box.classList.remove('hidden'); box.style.animation='iosbktoast .25s ease';
-  clearTimeout(toastTimer); toastTimer=setTimeout(function(){ if(toastState && toastState.sequence===sequence){ box.classList.add('hidden'); toastState=null; } },duration);
+  clearTimeout(toastTimer); toastTimer=setTimeout(function(){ if(toastState && toastState.sequence===sequence)hideToast(); },duration);
 }
 
 /* ============== net helpers (same endpoints/payloads as before) ============== */
@@ -668,30 +722,38 @@ function postJSON(url, body){ return csrfFetch(url,{method:'POST',headers:{'Cont
 /* ============== expand / section nav ============== */
 const expandedCards=new Set();
 let modalOpen=false;
-function busyUI(){ return expandedCards.size>0 || modalOpen || (document.activeElement && /INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)); }
+function busyUI(){ return expandedCards.size>0 || modalOpen || !!document.querySelector('dialog[open]') || (document.activeElement && /INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)); }
 function toggleCard(udid){
   var panel=document.getElementById('panel-'+udid); if(!panel) return;
   var willOpen=panel.classList.contains('hidden');
+  IOSBKConsole.closeLayers();
+  document.querySelectorAll('[data-card-toggle]').forEach(function(h){h.setAttribute('aria-expanded',String(willOpen&&h.dataset.cardToggle===udid));});
   // single-expand: collapse others
   document.querySelectorAll('[id^="panel-"]').forEach(function(p){ if(p!==panel){ p.classList.add('hidden'); } });
   document.querySelectorAll('[id^="chev-"]').forEach(function(c){ if(c.id!=='chev-'+udid){ setSVGIcon(c,'chevron-down'); } });
+  if(window.IOSBKJobs) window.IOSBKJobs.hide();
+  if(window.IOSBKHistory) window.IOSBKHistory.hide();
   expandedCards.clear();
   panel.classList.toggle('hidden', !willOpen);
   setSVGIcon(document.getElementById('chev-'+udid), willOpen ? 'chevron-up' : 'chevron-down');
-  if(willOpen) expandedCards.add(udid);
+  if(willOpen) { expandedCards.add(udid); var active=document.querySelector('.snav.active[data-udid="'+udid+'"]');switchSection(udid,active?active.dataset.sec:'backups'); }
   backupBrowser.visibilityChanged();
   if(!willOpen) maybeReload(); // 收起后若有挂起的设备增减刷新，此刻执行
 }
 function switchSection(udid, sec){
-  document.querySelectorAll('[data-sec-panel][data-udid="'+udid+'"]').forEach(function(p){ p.classList.toggle('hidden', p.dataset.secPanel!==sec); });
-  document.querySelectorAll('.snav[data-udid="'+udid+'"]').forEach(function(b){
-    var active=b.dataset.sec===sec;
-    b.classList.toggle('active', active && !b.dataset.danger);
-    b.classList.toggle('active-danger', active && !!b.dataset.danger);
-  });
-  if(sec==='backups') backupBrowser.open(udid); else backupBrowser.close(udid);
-  if(sec==='enc') loadEncStatus(udid); // 进加密页时拉一次当前加密状态
+  if(sec==='backup') sec='settings';
+  IOSBKConsole.closeLayers();
+  if(window.IOSBKJobs) window.IOSBKJobs.hide();
+  if(window.IOSBKHistory) window.IOSBKHistory.hide();
+  document.querySelectorAll('[data-sec-panel][data-udid="'+udid+'"]').forEach(function(p){p.classList.toggle('hidden',p.dataset.secPanel!==sec);});
+  document.querySelectorAll('.snav[data-udid="'+udid+'"]').forEach(function(b){var active=b.dataset.sec===sec;b.classList.toggle('active',active);b.setAttribute('aria-selected',String(active));});
+  if(sec==='jobs') IOSBKJobs.open(udid);
+  else IOSBKHistory.section(udid,sec);
+  if(sec==='settings')loadEncStatus(udid);
+  backupBrowser.close(udid);
 }
+function openBackupFiles(udid){backupBrowser.open(udid);}
+function closeBackupFiles(udid){backupBrowser.close(udid);}
 
 const deviceOperations=Object.create(null);
 let deviceOperationSequence=0;
@@ -733,6 +795,7 @@ function renderDeviceOperationButtons(){
 }
 let removeDeviceUdid='', removeDeviceReturnFocus=null;
 function openRemoveDeviceModal(udid, name, model){
+  IOSBKConsole.closeLayers();
   removeDeviceUdid=udid;
   removeDeviceReturnFocus=document.activeElement;
   document.getElementById('removeDeviceName').textContent=name||udid;
@@ -815,7 +878,9 @@ function renderRemovedDevices(devices, state){
     var buttonText=document.createElement('span'); buttonText.textContent=tr('removed.restoreAction'); button.appendChild(buttonText);
     renderRestoreManagedDeviceButton(device.udid,button);
     button.addEventListener('click',function(){restoreRemovedDeviceFromDrawer(device.udid,button);});
-    actions.appendChild(info); actions.appendChild(button); card.appendChild(actions); list.appendChild(card);
+    actions.appendChild(info);
+    var historyButton=document.createElement('button');historyButton.type='button';historyButton.className='history-button';historyButton.textContent=tr('history.open');historyButton.addEventListener('click',function(){if(window.IOSBKHistory)window.IOSBKHistory.openArchived(device.udid);});actions.appendChild(historyButton);
+    actions.appendChild(button); card.appendChild(actions); list.appendChild(card);
   });
 }
 function openRemovedDevicesDrawer(){
@@ -860,6 +925,7 @@ const latestEncryptionStatuses={}, backupEncryptionStates={};
 function renderEncStatus(udid,d){
   var el=document.getElementById('encState-'+udid); if(!el) return;
   var state=d.loading?['loader','enc.stateUnknown','#F3F7FA','#718090']:!d.online?['power','enc.stateOffline','#F3F7FA','#718090']:d.unknown?['alert','enc.stateErr','#F3F7FA','#718090']:d.will_encrypt?['lock','enc.stateOn','#E2F3EF','#0B7565']:['lock-open','enc.stateOff','#F3F7FA','#718090'];
+  var summary=document.getElementById('encryptionSummary-'+udid);if(summary)summary.textContent=tr(state[1]);
   el.style.background=state[2]; el.style.color=state[3]; el.innerHTML=iconHTML(state[0],d.loading?'spin':'')+'<span></span>'; el.querySelector('span').textContent=tr(state[1]);
 }
 function loadEncStatus(udid){
@@ -875,12 +941,13 @@ function renderBackupEncryption(udid,yes){
 function gotoFillIP(udid){
   var panel=document.getElementById('panel-'+udid);
   if(panel && panel.classList.contains('hidden')) toggleCard(udid);
-  switchSection(udid,'backup');
+  switchSection(udid,'settings');
+  IOSBKConsole.settings(udid,'connection');
   var ip=document.getElementById('networkAddress-'+udid);
   if(ip){ ip.scrollIntoView({block:'center'}); ip.focus(); }
 }
 function flipToggle(btn){
-  btn.classList.toggle('on'); markDirty(panelUdid(btn));
+  btn.classList.toggle('on'); btn.setAttribute('aria-checked',String(btn.classList.contains('on'))); markDirty(panelUdid(btn));
   if(btn.id && btn.id.indexOf('autoBackupToggle-')===0){ // 开自动备份 → 显示锁屏密码提示
     var note=document.getElementById('autoNote-'+btn.id.slice('autoBackupToggle-'.length));
     if(note) note.classList.toggle('hidden', !btn.classList.contains('on'));
@@ -889,7 +956,7 @@ function flipToggle(btn){
 
 /* ============== unsaved (dirty) tracking ============== */
 const dirtyCards=new Set();
-function panelUdid(el){ var p=el&&el.closest?el.closest('[data-sec-panel="backup"]'):null; return p?p.getAttribute('data-udid'):null; }
+function panelUdid(el){ return null; }
 function markDirty(udid){
   if(!udid) return;
   dirtyCards.add(udid);
@@ -975,6 +1042,8 @@ function checkVersion(snap){
   }
 }
 function applyStatus(snap){
+  if(window.IOSBKJobs)window.IOSBKJobs.onStatus(snap);
+  IOSBKI18n.setTimezone(snap.timezone);
   latestConnectionSnapshot=snap;
   renderConnectionHealth();
   checkVersion(snap); // 服务端版本变了（已部署新版本）→ 提示刷新
@@ -1021,6 +1090,8 @@ function backupProgressMode(progress){
   if(progress.state==='interrupted') return 'interrupted';
   if(progress.state==='completed') return 'completed';
   if(progress.state==='failed') return 'failed';
+  if(progress.state==='stopping') return 'stopping';
+  if(progress.state==='stopped') return 'stopped';
   if(progress.state==='running'){
     if(progress.phase==='preparing') return 'preparing';
     if(progress.phase==='waiting_authorization') return 'waiting-authorization';
@@ -1067,11 +1138,13 @@ function backupFailureMessage(d,fallbackKey){
 function renderBackupProgress(d){
   var u=d.udid, panel=document.getElementById('bkbar-'+u); if(!panel) return;
   var progress=d.backup_progress;
-  if(!progress && (d.backing_up || d.backup_state==='stopped')) progress={state:'preparing'};
+  var running=window.IOSBKConsole?IOSBKConsole.isBackupRunning(d):!!d.backing_up;
+  if(!progress && (running || d.backup_state==='stopped')) progress={state:'preparing'};
   if(!progress){ panel.classList.add('hidden'); panel.removeAttribute('data-progress-mode'); return; }
 
   var mode=d.backup_state==='stopping'?'stopping':(d.backup_state==='stopped'?'stopped':backupProgressMode(progress)), copy=backupProgressCopy(mode,d);
-  panel.classList.remove('hidden'); panel.setAttribute('data-progress-mode',mode);
+  var terminal=['completed','failed','stopped','interrupted'].indexOf(mode)>=0;
+  panel.classList.toggle('hidden',!running && (d.backing_up || !terminal)); panel.setAttribute('data-progress-mode',mode);
   var title=document.getElementById('bkprogress-title-'+u), subtitle=document.getElementById('bkprogress-subtitle-'+u), value=document.getElementById('bkprogress-value-'+u);
   var track=document.getElementById('bkprogress-track-'+u), fill=document.getElementById('bkprogress-fill-'+u);
   var overall=isBackupProgressNumber(progress.overall_percent) && progress.overall_percent<=100 ? progress.overall_percent : null;
@@ -1098,6 +1171,7 @@ function renderBackupProgress(d){
 }
 function rerenderBackupProgress(){ Object.keys(latestDeviceStatuses).forEach(function(udid){ renderBackupProgress(latestDeviceStatuses[udid]); }); }
 function patchDevice(d){
+  if(window.IOSBKChecks)window.IOSBKChecks.render(d);
   renderPairingResult(d);
   var u=d.udid;
   latestDeviceStatuses[u]=d;
@@ -1119,10 +1193,11 @@ function patchDevice(d){
     btn.disabled = dis;
     btn.setAttribute('style','gap:9px;padding:10px 17px;font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit;border:none;white-space:nowrap;min-width:132px;'+(dis?'background:#F3F7FA;color:#ADB9C2;cursor:not-allowed;':'background:#2C62C6;color:#fff;'));
     var retry=d.backup_progress && (d.backup_progress.state==='interrupted'||d.backup_progress.state==='failed');
-    btn.innerHTML = d.backing_up ? '<span data-i18n="device.backingUp"></span>' : (d.auto_backup_hold?'<span data-i18n="control.manualOnce"></span>':(retry?'<span data-i18n="progress.retry"></span>':'<span data-i18n="device.backupNow"></span>'));
+    btn.innerHTML = d.backing_up ? '<span data-i18n="'+IOSBKConsole.busyLabel(d)+'"></span>' : (d.auto_backup_hold?'<span data-i18n="control.manualOnce"></span>':(retry?'<span data-i18n="progress.retry"></span>':'<span data-i18n="device.backupNow"></span>'));
     btn.style.opacity='';
   }
   renderBackupControl(d);
+  var advanced=document.getElementById('backupAdvanced-'+u);if(advanced)advanced.disabled=!!btn.disabled;
 }
 
 /* ============== header actions ============== */
@@ -1145,42 +1220,46 @@ document.addEventListener('click', function(e){
 });
 
 /* ============== backup settings ============== */
-function saveConfig(udid){
-  var cfg={
-    start_time: document.getElementById('startTime-'+udid).value,
-    end_time: document.getElementById('endTime-'+udid).value,
-    backup_interval: parseInt(document.getElementById('backupInterval-'+udid).value),
-    min_battery_level: parseInt(document.getElementById('minBattery-'+udid).value),
-    only_when_charging: document.getElementById('chargingToggle-'+udid).classList.contains('on'),
-    backup_directory: document.getElementById('backupDir-'+udid).value,
-    auto_backup_enabled: document.getElementById('autoBackupToggle-'+udid).classList.contains('on'),
-    network_address: document.getElementById('networkAddress-'+udid).value.trim()
-  };
-  postJSON('/api/save-config/'+udid, cfg).then(function(data){ if(data.error){ toast(data,true); } else { clearDirty(udid); toast('bset.saved'); } }).catch(function(e){ toast('common.operationFailed',true); });
+var connectionChecks={};
+function clearConnectionResults(udid){
+  connectionChecks[udid]=(connectionChecks[udid]||0)+1;
+  ['dirResult-','ipResult-'].forEach(function(prefix){
+    var id=prefix+udid,box=document.getElementById(id);
+    delete inlineResults[id];
+    if(box){box.textContent='';box.classList.add('hidden');}
+  });
+  var button=document.getElementById('testIPBtn-'+udid);
+  if(button){button.disabled=false;button.style.opacity='';}
 }
 function checkBackupDir(udid){
   var path=(document.getElementById('backupDir-'+udid).value||'').trim();
+  var epoch=connectionChecks[udid]||0;
+  function current(){return epoch===(connectionChecks[udid]||0)&&path===(document.getElementById('backupDir-'+udid).value||'').trim();}
   var box=document.getElementById('dirResult-'+udid);
   box.classList.remove('hidden'); showInlineResult(box,null,'bset.dirChecking');
   postJSON('/api/check-dir',{path:path}).then(function(d){
+    if(!current())return;
     box.textContent='';
     if(d.ok){ showInlineResult(box,true,'bset.dirOk'); return; }
     showInlineResult(box,false,d,'bset.dirBad');
-  }).catch(function(e){ showInlineResult(box,false,{},'common.operationFailed'); });
+  }).catch(function(e){ if(current())showInlineResult(box,false,{},'common.operationFailed'); });
 }
 function testDeviceIP(udid){
   var btn=document.getElementById('testIPBtn-'+udid);
   if(btn.disabled) return;
   var ip=(document.getElementById('networkAddress-'+udid).value||'').trim();
+  var epoch=connectionChecks[udid]||0;
+  function current(){return epoch===(connectionChecks[udid]||0)&&ip===(document.getElementById('networkAddress-'+udid).value||'').trim();}
   var box=document.getElementById('ipResult-'+udid);
   box.classList.remove('hidden'); showInlineResult(box,null,'bset.testing');
   if(!ip){ showInlineResult(box,false,'action.testDeviceIP.enterTheDeviceIpFirst'); return; }
   btn.disabled=true; btn.style.opacity='.6';
   postJSON('/api/test-ip/'+udid, {ip:ip}).then(function(d){
+    if(!current())return;
     if(d.status) applyStatus(d.status);
     if(d.ok){ showInlineResult(box,true,'bset.testOk'); }
     else { showInlineResult(box,false,d,'action.testDeviceIP.unreachable'); }
-  }).catch(function(e){ showInlineResult(box,false,{},'common.operationFailed'); }).finally(function(){ btn.disabled=false; btn.style.opacity=''; });
+  }).catch(function(e){ if(current())showInlineResult(box,false,{},'common.operationFailed'); }).finally(function(){ if(current()){btn.disabled=false;btn.style.opacity='';} });
 }
 function pairingStatusText(d){
   var request=manualPairingRequests[d.udid];
@@ -1270,10 +1349,12 @@ function gateMsg(d){
   if(!key) return 'gate.cant';
   return {message_code:key,params:{b:d.battery,m:d.min_battery}};
 }
-function startBackup(udid, btn){
+function startBackup(udid, btn){ submitBackup(udid, btn, 'auto'); }
+function submitBackup(udid, btn, mode){
   btn.disabled=true; btn.style.opacity='.6';
-  function fail(payload){ toast(payload,true,'gate.cant'); btn.disabled=false; btn.style.opacity=''; }
-  csrfFetch('/api/backup/'+udid,{method:'POST'}).then(function(r){return r.json();}).then(function(data){
+  var advanced=document.getElementById('backupAdvanced-'+udid);if(advanced)advanced.disabled=true;
+  function fail(payload){ toast(payload,true,'gate.cant'); btn.disabled=false; btn.style.opacity=''; if(advanced)advanced.disabled=false; }
+  csrfFetch('/api/backup/'+udid,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode:mode||'auto'})}).then(function(r){return r.json();}).then(function(data){
     if(data.error_code || (data.error && data.code)){ fail(gateMsg(data)); }          // 被限制（未充电/电量低/离线/正忙）→ 说明原因
     else if(data.error){ fail(data); }
     else toast('action.fail.backupStartedYourDeviceWill');
@@ -1286,7 +1367,7 @@ let backupStopTarget=null, backupStopSubmitting=false, backupStopFocus=null;
 function renderBackupControl(d){
   var u=d.udid, pending=!!backupControlPending[u], stopping=d.backup_state==='stopping';
   var stop=document.getElementById('stopBackup-'+u);
-  if(stop){stop.classList.toggle('hidden',!d.backing_up);stop.disabled=pending||stopping||!d.backup_job_id;stop.textContent=tr(stopping?'control.stopping':'control.stop');}
+  if(stop){stop.classList.toggle('hidden',!d.backing_up||d.backup_job_active===false);stop.disabled=pending||stopping||!d.backup_job_id;stop.textContent=tr(stopping?'control.stopping':'control.stop');}
   var banner=document.getElementById('backupHold-'+u);
   if(banner)banner.classList.toggle('hidden',!d.auto_backup_hold);
   var message=document.getElementById('backupHoldMessage-'+u);
@@ -1305,7 +1386,7 @@ function renderStopBackupDialog(){
 }
 function openStopBackup(udid){
   var d=latestDeviceStatuses[udid];
-  if(!d||!d.backing_up||!d.backup_job_id||d.backup_state==='stopping'||backupControlPending[udid])return;
+  if(!d||!d.backing_up||d.backup_job_active===false||!d.backup_job_id||d.backup_state==='stopping'||backupControlPending[udid])return;
   backupStopTarget={udid:udid,jobID:d.backup_job_id};
   backupStopFocus=document.activeElement;
   backupStopSubmitting=false;
@@ -1374,7 +1455,7 @@ const backupBrowserRenderer=window.IOSBKBackupBrowser.domRenderer({document:docu
 const backupBrowser=window.IOSBKBackupBrowser.create({
   fetch:function(url,options){return options.method==='POST'?csrfFetch(url,options):IOSBKI18n.fetch(url,options);},
   render:backupBrowserRenderer,
-  isVisible:function(udid){var card=document.getElementById('panel-'+udid),section=document.querySelector('[data-sec-panel="backups"][data-udid="'+udid+'"]');return !document.hidden&&card&&!card.classList.contains('hidden')&&section&&!section.classList.contains('hidden');},
+  isVisible:function(udid){var card=document.getElementById('panel-'+udid),section=document.querySelector('[data-sec-panel="backups"][data-udid="'+udid+'"]');return !!document.getElementById('backupOverview-'+udid).closest('dialog[open]')&&!document.hidden&&card&&!card.classList.contains('hidden')&&section&&!section.classList.contains('hidden');},
   setTimeout:function(fn,delay){return setTimeout(fn,delay);},clearTimeout:function(timer){clearTimeout(timer);}
 });
 document.addEventListener('visibilitychange',function(){backupBrowser.visibilityChanged();});
@@ -1448,6 +1529,7 @@ function setRestoreEnabled(udid, enable){
 }
 let restoreUdid=null, restoreExpect='';
 function openRestoreModal(udid, devName){
+  IOSBKConsole.closeLayers();
   restoreUdid=udid; restoreExpect=devName||'';
   document.getElementById('rmDevName').textContent=restoreExpect;
   document.getElementById('rmExpect').textContent=restoreExpect;
@@ -1481,6 +1563,7 @@ function submitRestore(){
 window.addEventListener('DOMContentLoaded', function(){
   applyI18n();
   applyStatus(INITIAL_STATUS);
+  IOSBKConsole.init();
   connectSSE();
   // 备份设置改动即标脏（输入框/下拉/时间/滑块都会冒泡 input/change；开关走 flipToggle）
   document.addEventListener('input', function(e){ markDirty(panelUdid(e.target)); });
@@ -1499,6 +1582,7 @@ function trapFocusWithin(container, event){
   event.preventDefault(); focusable[next].focus();
 }
 document.addEventListener('keydown', function(event){
+  if(document.querySelector('dialog[open]')) return;
   if(event.key==='Tab'){
     var removeModal=document.getElementById('removeDeviceModal');
     if(!removeModal.classList.contains('hidden')){ trapFocusWithin(removeModal,event); return; }

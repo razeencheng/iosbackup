@@ -2,13 +2,13 @@
 
 [简体中文](backup-browser.zh-CN.md) · [Back to the operations manual](../OPERATIONS.md)
 
-Open a device's **Backups** tab to read the backup stored on the server or NAS. The phone can be offline: the overview and an unencrypted file list are read locally. Starting a backup, changing its encryption password, and restoring a device still require an available device connection.
+In **Backups**, open the date marked **Current backup source**, then **Browse the current backup file list**. When history is off, use the separate **Current backup set** entry. This reads the current backup stored on the server or NAS. The phone can be offline: the overview and an unencrypted file list are read locally. Starting a backup, changing its encryption password, and restoring a device still require an available device connection.
 
 The list contains paths and metadata, not the contents of photos, messages, or other files. A readable list does not establish that the backup can be restored. Check backup completion, file-list readability, file contents, and a recovery rehearsal separately.
 
 ## Read and refresh
 
-1. Open the device card and select **Backups**. Existing backups are indexed on first viewing; starting the application does not scan every device's backup.
+1. Open **Backups → the current source’s Details → Browse the current backup file list**. Existing backups are indexed when the file list is first opened; starting the application does not scan every device's backup.
 2. Wait for the local read to finish. The page shows the overview and a file-list preview automatically. **Refresh** requests another local read; no phone connection is needed.
 3. Check the status strip and both read times. The overview and list can have different timestamps when only one part of an update succeeds. **Last successful backup** is the application's separate success record, not the time the information was read.
 4. Use **Retry reading** after checking the backup location, mount, permissions, and free space if a read fails. `—` means unknown or unavailable, not zero or unencrypted.
@@ -58,3 +58,21 @@ Current built-in limits are:
 These limits protect NAS memory, CPU and disk use; they are not additional environment settings. Allow free space for the index as well as the original backup. A budget or storage failure does not publish a partial list as complete. Compatible previous data is kept when possible, while the page reports the failed update. The index can be regenerated from a readable unencrypted backup; an encrypted historical list may not be reproducible without another successful compatible online query.
 
 See [Encryption and credentials](encryption.md), [Devices and storage](device-storage.md), and [Instance backup and recovery](instance-recovery.md) for protecting the actual backup and its credentials. Local unpacking remains a separate [experimental operation](experimental.md).
+
+## Task records and backup mode
+
+Open the device's **Task records** tab, filter by type or result, and select a job to inspect its requested mode, execution outcome, phase events and last confirmed backup activity. Records survive restarts and remain available while the device is offline. Page refreshes and connection heartbeats do not advance backup activity time.
+
+The page displays up to 1,000 recent events. **Copy logs** produces readable text; **Download logs** exports a JSONL summary and all retained events. Retention is up to 30 days, capped by 1,000 completed jobs, 10,000 events / 1 MiB per job, and a 256 MiB total budget, whichever is reached first. Active summaries are protected separately; atomic writes need temporary space. Corrupt or orphaned records also have age and capacity limits. Truncation, expiration and saving failures are shown explicitly; exporting cannot recover already-pruned events. Review device names and identifiers in the summary before sharing it.
+
+Select **Back up now** to start in automatic mode, letting the device and tool choose a compatible mode. To request a complete backup again, use the adjacent **⋯ → Advanced: force a full backup** control, read the explanation and confirm. This affects only this request, not the automatic schedule. Observed mode remains **Unknown** without reliable evidence. History settings determine whether an independent version is retained; task records themselves do not contain backup data. The device card keeps the success, failure, stopped or interrupted result visible after the backup ends.
+
+## Read-only backup checks
+
+Every successful backup command is followed by a quick check with a 30-second deadline. It reads required plist metadata, the `SnapshotState=finished` marker and the presence of a nonempty `Manifest.db`; it does not scan every object. Encrypted backups can pass this metadata check without decrypting their manifest.
+
+Select **Check backup** for an offline manifest/object scan with a 15-minute deadline. For readable unencrypted manifests, regular-file entries must reference an existing regular object; directories and symbolic links do not require ordinary file objects. Unknown record types, missing tools, inaccessible sources, cancellation and timeouts retain the completed coverage and cannot count as a complete pass. The page reports **passed**, **issues found**, or **incomplete/unavailable**. Neither check validates every content hash or guarantees a successful restore on a device.
+
+Checks share the local scan limit and exclude writes to the same device's backup. Use **Cancel check** to cancel the selected scan. Completed results are included in task records and exports. Changing the backup source or writing it again marks old evidence stale; after restart, its current validity is unknown until checked again. Backup execution, checking and history saving are shown separately. A tool success remains an execution success even when checking needs attention. Manual checks do not send notifications.
+
+Quick checks show required metadata and completion-marker coverage, without counts for a manifest scan they did not perform. Cancellation stops the task, timeout interrupts it, and read failure fails it; a finished scan that finds issues still retains its valid conclusion. An incomplete latest attempt can also show the previous completed result while its task record remains retained, with its own timestamp and source validity.

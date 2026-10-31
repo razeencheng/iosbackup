@@ -18,6 +18,7 @@ Before enabling a schedule, **complete one USB backup on a non-critical device**
 | [Enable and validate Wi-Fi backup](manual/wifi.md) | Prepare on a computer, pair on the NAS, validate Wi-Fi and fall back to USB |
 | [Manage backup encryption and passwords](manual/encryption.md) | Distinguish four credentials and handle existing encrypted backups |
 | [Browse local backups and export file lists](manual/backup-browser.md) | Read while the phone is offline, distinguish read times, search the bounded preview and download a complete saved CSV |
+| [Historical restore points and complete export](manual/backup-history.md) | Three-day retention, pinning, checks, full export, enable/disable behavior and storage costs (development branch) |
 | [Configure and verify notifications](manual/notifications.md) | Save rules, check test delivery and observe a real event |
 | [Manage devices and storage](manual/device-storage.md) | Remove and re-add devices, check capacity and protect copies |
 | [Restore device data: overview and preparation](manual/restore.md) | Protect the backup and check Finder / Apple Devices prerequisites and validation gaps |

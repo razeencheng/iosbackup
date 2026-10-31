@@ -40,7 +40,7 @@ func copyFor(language, key string) string {
 
 func defaultTemplatesFor(language string) map[string]string {
 	result := make(map[string]string)
-	for _, event := range []Type{BackupStart, BackupSuccess, BackupFailed, DeviceOnline, DeviceOffline} {
+	for _, event := range []Type{BackupStart, BackupSuccess, BackupFailed, BackupCheckAttention, BackupHistoryAttention, DeviceOnline, DeviceOffline} {
 		result[string(event)] = copyFor(language, "body."+string(event))
 	}
 	result[string(SystemError)] = "${content}"
@@ -68,6 +68,21 @@ func localizeMessage(message Message, language string) Message {
 		return message
 	}
 	if message.Test {
+		if message.Params == nil {
+			message.Params = map[string]string{}
+		}
+		message.Params["execution_result"] = copyFor(language, "outcome.succeeded")
+		message.Params["check_result"] = copyFor(language, "outcome.passed")
+		message.Params["history_result"] = copyFor(language, "outcome.not_enabled")
+		if message.Type == BackupCheckAttention {
+			message.Params["check_result"] = copyFor(language, "outcome.unavailable")
+		}
+		if message.Type == BackupHistoryAttention {
+			message.Params["history_result"] = copyFor(language, "outcome.failed")
+		}
+		if message.Type == BackupFailed {
+			message.Params["execution_result"] = copyFor(language, "outcome.failed")
+		}
 		message.DeviceName = copyFor(language, "device.test")
 		message.Title = copyFor(language, "test.title") + ": " + copyFor(language, "title."+string(message.Type))
 		message.Content = copyFor(language, "test.body")
@@ -76,7 +91,7 @@ func localizeMessage(message Message, language string) Message {
 		}
 		return message
 	}
-	if message.Type == BackupFailed {
+	if message.Type == BackupFailed || (message.Type == BackupCheckAttention || message.Type == BackupHistoryAttention) && (message.ReasonCode != "" || message.ReasonMessageCode != "") {
 		reason := message.ExtraFields["reason"]
 		if reason != "" {
 			message.ExtraFields["diagnostics"] = reason
@@ -136,7 +151,7 @@ func (manager *Manager) NewTestMessage(event Type) *Message {
 	if event == BackupFailed || event == SystemError {
 		level = LevelError
 	}
-	if event == DeviceOffline {
+	if event == DeviceOffline || event == BackupCheckAttention || event == BackupHistoryAttention {
 		level = LevelWarning
 	}
 	return &Message{Type: event, Level: level, Test: true, DeviceUDID: "test-device"}

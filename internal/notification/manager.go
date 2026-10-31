@@ -404,10 +404,12 @@ func MergeTemplates(templates map[string]string) map[string]string {
 func ValidateTemplates(templates map[string]string) error {
 	knownTypes := map[string]bool{
 		string(BackupStart): true, string(BackupSuccess): true, string(BackupFailed): true,
+		string(BackupCheckAttention): true, string(BackupHistoryAttention): true,
 		string(DeviceOnline): true, string(DeviceOffline): true, string(SystemError): true,
 	}
 	knownVariables := map[string]bool{
 		"type": true, "level": true, "title": true, "content": true,
+		"execution_result": true, "check_result": true, "history_result": true,
 		"device_name": true, "device_udid": true, "timestamp": true, "reason": true, "diagnostics": true,
 	}
 	for eventType, template := range templates {
@@ -452,6 +454,7 @@ func renderTemplate(message Message, templates map[string]string) string {
 func ValidateRules(rules map[string][]string, notifiers []map[string]interface{}) error {
 	knownTypes := map[string]bool{
 		string(BackupStart): true, string(BackupSuccess): true, string(BackupFailed): true,
+		string(BackupCheckAttention): true, string(BackupHistoryAttention): true,
 		string(DeviceOnline): true, string(DeviceOffline): true, string(SystemError): true,
 	}
 	knownNotifiers := make(map[string]bool, len(notifiers))
@@ -545,6 +548,6 @@ func NewManagerFromConfig(config *Config, allowPrivate []netip.Prefix, options O
 		manager.Close()
 		return nil, err
 	}
-	manager.SetRules(config.NotificationRules)
+	manager.SetRules(MigrateBackupOutcomeRules(config.NotificationRules))
 	return manager, nil
 }

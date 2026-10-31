@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="{{.Locale}}">
+<html lang="{{.Locale}}" data-timezone="{{.Timezone}}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -82,7 +82,7 @@
     <div style="background:#fff;border:1px solid #D8E2EA;border-radius:var(--iosbk-radius);padding:18px;margin-bottom:14px">
       <div style="font-size:15px;font-weight:600" data-i18n="notif.templatesTitle">{{t $.Locale "notif.templatesTitle"}}</div>
       <div style="font-size:12.5px;color:#6F7E8C;margin-top:3px;margin-bottom:5px" data-i18n="notif.templatesBody">{{t $.Locale "notif.templatesBody"}}</div>
-      <div style="font-size:12px;color:#718090;margin-bottom:14px"><code>${title}</code> · <code>${content}</code> · <code>${device_name}</code> · <code>${device_udid}</code> · <code>${timestamp}</code> · <code>${type}</code> · <code>${level}</code> · <code>${reason}</code> · <code>${diagnostics}</code></div>
+      <div style="font-size:12px;color:#718090;margin-bottom:14px"><code>${title}</code> · <code>${content}</code> · <code>${device_name}</code> · <code>${device_udid}</code> · <code>${timestamp}</code> · <code>${type}</code> · <code>${level}</code> · <code>${reason}</code> · <code>${diagnostics}</code> · <code>${execution_result}</code> · <code>${check_result}</code> · <code>${history_result}</code></div>
       <div id="templates" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px"></div>
     </div>
 
@@ -90,7 +90,7 @@
     <div style="background:#fff;border:1px solid #D8E2EA;border-radius:var(--iosbk-radius);padding:18px;display:flex;flex-wrap:wrap;gap:14px;align-items:center;justify-content:space-between">
       <div style="flex:1;min-width:200px"><div style="font-size:15px;font-weight:600" data-i18n="notif.testTitle">{{t $.Locale "notif.testTitle"}}</div><div style="font-size:12.5px;color:#6F7E8C;margin-top:3px" data-i18n="notif.testUsesSaved">{{t $.Locale "notif.testUsesSaved"}}</div><div id="notifTestHint" role="status" aria-live="polite" style="font-size:12.5px;color:#6F7E8C;margin-top:5px">{{t $.Locale "notif.loading"}}</div></div>
       <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-        <select id="testType" class="iosbk-in" style="width:auto;min-width:150px"><option value="backup_start" data-i18n="notif.evtStart">{{t $.Locale "notif.evtStart"}}</option><option value="backup_success" data-i18n="notif.evtSuccess">{{t $.Locale "notif.evtSuccess"}}</option><option value="backup_failed" data-i18n="notif.evtFailed">{{t $.Locale "notif.evtFailed"}}</option><option value="device_online" data-i18n="notif.evtOnline">{{t $.Locale "notif.evtOnline"}}</option><option value="device_offline" data-i18n="notif.evtOffline">{{t $.Locale "notif.evtOffline"}}</option><option value="system_error" data-i18n="notif.evtError">{{t $.Locale "notif.evtError"}}</option></select>
+        <select id="testType" class="iosbk-in" style="width:auto;min-width:150px"><option value="backup_start" data-i18n="notif.evtStart">{{t $.Locale "notif.evtStart"}}</option><option value="backup_success" data-i18n="notif.evtSuccess">{{t $.Locale "notif.evtSuccess"}}</option><option value="backup_failed" data-i18n="notif.evtFailed">{{t $.Locale "notif.evtFailed"}}</option><option value="backup_check_attention" data-i18n="notif.evtCheck">{{t $.Locale "notif.evtCheck"}}</option><option value="backup_history_attention" data-i18n="notif.evtHistory">{{t $.Locale "notif.evtHistory"}}</option><option value="device_online" data-i18n="notif.evtOnline">{{t $.Locale "notif.evtOnline"}}</option><option value="device_offline" data-i18n="notif.evtOffline">{{t $.Locale "notif.evtOffline"}}</option><option value="system_error" data-i18n="notif.evtError">{{t $.Locale "notif.evtError"}}</option></select>
         <button id="notifTestBtn" disabled aria-describedby="notifTestHint" onclick="testNotification()" style="display:inline-flex;align-items:center;gap:8px;padding:9px 16px;background:#2E7D5B;color:#fff;border:none;border-radius:var(--iosbk-radius);font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-send"></use></svg><span data-i18n="notif.test">{{t $.Locale "notif.test"}}</span></button>
       </div>
     </div>
@@ -178,6 +178,8 @@ const RULE_DEFS = [
   { rk:'backup_start', lbl:'notif.evtStart', icon:'play', color:'#6F7E8C' },
   { rk:'backup_success', lbl:'notif.evtSuccess', icon:'check-circle', color:'#2E7D5B' },
   { rk:'backup_failed', lbl:'notif.evtFailed', icon:'x-circle', color:'#BD2C24' },
+ {rk:'backup_check_attention',lbl:'notif.evtCheck',icon:'info',color:'#8A5A12'},
+ {rk:'backup_history_attention',lbl:'notif.evtHistory',icon:'info',color:'#8A5A12'},
   { rk:'device_online', lbl:'notif.evtOnline', icon:'wifi', color:'#0B7565' },
   { rk:'device_offline', lbl:'notif.evtOffline', icon:'power', color:'#718090' },
   { rk:'system_error', lbl:'notif.evtError', icon:'alert', color:'#B45309' }

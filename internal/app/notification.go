@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"time"
 
 	notificationpkg "iosbackup/internal/notification"
 )
@@ -50,17 +51,21 @@ func (app *application) notifySystemEvent(code string, params map[string]string)
 	}
 }
 
-func notificationManagerOptions(workerCount, queueSize int) notificationpkg.Options {
+func notificationManagerOptions(workerCount, queueSize int, clocks ...func() time.Time) notificationpkg.Options {
+	now := nowBeijing
+	if len(clocks) > 0 && clocks[0] != nil {
+		now = clocks[0]
+	}
 	return notificationpkg.Options{
-		Now:         nowBeijing,
+		Now:         now,
 		Logf:        log.Printf,
 		WorkerCount: workerCount,
 		QueueSize:   queueSize,
 	}
 }
 
-func newNotificationManager() *notificationManager {
-	return notificationpkg.NewManager(notificationManagerOptions(4, 100))
+func newNotificationManager(clocks ...func() time.Time) *notificationManager {
+	return notificationpkg.NewManager(notificationManagerOptions(4, 100, clocks...))
 }
 
 func newNotificationManagerWithLimits(workerCount, queueSize int) *notificationManager {

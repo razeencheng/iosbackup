@@ -4,6 +4,7 @@ import (
 	"context"
 	"embed"
 	"html/template"
+	"iosbackup/internal/backupstore"
 	"sync"
 	"time"
 )
@@ -45,23 +46,25 @@ type device struct {
 
 // BackupConfig 备份配置结构
 type backupConfig struct {
-	UDID                  string     `json:"udid"`
-	Name                  string     `json:"name"`
-	DeviceType            string     `json:"device_type,omitempty"` // 移除设备后保留型号，供恢复面板展示
-	StartTime             string     `json:"start_time"`
-	EndTime               string     `json:"end_time"`
-	BackupInterval        int        `json:"backup_interval"` // 小时
-	MinBatteryLevel       int        `json:"min_battery_level"`
-	OnlyWhenCharging      bool       `json:"only_when_charging"`
-	BackupDirectory       string     `json:"backup_directory"`
-	AutoBackupEnabled     bool       `json:"auto_backup_enabled"`
-	AutoBackupHold        bool       `json:"auto_backup_hold,omitempty"`
-	AutoBackupHoldVersion string     `json:"auto_backup_hold_version,omitempty"`
-	LastBackup            time.Time  `json:"last_backup"`
-	NetworkAddress        string     `json:"network_address,omitempty"`        // 可选：Wi-Fi/Tailscale IP（跨子网用）；零值安全
-	LastBackupConnection  string     `json:"last_backup_connection,omitempty"` // 上次备份的连接类型（usb/network）；零值安全
-	RestoreEnabled        bool       `json:"restore_enabled,omitempty"`        // 每设备恢复开关，默认 false（关时 restore 端点 403）
-	RemovedAt             *time.Time `json:"removed_at,omitempty"`             // 可恢复移除时间；非空时不发现、不展示、不执行任务
+	HistoryPolicyPending  bool               `json:"history_policy_pending,omitempty"`
+	History               backupstore.Policy `json:"history"`
+	UDID                  string             `json:"udid"`
+	Name                  string             `json:"name"`
+	DeviceType            string             `json:"device_type,omitempty"` // 移除设备后保留型号，供恢复面板展示
+	StartTime             string             `json:"start_time"`
+	EndTime               string             `json:"end_time"`
+	BackupInterval        int                `json:"backup_interval"` // 小时
+	MinBatteryLevel       int                `json:"min_battery_level"`
+	OnlyWhenCharging      bool               `json:"only_when_charging"`
+	BackupDirectory       string             `json:"backup_directory"`
+	AutoBackupEnabled     bool               `json:"auto_backup_enabled"`
+	AutoBackupHold        bool               `json:"auto_backup_hold,omitempty"`
+	AutoBackupHoldVersion string             `json:"auto_backup_hold_version,omitempty"`
+	LastBackup            time.Time          `json:"last_backup"`
+	NetworkAddress        string             `json:"network_address,omitempty"`        // 可选：Wi-Fi/Tailscale IP（跨子网用）；零值安全
+	LastBackupConnection  string             `json:"last_backup_connection,omitempty"` // 上次备份的连接类型（usb/network）；零值安全
+	RestoreEnabled        bool               `json:"restore_enabled,omitempty"`        // 每设备恢复开关，默认 false（关时 restore 端点 403）
+	RemovedAt             *time.Time         `json:"removed_at,omitempty"`             // 可恢复移除时间；非空时不发现、不展示、不执行任务
 }
 
 // BackupLog 备份日志结构
@@ -115,6 +118,7 @@ const (
 
 // App 应用结构
 type application struct {
+	historyHTTP         *historyService
 	backupIndex         *backupIndexCoordinator
 	backupIndexStatuses map[string]backupIndexBrief
 	backupIndexClosed   bool
@@ -158,7 +162,13 @@ type application struct {
 	htmlTemplate              *template.Template
 	loginTemplate             *template.Template
 	onboardingTemplate        *template.Template
-	backupInProgress          map[string]bool // 跟踪正在备份的设备
+	backupInProgress          map[string]bool // 备份及其他互斥操作共用的占用标志
+	historyReviewInProgress   map[string]bool // 仅用于区分历史检查的界面状态
+	backupStorage             *backupStorage
+	backupGenerations         *generationStore
+	backupJobRecords          *backupJobStore
+	backupCheckResults        map[string]backupCheckResult
+	backupChecks              map[string]*backupCheckRun
 	backupJobs                map[string]*backupJob
 	backupHolds               map[string]backupHold
 	checkInProgress           map[string]bool // 跟踪正在检查备份条件的设备
@@ -283,6 +293,7 @@ func (app *application) replaceNotificationManager(manager *notificationManager)
 // defaultBackupConfig 返回新设备的默认备份配置（唯一来源，避免多处漂移）。
 func (app *application) defaultBackupConfig(udid, name string) *backupConfig {
 	return &backupConfig{
+		History:           backupstore.Policy{Days: 3},
 		UDID:              udid,
 		Name:              name,
 		StartTime:         "18:00",
@@ -299,6 +310,9 @@ func (app *application) defaultBackupConfig(udid, name string) *backupConfig {
 // applyBackupConfigDefaults 补齐旧版或部分配置缺少的必填字段。
 func (app *application) applyBackupConfigDefaults(cfg *backupConfig) {
 	defaults := app.defaultBackupConfig(cfg.UDID, cfg.Name)
+	if cfg.History.Days == 0 {
+		cfg.History.Days = 3
+	}
 	if cfg.StartTime == "" {
 		cfg.StartTime = defaults.StartTime
 	}

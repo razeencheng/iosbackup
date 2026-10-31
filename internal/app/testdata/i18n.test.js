@@ -32,6 +32,14 @@ assert.equal(app.events.at(-1).type,'iosbk:localechange');
 assert.equal(app.api.t('ui.only'),'Fallback');
 assert.equal(app.api.t('greeting',{name:'<script>'}),'你好，<script>');
 assert.equal(app.api.formatDate('2026-10-11T00:30:00Z'),new Intl.DateTimeFormat('zh-CN',{timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date('2026-10-11T00:30:00Z')));
+const utcApp=boot({timezone:'UTC'});
+const expectedUTC=new Intl.DateTimeFormat('en',{timeZone:'UTC',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date('2026-10-11T00:30:00Z'));
+assert.equal(utcApp.api.formatDate('2026-10-11T00:30:00Z'),expectedUTC,'dates must use the deployment timezone');
+assert.equal(utcApp.api.formatDate('2026-10-11 08:30'),expectedUTC,'legacy values remain Beijing wall clocks');
+utcApp.api.setLocale('zh-CN');
+assert.equal(utcApp.api.getTimezone(),'UTC','browser language cannot alter the timezone');
+utcApp.api.setTimezone('Mars/Olympus');
+assert.equal(utcApp.api.getTimezone(),'UTC','invalid status values cannot break date rendering');
 app.api.fetch('/api/example',{headers:{'X-Test':'value'}});
 assert.equal(new Headers(app.requests[0].opts.headers).get('Accept-Language'),'zh-CN');
 assert.equal(new Headers(app.requests[0].opts.headers).get('X-Test'),'value');
@@ -67,6 +75,12 @@ const passwordAction=consoleDOM.get('changeBackupPw-PHONE');passwordAction.setAt
 for(const [conn,available,backingUp,disabled] of [['usb',true,false,false],['offline',false,false,true],['usb',true,true,true],['usb',true,false,false]]) {
  vm.runInContext('patchDevice('+JSON.stringify({udid:'PHONE',conn,operations_available:available,backing_up:backingUp})+')',consoleApp.context);
  assert.equal(passwordAction.disabled,disabled,'password action gating for '+conn+' / backing_up='+backingUp);
+}
+for(const operation of ['check','local','backup']) {
+ vm.runInContext('patchDevice('+JSON.stringify({udid:'PHONE',conn:'usb',operations_available:true,backing_up:true,active_operation:operation})+')',consoleApp.context);
+ assert.equal(passwordAction.disabled,true,'busy operation must retain device action protection');
+ assert.equal(consoleDOM.get('bkbar-PHONE').classList.contains('hidden'),operation!=='backup','only phone backups show progress/authorization hints');
+ assert.match(consoleDOM.get('backupBtn-PHONE').innerHTML,new RegExp(operation==='check'?'console.checkingBackup':operation==='local'?'console.deviceBusy':'device.backingUp'));
 }
 
 vm.runInContext(`latestEncryptionStatuses.PHONE={online:true,will_encrypt:true};backupEncryptionStates.PHONE=false;listState.PHONE={all:[],filtered:[],page:0,pageSize:200,total:0};showInlineResult(document.getElementById('ipResult-PHONE'),true,'bset.testOk');dirtyCards.add('PHONE');`,consoleApp.context);

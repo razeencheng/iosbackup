@@ -6,7 +6,7 @@ Set up a development environment for offline tests. Use the operations manual fo
 
 ## Prepare the environment
 
-Install Git and Go on a trusted development machine. The current [go.mod](../go.mod) declares language version `go 1.24` and toolchain `go1.27.3`; use the toolchain matching the project/CI. Automatic toolchain selection may download it. “Offline default tests” means the tests themselves do not access external services, not an offline first-time Go installation. Prepare the toolchain and caches before disconnecting if necessary.
+Install Git and Go on a trusted development machine. The current [go.mod](../go.mod) declares minimum version `go 1.25.0` and toolchain `go1.27.3`; use the toolchain matching the project/CI. The minimum supports the root-relative filesystem APIs used by storage and is separate from the selected build toolchain. Automatic toolchain selection may download it. “Offline default tests” means the tests themselves do not access external services, not an offline first-time Go installation. Prepare the toolchain and caches before disconnecting if necessary.
 
 The Go module remains standard-library-only. Do not add third-party Go packages. Image components such as libimobiledevice and netmuxd are separate dependencies recorded in [third_party](../third_party/components.lock.json). Pure Go builds and default unit tests do not require a real phone.
 
@@ -29,6 +29,7 @@ go list -m all
 | `internal/config` | Startup parameter and path parsing/validation |
 | `internal/i18n` | Shared language negotiation and API message resources |
 | `internal/notification` | Notification manager, message types, channel adapters |
+| `internal/backupstore` | Independent history objects, copy/clone preparation, catalogs, read leases and recovery transactions |
 | `internal/persistence` | Atomic file writes and secret-storage support |
 | `internal/boundedio` | Bounded output and line-reading utilities |
 | `internal/buildinfo` | Build identity and version information |
@@ -36,6 +37,10 @@ go list -m all
 | `scripts`, `.github/workflows` | Tests, public-tree/license checks, build and release workflows |
 
 The project is no longer one root-level `package main`. Target `./internal/app` for individual application tests and `./cmd/iosbackup` for the executable. `TestPackageDependencyDirection` checks dependency direction. Read existing module tests before changing behavior.
+
+Historical backup implementation notes and lifecycle contracts are in [the backupstore module](../internal/backupstore/README.md). Retention defaults to three natural days including today; policy confirmation, migration and current-source selection live in `internal/app/backup_history*.go`. History HTTP handlers resolve server-side point IDs, with revision checks and one-use policy previews. Exports stream under read leases and idle deadlines. See [history usage](manual/backup-history.md).
+
+History policy updates persist their target and `history_policy_pending` before starting storage preparation. `PUT /api/backup-history/{udid}/policy` returns `202` with a background operation; disconnecting the request does not cancel that operation. The history list exposes `policy_operation` and `can_retry_policy`. `POST /api/backup-history/{udid}/policy-retry` accepts an empty object and resumes only the saved target. A pending transition must finish before changing the target or backup directory. Restarted tasks also resume preparation before writing new device data. Configuration locks never span backup copying, and the last confirmed source remains available until replacement is durable. Store recovery runs under device write admission and respects read leases.
 
 ## Make a local change
 
@@ -104,7 +109,7 @@ Backup terminal state may include `last_backup_message_code` and `last_backup_me
 
 Keep pending actions, unsaved input and feedback as state plus message descriptions. A language change rerenders that state without restarting an operation, clearing a draft or extending a toast's original expiry.
 
-Keep interface language, notification language and scheduling separate. Notification `language` is persisted per deployment; omitted language remains `zh-CN` for compatibility. An empty body override selects the built-in template when preparing a message. Existing nonempty templates are user content, even when they match an older Chinese default: preserve them until the administrator clears them. Queued messages retain their language and rendered content snapshot; later settings do not translate them again. Switching interface language does not change notification language or backup times. Scheduling, notification timestamps and UI date display currently use `Asia/Shanghai`; `last_backup_at` includes an offset while `last_backup` remains for older clients. Parse legacy offset-free backup times as Beijing time, independently of the browser's timezone.
+Keep interface language, notification language and scheduling separate. Notification `language` is persisted per deployment; omitted language remains `zh-CN` for compatibility. An empty body override selects the built-in template when preparing a message. Existing nonempty templates are user content, even when they match an older Chinese default: preserve them until the administrator clears them. Queued messages retain their language and rendered content snapshot; later settings do not translate them again. Switching interface language does not change notification delivery or backup times. Scheduling, UI timestamps, notifications and application logs use the deployment `TZ` (default `Asia/Shanghai`). Invalid explicit IANA names prevent startup. Changing `TZ` keeps configured clock windows and reinterprets them in the new zone; backup intervals remain elapsed hours. Historical instants do not change. Use `app.nowTime()` / `app.inDeploymentTime()` for wall-clock data; standard `last_backup_at` timestamps include an offset, while legacy `last_backup` remains a Shanghai wall clock for older clients. The binary embeds Go timezone data for scratch images.
 
 Notification tests use the saved configuration. Disable configuration editing until the first response has actually been accepted, and guard mutation functions too. The UI and test function must block testing without that baseline, during a load or save, while the draft is dirty, or after a failed save confirmation. Preserve edits made during a save, ignore stale load responses and keep the draft on failure. If confirmation fails after a baseline was accepted, preserve editing and retry-save access while testing remains blocked. A save is confirmed by reading the configuration back; it does not automatically send a test. See the [notification manual](manual/notifications.md) for user steps.
 
@@ -144,6 +149,14 @@ The test image selection is saved in Compose, so later recreation uses the same 
 Maintain documents by purpose: `README` provides the overview, `QUICKSTART` the short route to a first USB backup, `OPERATIONS` navigation, and `docs/manual/` complete task procedures. `FEATURE_STATUS` defines maturity. Notification fields and events belong in the notification manual, the Webhook contract in `WEBHOOK_GUIDE`, and test scope and result-recording requirements in `TESTING_GUIDE`. The old notification guide and test summary retain links only. Update both languages and their entry links when changing procedures.
 
 From the root of a public checkout, run:
+
+New public manuals must also register both language pages and navigation in `website/content-map.mjs`. Documentation links trigger the separate [website.yml](../.github/workflows/website.yml) checks; passing application tests does not validate the website build. With Node.js 24, run:
+
+```sh
+npm --prefix website ci
+npm --prefix website test
+npm --prefix website run build
+```
 
 ```bash
 ./scripts/check_public_repo.sh --directory .

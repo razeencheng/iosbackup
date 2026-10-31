@@ -9,12 +9,14 @@ import (
 type Type string
 
 const (
-	BackupStart   Type = "backup_start"
-	BackupSuccess Type = "backup_success"
-	BackupFailed  Type = "backup_failed"
-	DeviceOnline  Type = "device_online"
-	DeviceOffline Type = "device_offline"
-	SystemError   Type = "system_error"
+	BackupStart            Type = "backup_start"
+	BackupSuccess          Type = "backup_success"
+	BackupFailed           Type = "backup_failed"
+	BackupCheckAttention   Type = "backup_check_attention"
+	BackupHistoryAttention Type = "backup_history_attention"
+	DeviceOnline           Type = "device_online"
+	DeviceOffline          Type = "device_offline"
+	SystemError            Type = "system_error"
 )
 
 // Level 是通知级别。

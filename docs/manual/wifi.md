@@ -38,7 +38,7 @@ These computer-side routes were checked against official Apple documentation on 
 1. **In the Web UI** , confirm this deployment has paired with the device and completed a USB backup. Otherwise, return to [USB backup](usb-backup.md).
 2. **On the phone** , join a Wi-Fi network that can reach the host and connect a charger. Do not leave a USB data cable connected to the NAS: the application prefers USB when it is available.
 3. **In the Web UI** , wait for discovery to update. With no job running, you can select **Refresh devices** from the upper-right menu. Confirm the target card shows **Wi-Fi connected** .
-4. Open **Backup settings** . Leave **Device IP** blank when local-network discovery works. If a manual address is necessary, complete the next section and return here.
+4. Open **Device settings → Connection and backup location** . Leave **Device IP** blank when local-network discovery works. If a manual address is necessary, complete the next section and return here.
 5. Check the minimum battery, charging requirement, and save location, then select **Back up now** . **On the phone** , enter the device passcode if a white passcode screen appears when the backup wakes it, or unlock it and tap **Trust** if prompted. Maintain Wi-Fi and power throughout the job; keeping the phone unlocked or its screen on is not required.
 6. Wait for an explicit success or failure state. On success, check the completion time, then try reading information and the list under [View backups](inspection.md). Record whether an encrypted list was actually readable.
 
@@ -50,7 +50,7 @@ These computer-side routes were checked against official Apple documentation on 
 A manual IP helps connect an already paired, reachable device. It does not bypass a firewall or supply missing trust or wireless preparation. The test attempts a device connection; it is not merely a latency display.
 
 1. **On the phone or router management page** , identify this device's current IP. Do not guess, use the NAS address, or enter a hostname or a URL with a port.
-2. Ensure no Wi-Fi job is active. **In Web UI → Backup settings** , enter **Device IP** and select **Test connection** .
+2. Ensure no Wi-Fi job is active. **In Web UI → Device settings → Connection and backup location** , enter **Device IP** and select **Test connection** .
 3. Wait for **Device connected. Save settings to keep this IP.** , then select **Save settings** and confirm the save. A successful test alone does not persist the address from the input field.
 4. Confirm the card shows Wi-Fi and run the complete manual backup above. Recheck, test, and save if the address changes. Updating or clearing an existing saved address can restart the wireless connection service, so do it only while idle.
 
@@ -67,7 +67,7 @@ If the known IP still does not establish a connection, stop repeating the test a
 | Brief disappearance or “Waiting for the device to reconnect” | Observe the job phase and last activity. An online device does not mean backup data is still being transferred |
 | Failure, `mobilebackup2 (-4)`, or `backup_stalled` | Preserve surrounding logs and phase information, wait for the job to end, then make the USB comparison below |
 
-1. Turn automatic backup off and save, then wait for the old job's failed, interrupted, or completed state. There is no cancel button in the current version; do not repeatedly restart connection services during an active job.
+1. Turn automatic backup off and save, then wait for the old job's failed, interrupted, or completed state. You can also select **Stop backup** and wait for **Stopping** to finish; do not repeatedly restart connection services during an active job.
 2. Connect the NAS with a reliable USB data cable, respond to passcode or trust prompts, and wait for **USB connected** .
 3. Confirm the same save location and backup set, then start a new manual backup. It is a new job that may incrementally update the existing set, not a resumption of the failed Wi-Fi session.
 4. If USB succeeds but Wi-Fi repeatedly fails, use USB for now. Follow [Troubleshooting](troubleshooting.md); consult the [Wi-Fi NAT case study](wifi-nat.md) only when logs and connection checks point to a problem with an idle connection between subnets. Do not copy firewall rules for a different router without analysis.

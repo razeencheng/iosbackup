@@ -73,6 +73,14 @@
     "system_error": [
       "Telegram_main_bot",
       "Email_gmail"
+    ],
+    "backup_check_attention": [
+      "Telegram_main_bot",
+      "Email_gmail"
+    ],
+    "backup_history_attention": [
+      "Telegram_main_bot",
+      "Email_gmail"
     ]
   },
   "notification_templates": {
@@ -81,7 +89,9 @@
     "backup_failed": "",
     "device_online": "",
     "device_offline": "",
-    "system_error": ""
+    "system_error": "",
+    "backup_check_attention": "",
+    "backup_history_attention": ""
   },
   "language": "zh-CN"
 }

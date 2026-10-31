@@ -9,7 +9,7 @@ import (
 )
 
 var (
-	goDirectiveRE        = regexp.MustCompile(`(?m)^go ([0-9]+)\.([0-9]+)$`)
+	goDirectiveRE        = regexp.MustCompile(`(?m)^go ([0-9]+)\.([0-9]+)(?:\.([0-9]+))?$`)
 	toolchainDirectiveRE = regexp.MustCompile(`(?m)^toolchain go([0-9]+)\.([0-9]+)\.([0-9]+)$`)
 	goBuilderImageRE     = regexp.MustCompile(`(?m)^FROM golang:([0-9]+\.[0-9]+\.[0-9]+)-alpine@(sha256:[0-9a-f]{64}) AS go-builder$`)
 )
@@ -18,7 +18,13 @@ func TestGoToolchainSecurityBaselineIsCentralized(t *testing.T) {
 	module := readRepoFile(t, "go.mod")
 	goMatch := goDirectiveRE.FindStringSubmatch(module)
 	if goMatch == nil {
-		t.Fatal("go.mod must preserve a major.minor source-language compatibility directive")
+		t.Fatal("go.mod must declare the minimum source-compatible Go version")
+	}
+	if goMatch[3] == "" {
+		goMatch[3] = "0"
+	}
+	if versionBefore(t, goMatch[1:], []int{1, 25, 0}) {
+		t.Fatal("storage root-relative APIs require Go 1.25.0 or newer")
 	}
 	toolchainMatch := toolchainDirectiveRE.FindStringSubmatch(module)
 	if toolchainMatch == nil {
@@ -51,7 +57,7 @@ func TestGoToolchainSecurityBaselineIsCentralized(t *testing.T) {
 	assertGoImageSupplyChainRecord(t, imageName, digest)
 
 	contributing := readRepoFile(t, "CONTRIBUTING.md")
-	sourceVersion := strings.Join(goMatch[1:], ".")
+	sourceVersion := strings.TrimPrefix(goMatch[0], "go ")
 	if !strings.Contains(contributing, "Go "+sourceVersion+" or newer") || !strings.Contains(contributing, "Go "+version) {
 		t.Fatalf("CONTRIBUTING.md must distinguish Go %s source compatibility from the Go %s security toolchain", sourceVersion, version)
 	}

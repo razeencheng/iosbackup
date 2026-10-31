@@ -6,7 +6,7 @@
 
 ## 准备环境
 
-在可信开发机安装 Git 和 Go。当前 [go.mod](../go.mod) 的语言版本为 `go 1.24`，工具链指令为 `go1.27.3`；使用与项目/CI 一致的工具链。自动工具链选择可能需要下载，因此“默认测试离线”指测试本身不访问外部服务，不代表首次安装 Go 可以不联网。需要完全断网时，先准备所需工具链与缓存。
+在可信开发机安装 Git 和 Go。当前 [go.mod](../go.mod) 的最低版本为 `go 1.25.0`，工具链指令为 `go1.27.3`；使用与项目/CI 一致的工具链。最低版本满足存储所用的根目录相对文件操作 API，与实际选择的构建工具链分开管理。自动工具链选择可能需要下载，因此“默认测试离线”指测试本身不访问外部服务，不代表首次安装 Go 可以不联网。需要完全断网时，先准备所需工具链与缓存。
 
 Go 模块保持标准库依赖，不添加第三方 Go 包。Docker 镜像内的 libimobiledevice、netmuxd 等系统组件是另一套依赖，版本与许可记录在 [third_party](../third_party/components.lock.json)。纯 Go 编译或默认单元测试不需要连接真实手机。
 
@@ -29,6 +29,7 @@ go list -m all
 | `internal/config` | 启动参数和路径解析、校验 |
 | `internal/i18n` | 共用语言解析与 API 消息资源 |
 | `internal/notification` | 通知管理器、消息类型与渠道适配器 |
+| `internal/backupstore` | 独立历史对象、复制/克隆准备、目录记录、读取占用和恢复事务 |
 | `internal/persistence` | 原子文件写入与秘密存储支持 |
 | `internal/boundedio` | 有界输出、行读取等工具 |
 | `internal/buildinfo` | 构建身份与版本信息 |
@@ -36,6 +37,12 @@ go list -m all
 | `scripts`、`.github/workflows` | 测试、公开目录与许可检查、构建发布流程 |
 
 当前项目不再是根目录单一 `package main`。运行单个应用测试时用 `./internal/app`，运行可执行构建时用 `./cmd/iosbackup`。依赖方向由 `TestPackageDependencyDirection` 检查；查看某模块的现有测试再修改其行为。
+
+
+历史备份的生命周期和存储约定见 [backupstore 模块说明](../internal/backupstore/README.md)。默认保留含当天的 3 个自然日；策略确认、迁移与当前来源选择位于 `internal/app/backup_history*.go`。历史 HTTP 接口由服务端解析点 ID，变更检查版本号，策略使用一次性预览确认。导出持有读取占用并设置写入空闲期限。使用流程见[历史恢复点](manual/backup-history.zh-CN.md)。
+
+历史策略变更先保存目标和 `history_policy_pending`，再准备存储。`PUT /api/backup-history/{udid}/policy` 返回 `202` 及后台操作；请求断开不会取消操作。历史列表提供 `policy_operation` 和 `can_retry_policy`。`POST /api/backup-history/{udid}/policy-retry` 接收空对象，只继续已保存的目标。未完成转换前不能改变目标或备份目录；重启后的新备份也先继续准备，再写入手机数据。配置锁不跨越整份复制，新来源可靠保存前保留已确认来源。存储恢复在设备独占写入期间执行，并尊重读取占用。
+
 
 ## 完成一次本地修改
 
@@ -104,7 +111,7 @@ go run ./internal/i18n/cmd/gencodes -dir internal/i18n -check
 
 将等待中的操作、未保存输入和反馈保存为状态与消息描述。切语只重新渲染，不重新发起操作、不清除草稿，也不延长提示的原到期时间。
 
-界面语言、通知语言和备份调度相互独立。通知 `language` 按部署实例持久化，缺省仍为 `zh-CN`，兼容旧配置。正文覆盖为空时，准备消息时按通知语言选择默认模板。已有非空模板视为用户内容，即使恰好等于旧中文默认值，也要保留，直到管理员主动清空。入队消息保留当时的语言和已渲染内容，后续设置不会再次翻译它们。切换界面语言不改变通知语言或备份时刻。计划、通知时间和界面日期显示当前仍使用 `Asia/Shanghai`；`last_backup_at` 携带偏移，同时为旧客户端保留 `last_backup`。旧的无偏移备份时间须按北京时间解析，不随浏览器时区改变。
+界面语言、通知语言和备份调度相互独立。通知 `language` 按部署实例持久化，缺省仍为 `zh-CN`，兼容旧配置。正文覆盖为空时，准备消息时按通知语言选择默认模板。已有非空模板视为用户内容，即使它恰好等于旧中文默认值，也要保留，直到管理员主动清空。入队消息保留当时的语言和已渲染内容，后续设置不会再次翻译它们。切换界面语言不改变通知或备份时刻。调度、页面、通知和应用日志统一使用部署 `TZ`（默认 `Asia/Shanghai`），显式时区无效时阻止启动。更改 `TZ` 保留已填钟点并按新时区解释；备份间隔继续按实际经过的小时数计算，历史实际时刻不变。墙钟时间使用 `app.nowTime()` / `app.inDeploymentTime()`；标准字段 `last_backup_at` 携带偏移，旧 `last_backup` 仍为上海钟点以兼容旧客户端。二进制嵌入标准库时区数据，支持 scratch 镜像。
 
 通知测试使用已保存配置。实际接纳首次配置响应前，禁止编辑配置，变更函数入口也须检查。尚无已接纳配置、正在加载或保存、草稿未保存、保存确认失败时，界面和测试函数均须禁止测试。保存期间的新编辑、失败时的草稿均要保留，过期加载响应不得覆盖当前状态。已有配置基线时，保存确认失败仍须允许编辑和重试保存，但继续禁止测试。保存后读取配置以确认结果，不自动发送测试。用户步骤见[通知手册](manual/notifications.zh-CN.md)。
 
@@ -144,6 +151,14 @@ docker compose logs iosbackup
 文档修改按职责维护：`README` 负责概览，`QUICKSTART` 负责首次 USB 备份的简要步骤，`OPERATIONS` 负责导航，`docs/manual/` 负责完整任务步骤；功能分级以 `FEATURE_STATUS` 为准。通知字段与事件统一在通知手册，Webhook 协议在 `WEBHOOK_GUIDE`；测试范围和结果记录要求统一在 `TESTING_GUIDE`。旧通知指南和测试总结仅保留入口，不再复制正文。修改正文时同步中英文并更新入口链接。
 
 公开检出的仓库根目录可运行：
+
+新增公开手册时，需要同时在 `website/content-map.mjs` 登记双语页面和导航。文档链接变更也会触发独立的 [website.yml](../.github/workflows/website.yml) 检查；应用测试通过不代表网站构建通过。使用 Node.js 24 执行：
+
+```sh
+npm --prefix website ci
+npm --prefix website test
+npm --prefix website run build
+```
 
 ```bash
 ./scripts/check_public_repo.sh --directory .

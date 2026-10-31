@@ -1,0 +1,54 @@
+/* B 方案：设备卡保留上下文，操作围绕所选备份或任务展开。 */
+.backup-advanced{width:34px;min-height:42px;padding:0;flex:none}
+@media(max-width:540px){.device-action-row{column-gap:8px}.device-action-row .backup-action{min-width:0!important;padding-inline:12px!important}.device-action-row .connection-badge{font-size:11px!important;gap:5px!important;padding-inline:7px!important}}
+.console-tabs{display:flex;gap:12px;padding:0 22px;border-bottom:1px solid #d8e2ea;background:#fff}
+.console-tabs .snav{padding:15px 4px;margin-right:20px;border-radius:0;background:transparent;box-shadow:none;border-bottom:2px solid transparent}
+.console-tabs .snav.active{border-bottom-color:#2c62c6}
+.console-content{padding:24px;background:#fff;min-width:0}
+.console-content h3{margin:0 0 6px;font-size:16px}
+.console-summary{display:grid;grid-template-columns:1.15fr .65fr 1fr auto;gap:18px;padding:8px 0 26px;margin-bottom:22px;border-bottom:1px solid #e5ebf0;align-items:center}
+.console-summary>div{min-width:0}.console-summary strong{display:block;font-size:23px;font-weight:650;margin-top:8px;letter-spacing:-.025em;overflow-wrap:anywhere}.console-summary>div:first-child strong{font-size:18px}
+.console-summary small,.console-eyebrow{font-size:12px;color:#718090;line-height:1.6}.console-summary small{display:block;margin-top:7px}
+.console-summary .history-button{border:0;padding-inline:0;font-size:12px}
+.console-current{display:flex;justify-content:space-between;align-items:center;gap:18px;padding:16px;background:#f6f9fc;border:1px solid #d8e2ea;border-radius:9px;margin-bottom:24px;font-size:14px}
+.console-current .history-note{margin-bottom:0}.console-current button{flex-shrink:0}
+.console-point-row{display:grid;grid-template-columns:1.15fr .8fr 1.1fr .9fr auto;align-items:center;gap:16px;padding:18px 12px;border-bottom:1px solid #e5ebf0;font-size:12px}
+.console-point-row.attention{background:#fffaf0}.console-point-row>div{min-width:0}
+.console-point-row .history-point-select{font-size:13px;font-weight:650;line-height:1.5;min-height:24px;display:block;white-space:normal}
+.console-table-head{padding-block:10px;background:#f6f8fa;border-radius:7px 7px 0 0;color:#718090;font-size:11px}
+.console-subtle{display:block;font-size:11px;color:#718090;margin-top:6px;line-height:1.6}.console-good{color:#2e7d5b}.console-amber{color:#8a5a12}
+.console-row-actions{display:flex;align-items:center;gap:7px;justify-content:flex-end}
+.console-row-actions .history-button{padding:6px 10px;min-height:34px;font-size:12px;white-space:nowrap}
+.console-text-button{border-color:transparent;background:transparent}
+.history-layout,.history-layout.has-selection{display:block;margin-top:14px}.history-layout.has-selection .history-list-column{display:block}
+.history-toolbar h3{font-size:16px}.history-toolbar>.history-button{border:0;background:transparent;padding-inline:0;min-height:30px}
+.history-detail{position:static;border:0;border-radius:0;padding:24px}
+.history-detail h3{margin-top:0;font-size:20px}.console-point-hero{font-size:16px;color:#405162;margin:8px 0 22px}
+.history-detail .history-actions{margin:22px 0}.history-detail .history-note{margin:12px 0}
+.console-related{margin-top:24px;padding-top:16px;border-top:1px solid #e5ebf0}.console-related h4{font-size:14px;margin:0 0 10px}
+.console-navigation-row{display:block;width:100%;padding:14px 0;color:#2c62c6;border:0;border-bottom:1px solid #e5ebf0;background:transparent;text-align:left;font:600 13px/1.5 inherit;cursor:pointer}
+.console-navigation-row::after{content:'→';float:right;margin-left:8px}
+.console-drawer,.console-dialog{color:#213041;background:#fff;padding:0;border:1px solid #d8e2ea;box-shadow:0 25px 80px #13253d30}
+.console-drawer{position:fixed;inset:0 0 0 auto;margin:0;width:min(620px,100vw);max-width:100vw;max-height:100dvh;height:100dvh;border:0;border-left:1px solid #d8e2ea;overflow:auto}
+.console-dialog{width:min(600px,calc(100vw - 28px));max-height:90dvh;border-radius:12px;overflow:auto}
+.console-drawer::backdrop,.console-dialog::backdrop{background:#17283b55;backdrop-filter:blur(2px)}
+.console-layer-head{position:sticky;top:0;z-index:1;background:#fff;display:flex;gap:14px;align-items:center;justify-content:space-between;padding:22px 24px;border-bottom:1px solid #e5ebf0}
+.console-layer-head h2{font-size:18px;margin:0}.console-close{border:1px solid #d8e2ea;border-radius:7px;background:#fff;color:#607181;font:inherit;font-size:12px;padding:8px 12px;cursor:pointer}
+.console-layer-body{padding:24px;min-width:0}.console-layer-body p{font-size:13px;line-height:1.8;overflow-wrap:anywhere}
+.console-layer-body>label{display:flex;align-items:center;justify-content:space-between;gap:16px;font-size:13px}
+.console-settings-form{display:flex;flex-direction:column;gap:18px}.console-settings-form input{max-width:100%}
+.console-settings-form>.history-actions{margin:0;justify-content:flex-end;border-top:1px solid #e5ebf0;padding-top:16px}
+.console-settings-list{margin-top:22px;border:1px solid #d8e2ea;border-radius:9px;overflow:hidden}
+.console-setting-row{display:flex;justify-content:space-between;align-items:center;gap:22px;padding:22px}.console-setting-row+.console-setting-row{border-top:1px solid #e5ebf0}
+.console-setting-row>div{min-width:0}.console-setting-row h4{font-size:14px;margin:0}.console-setting-row .history-note{margin:6px 0 0;font-size:12px}.console-setting-row button{flex-shrink:0;font-size:12px;min-height:34px;padding:6px 13px}
+.console-advanced{margin-top:24px;font-size:12px;color:#718090}.console-advanced summary{cursor:pointer}.console-error{color:#9f231c}
+.history-settings{margin:0;padding:0;border:0;background:transparent}.history-settings h3{display:none}.history-policy-fields{gap:24px;margin-bottom:18px}
+.console-filters{display:flex;gap:8px;flex-wrap:wrap}.console-filters select{font-size:12px;padding:7px 10px;max-width:100%}
+.console-task-row{display:grid;grid-template-columns:1.1fr 1.5fr .45fr auto;align-items:center;gap:18px;width:100%;padding:18px 12px;border:0;border-bottom:1px solid #e5ebf0;background:#fff;text-align:left;color:#213041;font:inherit;font-size:13px;cursor:pointer}
+.console-task-row:hover{background:#f8fafc}.console-task-row>span{min-width:0}.console-task-row strong{font-size:13px;font-weight:600}.console-task-row small{display:block;font-size:11px;color:#718090;line-height:1.6;margin-top:6px;overflow-wrap:anywhere}.console-task-link{color:#2c62c6;font-size:12px}.console-duration{font-size:12px;color:#718090}
+.console-job-point{margin:20px 0}.console-drawer .jobs-summary{margin-top:0}.console-drawer .backup-browser-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}
+[data-card-toggle]:focus-visible,.console-task-row:focus-visible,.console-navigation-row:focus-visible{outline:2px solid #2c62c6;outline-offset:-3px}
+@media(max-width:800px){.console-point-row{grid-template-columns:1.1fr .7fr 1fr;gap:14px}.console-point-row>.console-retention{grid-column:1/3}.console-row-actions{grid-column:3}.console-table-head span:nth-child(n+4){display:none}.console-summary{grid-template-columns:1.2fr .7fr 1fr}.console-summary>div:last-child{grid-column:1/-1}.console-summary>div:last-child button{padding:0;min-height:18px}.console-task-row{grid-template-columns:1fr 1.2fr auto}.console-task-link{display:none}}
+@media(max-width:540px){.console-content{padding:16px!important}.console-tabs{padding:0 16px;gap:0;justify-content:space-between}.console-tabs .snav{margin:0;padding:14px 0;font-size:12px}.console-tabs .snav .ui-icon{width:15px}.console-summary{gap:16px;grid-template-columns:1fr 1fr}.console-summary>div:first-child{grid-column:1/-1}.console-summary strong{font-size:20px}.console-point-row{grid-template-columns:1fr 1fr;padding-inline:0}.console-point-row>div:first-child{grid-column:1/-1}.console-point-row>.console-retention{grid-column:auto}.console-row-actions{grid-column:auto}.console-table-head{display:none}.console-task-row{grid-template-columns:1fr;padding:16px 0;gap:10px}.console-task-row .console-duration{display:none}.console-current{align-items:flex-start;flex-direction:column}.console-setting-row{padding:18px;gap:12px}.console-layer-body,.history-detail{padding:18px}.console-layer-head{padding:18px}.console-settings-form>div{max-width:100%}.console-settings-form .iosbk-in{min-width:0!important}.console-settings-form input[type=time]{width:110px!important}.history-actions .history-button{white-space:normal}.history-toolbar>.history-button{width:auto}.console-setting-row .history-note{overflow-wrap:anywhere}}
+
+.console-outcomes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:18px 0}.console-outcomes>div{padding:12px 10px;background:#fff;border:1px solid #d8e2ea;border-radius:7px}.console-outcomes small{display:block;font-size:11px;color:#718090;margin-bottom:7px}.console-outcomes strong{font-size:13px;line-height:1.5;display:block}.console-outcomes:empty{display:none}

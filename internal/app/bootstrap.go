@@ -88,22 +88,24 @@ func run(ctx context.Context, cfg runtimeConfig) error {
 	ctx, cancelWorkers := context.WithCancel(ctx)
 	defer cancelWorkers()
 
-	// 初始化日志级别
+	// 日志时间跟随部署时区，写入标准输出。
+	app := newApplicationWithRuntime(ctx, cfg)
+	log.SetFlags(0)
+	log.SetOutput(deploymentLogWriter{output: os.Stdout, now: app.nowTime})
 	initLogLevel()
 	paths := applyRuntimeConfig(cfg)
 
-	app := newApplicationWithRuntime(ctx, cfg)
 	if err := app.initializeSecurity(); err != nil {
 		return err
 	}
 	app.notificationConfigStore = newNotificationConfigStore(paths.NotificationConfigFile, app.secretStore)
 
 	// 初始化通知管理器
-	notificationManager, err := initNotificationManagerFromStore(app.notificationConfigStore, cfg.WebhookAllowCIDRs)
+	notificationManager, err := initNotificationManagerFromStore(app.notificationConfigStore, cfg.WebhookAllowCIDRs, app.nowTime)
 	if err != nil {
 		log.Printf("event=notification.init_failed error=%v", err)
 		// 创建一个空的通知管理器，但禁用通知功能
-		notificationManager = newNotificationManager()
+		notificationManager = newNotificationManager(app.nowTime)
 		notificationManager.Disable()
 	}
 	app.replaceNotificationManager(notificationManager)
@@ -113,6 +115,27 @@ func run(ctx context.Context, cfg runtimeConfig) error {
 	// 加载配置
 	if err := app.loadConfigs(); err != nil {
 		log.Printf("event=config.load_failed error=%v", err)
+	}
+
+	// 在设备调度和写入服务启动前核对已登记历史事务；不自动认领未知目录。
+	if err := app.recoverBackupStorage(ctx); err != nil {
+		return fmt.Errorf("recover backup storage: %w", err)
+	}
+	defer app.backupStorage.close()
+	defer app.closeHistoryHTTP()
+
+	jobs, err := openBackupJobStore(app.paths.BackupJobsDir, app.nowTime, defaultBackupJobLimits(), app.broadcastStatus)
+	if err != nil {
+		app.addErrorLog("SYSTEM", fmt.Sprintf("event=backup.records_unavailable error=%v", err))
+	} else {
+		app.mu.Lock()
+		app.backupJobRecords = jobs
+		app.mu.Unlock()
+		defer func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			_ = jobs.close(ctx)
+		}()
 	}
 
 	// 启动 usbmuxd（USB 设备）

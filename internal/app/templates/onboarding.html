@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="{{.Locale}}">
+<html lang="{{.Locale}}" data-timezone="{{.Timezone}}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -29,7 +29,7 @@
             <a class="home-button" href="/" id="backConsole">{{t $.Locale "guide.back"}}</a>
           </div>
         </div>
-        <div class="status-row"><span id="liveText">{{t $.Locale "guide.connecting"}}</span><span id="tzText">{{t $.Locale "guide.tz"}}</span><span class="version">{{.Version}}</span></div>
+        <div class="status-row"><span id="liveText">{{t $.Locale "guide.connecting"}}</span><span id="tzText">{{t $.Locale "guide.tz" "timezone" $.Timezone}}</span><span class="version">{{.Version}}</span></div>
       </header>
 
       <section class="hero">

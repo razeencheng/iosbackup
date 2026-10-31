@@ -37,6 +37,7 @@ func defaultNotificationRules() map[string][]string {
 		string(notificationBackupStart): {}, string(notificationBackupSuccess): {},
 		string(notificationBackupFailed): {}, string(notificationDeviceOnline): {},
 		string(notificationDeviceOffline): {}, string(notificationSystemError): {},
+		string(notificationpkg.BackupCheckAttention): {}, string(notificationpkg.BackupHistoryAttention): {},
 	}
 }
 
@@ -374,7 +375,14 @@ func (s *notificationConfigStore) loadAndMigrateLocked() (*notificationConfig, e
 		if _, err := notificationpkg.NormalizeLanguage(envelope.Config.Language); err != nil {
 			return nil, err
 		}
+		_, checkPresent := envelope.Config.NotificationRules[string(notificationpkg.BackupCheckAttention)]
+		_, historyPresent := envelope.Config.NotificationRules[string(notificationpkg.BackupHistoryAttention)]
 		normalizeNotificationConfig(&envelope.Config)
+		if !checkPresent || !historyPresent {
+			if err := s.writeLocked(&envelope.Config); err != nil {
+				return nil, err
+			}
+		}
 		return &envelope.Config, nil
 	}
 
@@ -742,6 +750,7 @@ func normalizeNotificationConfig(cfg *notificationConfig) {
 	if cfg.NotificationRules == nil {
 		cfg.NotificationRules = defaultNotificationRules()
 	}
+	cfg.NotificationRules = notificationpkg.MigrateBackupOutcomeRules(cfg.NotificationRules)
 	if cfg.NotificationTemplates == nil {
 		cfg.NotificationTemplates = mergeNotificationTemplates(nil)
 	} else {

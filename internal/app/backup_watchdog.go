@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"strconv"
 	"strings"
 	"sync"
@@ -26,12 +27,17 @@ type backupActivity struct {
 	lastFile     string
 	lastProgress backupProgressUpdate
 	success      bool
+	deviceLocked bool
 }
 
 func (a *backupActivity) observe(line, stream string, at time.Time) (backupProgressUpdate, bool) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	line = strings.TrimSpace(ansiRE.ReplaceAllString(line, ""))
+	// Keep only a known terminal diagnostic; never persist raw tool output.
+	if line == "ErrorCode 208: Device locked (MBErrorDomain/208)" {
+		a.deviceLocked = true
+	}
 	if stream == "STDERR" && strings.HasPrefix(line, "IOSBK_ACTIVITY ") {
 		parts := strings.Fields(line)
 		if len(parts) != 3 {
@@ -138,8 +144,20 @@ func (a *backupActivity) timeout(cfg runtimeConfig, at time.Time) error {
 	return fmt.Errorf("%w (phase %s, inactive for %s)", errBackupStalled, a.phase, limit)
 }
 
-func (app *application) runBackupCommand(ctx context.Context, cancel context.CancelCauseFunc, udid, sessionID, directory string, network bool) error {
-	args := []string{"-u", udid, "backup", directory}
+func (app *application) runBackupCommand(ctx context.Context, cancel context.CancelCauseFunc, udid, sessionID, directory string, network bool, requests ...backupRequest) error {
+	request := backupRequest{Mode: "auto"}
+	if len(requests) > 0 {
+		var err error
+		request, err = requests[0].normalized()
+		if err != nil {
+			return err
+		}
+	}
+	args := []string{"-u", udid}
+	if request.Mode == "full" {
+		args = append(args, "--full")
+	}
+	args = append(args, "backup", directory)
 	if network {
 		args = append([]string{"-n"}, args...)
 	}
@@ -178,6 +196,7 @@ func (app *application) runBackupCommand(ctx context.Context, cancel context.Can
 				update, internal := activity.observe(line, kind, at)
 				if update.Phase != "" || update.OverallPercent != nil || update.CurrentBytes != nil || !update.LastActivityAt.IsZero() {
 					app.applyBackupProgressUpdate(udid, update, at, sessionID)
+					app.recordBackupActivity(sessionID, update)
 				}
 				return internal
 			})
@@ -232,6 +251,10 @@ func (app *application) runBackupCommand(ctx context.Context, cancel context.Can
 	}
 	readers.Wait() // 旧输出必须在终态与下一任务前全部收束。
 	if commandErr != nil {
+		var exitErr *exec.ExitError
+		if activity.deviceLocked && errors.As(commandErr, &exitErr) {
+			return fmt.Errorf("device locked: %w", commandErr)
+		}
 		return commandErr
 	}
 	if !activity.success {

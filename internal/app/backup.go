@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"iosbackup/internal/backupstore"
 	"iosbackup/internal/i18n"
 )
 
@@ -75,7 +76,7 @@ func backupFailureState(err error) (stateCode, errorCode string) {
 	}
 	message := strings.ToLower(err.Error())
 	switch {
-	case strings.Contains(message, "no space"), strings.Contains(message, "read-only file system"), strings.Contains(message, "permission denied"):
+	case errors.Is(err, backupstore.ErrCapacity), strings.Contains(message, "no space"), strings.Contains(message, "read-only file system"), strings.Contains(message, "permission denied"):
 		return backupStateFailed, "storage_unavailable"
 	case strings.Contains(message, "device locked"), strings.Contains(message, "passcode"):
 		return backupStateFailed, "device_locked"
@@ -165,9 +166,18 @@ func (app *application) PerformBackup(udid string) error {
 func (app *application) runBackupJob(job *backupJob) (retErr error) {
 	defer func() { app.finishBackupJob(job, retErr) }()
 	udid, cfg, device := job.udid, job.config, job.device
+	var check *backupCheckResult
 	backupLog := func(message string) { app.addLog(udid, backupSessionLog(job.id, message)) }
 	defer func() {
 		app.recordBackupResult(job, retErr)
+		if app.backupJobRecords != nil {
+			state := backupStateSucceeded
+			if retErr != nil {
+				state, _ = backupFailureState(retErr)
+			}
+			app.backupJobRecords.executionFinished(job.id, state, app.nowTime())
+		}
+		app.notifyBackupOutcome(job, retErr, check)
 		if retErr == nil {
 			return
 		}
@@ -176,11 +186,6 @@ func (app *application) runBackupJob(job *backupJob) (retErr error) {
 			return
 		}
 		backupLog(fmt.Sprintf("event=backup.failed error=%v", retErr))
-		if manager := app.notificationManagerSnapshot(); manager != nil {
-			_, code := backupFailureState(retErr)
-			messageCode, params := backupFailureMessage(retErr, code)
-			manager.SendBackupFailureWithReason(device.Name, udid, code, retErr.Error(), messageCode, params)
-		}
 	}()
 	app.broadcastStatus()
 	if err := context.Cause(job.ctx); err != nil {
@@ -203,6 +208,41 @@ func (app *application) runBackupJob(job *backupJob) (retErr error) {
 	if err := os.MkdirAll(backupDir, 0755); err != nil {
 		return err
 	}
+	history, historyErr := app.prepareBackupHistory(job, backupDir)
+	if historyErr != nil {
+		if (errors.Is(historyErr, context.Canceled) || errors.Is(historyErr, context.DeadlineExceeded)) && context.Cause(job.ctx) != nil {
+			historyErr = context.Cause(job.ctx)
+		}
+		if cfg.History.Enabled || job.historyState != "" {
+			state := "failed"
+			if errors.Is(historyErr, errBackupStoppedByUser) {
+				state = "not_saved"
+			}
+			app.setHistoryJobState(job, state)
+		}
+		return historyErr
+	}
+	if history != nil {
+		backupDir = history.work.Parent
+		if history.active {
+			app.setHistoryJobState(job, "preparing")
+		} else {
+			app.setHistoryJobState(job, "not_enabled")
+		}
+		defer func() {
+			if history.active && check == nil {
+				ctx, cancel := context.WithTimeout(context.Background(), historyIOTimeout)
+				defer cancel()
+				if err := history.store.AbortWork(ctx, history.work.ID); err != nil {
+					app.setHistoryJobState(job, "failed")
+					backupLog(fmt.Sprintf("event=backup.history_cleanup_failed error=%v", err))
+				} else {
+					app.setHistoryJobState(job, "not_saved")
+				}
+			}
+		}()
+	}
+	job.backupRoot = backupDir
 	if err := context.Cause(job.ctx); err != nil {
 		return err
 	}
@@ -218,21 +258,42 @@ func (app *application) runBackupJob(job *backupJob) (retErr error) {
 		if app.backupJobs[udid] == job && !job.stopAccepted {
 			state := app.deviceOperationStates[udid]
 			state.BackupState = backupStateRunning
+			if app.backupJobRecords != nil {
+				app.backupJobRecords.transition(job.id, backupStateRunning)
+			}
 			state.LastBackupMessageCode, state.LastBackupMessageParams = "", nil
 			app.deviceOperationStates[udid] = state
 		}
 		app.mu.Unlock()
 		app.broadcastStatus()
-		err = app.runBackupCommand(job.ctx, job.cancel, udid, job.id, backupDir, network)
+		effectiveRequest := job.request
+		if history != nil && history.forceFull {
+			effectiveRequest.Mode = "full"
+		}
+		err = app.startHistoryCurrentWrite(job, history)
+		if err == nil {
+			err = app.runBackupCommand(job.ctx, job.cancel, udid, job.id, backupDir, network, effectiveRequest)
+		}
+	}
+	if (errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)) && context.Cause(job.ctx) != nil {
+		err = context.Cause(job.ctx)
 	}
 	app.recordBackupResult(job, err)
+	executionAt := app.nowTime()
+	if app.backupJobRecords != nil {
+		state := backupStateSucceeded
+		if err != nil {
+			state, _ = backupFailureState(err)
+		}
+		app.backupJobRecords.executionFinished(job.id, state, executionAt)
+	}
 	if err != nil {
 		return err
 	}
 	// 与配置编辑串行保存成功时间，避免旧候选覆盖本次结果。
 	app.configPersistMu.Lock()
 	app.mu.Lock()
-	at := nowBeijing()
+	at := executionAt
 	if d := app.devices[udid]; d != nil {
 		d.LastBackup = at
 	}
@@ -253,9 +314,9 @@ func (app *application) runBackupJob(job *backupJob) (retErr error) {
 		backupLog(fmt.Sprintf("event=backup.metadata_save_failed error=%v", saveErr))
 	}
 	backupLog("event=backup.completed")
-	if manager := app.notificationManagerSnapshot(); manager != nil {
-		manager.SendBackupSuccess(device.Name, udid)
-	}
+	result := app.quickCheckBackup(job)
+	check = &result
+	app.finishBackupHistory(job, history, check, executionAt)
 	return nil
 }
 
@@ -288,13 +349,13 @@ func (app *application) readBackupOutput(udid, sessionID string, pipe interface{
 			}
 		} else if logType == "STDOUT" {
 			if update, ok := parseBackupProgressLine(line); ok {
-				app.applyBackupProgressUpdate(udid, update, nowBeijing(), sessionID)
+				app.applyBackupProgressUpdate(udid, update, app.nowTime(), sessionID)
 			}
 		}
 		shouldLog := !carriageReturn
 		if carriageReturn {
 			isProgress := strings.Contains(line, "%") || strings.Contains(line, "[")
-			now := nowBeijing()
+			now := app.nowTime()
 			shouldLog = !isProgress || now.Sub(lastProgressUpdate) > 5*time.Second ||
 				strings.Contains(line, "Finished") || strings.Contains(line, "Receiving") || strings.Contains(line, "Sending")
 			if shouldLog && isProgress {

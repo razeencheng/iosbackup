@@ -12,11 +12,13 @@ import (
 
 // homePayload 与 handleHome 渲染用的数据结构一致。
 type homePayload struct {
+	Timezone                      string
 	Locale                        string
 	InitialStatus                 statusSnapshot
 	Devices                       []*device
 	Configs                       map[string]*backupConfig
 	BackupStatuses                map[string]bool
+	ActiveOperations              map[string]string
 	HasBackupInProgress           bool
 	EncryptionAvailable           bool
 	ExperimentalOperationsEnabled bool
@@ -63,13 +65,13 @@ func TestIndexTemplateOnlineDevice(t *testing.T) {
 	})
 	// 新模板：分段导航 + 每设备的 id/handler + i18n 字典 + CSRF
 	for _, want := range []string{
-		"networkAddress-U-ON",     // 设备 IP 输入框 id
-		"switchSection('U-ON'",    // 分段导航 handler
-		"openRestoreModal('U-ON'", // 恢复入口（RestoreEnabled=true）
-		"X-IOSBK-CSRF",            // CSRF 头
-		`data-sec-panel="enc"`,    // 加密分区面板
-		"/static/ui-messages.js",  // 内嵌双语字典
-		"toggleCard('U-ON')",      // 卡片展开
+		"networkAddress-U-ON",          // 设备 IP 输入框 id
+		"switchSection('U-ON'",         // 分段导航 handler
+		"openRestoreModal('U-ON'",      // 恢复入口（RestoreEnabled=true）
+		"X-IOSBK-CSRF",                 // CSRF 头
+		`id="setting-encryption-U-ON"`, // 加密分区面板
+		"/static/ui-messages.js",       // 内嵌双语字典
+		"toggleCard('U-ON')",           // 卡片展开
 	} {
 		if !strings.Contains(html, want) {
 			t.Errorf("渲染结果应包含 %q", want)

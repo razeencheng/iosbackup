@@ -13,6 +13,10 @@ The tiers below distinguish everyday features from those that require experiment
 | Scheduled backup | Uses per-device time window, interval, battery, and charging settings. A skipped run is retried on a later scheduler check. |
 | Stop a backup and hold scheduling | Stops the current task after confirmation and holds automatic backups until explicitly resumed. A saved hold survives restart; a manual backup does not clear it. Existing backup files are updated in place, so interruption can affect the previous backup's recoverability. This does not provide pause/resume or rollback. See [scheduling](manual/scheduling.md#stop-a-backup-and-hold-automatic-scheduling). |
 | [Local backup information and file lists](manual/backup-browser.md) | The phone can be offline. Reads the local overview and unencrypted manifest; retains completed indexes across restarts and refreshes after successful backups. Preview is limited to 5,000 entries / 16 MiB; full CSV requires a complete saved list. Does not decrypt encrypted manifests or verify restorability. |
+| Manual backup mode | Automatic selection by default, with an advanced full-backup request. With history disabled this updates the current set; enabled devices save isolated historical results. |
+| Durable task records | Bounded summaries and sanitized events survive restarts; copy/export is available under Backups. Task records do not contain backup data. |
+| Read-only checks | Automatic metadata/completion checks and manual unencrypted manifest/object checks. Reports coverage and distinguishes issues from unavailable checks; no repair or restore guarantee. |
+| Deployment timezone | Validated `TZ` controls windows, displayed dates, notifications and application logs. Defaults to Asia/Shanghai; intervals remain elapsed hours. |
 | Local Web UI and single-admin auth | No telemetry or remote frontend assets. Authentication is single-administrator only and does not make public exposure safe. |
 | Optional notifications | Telegram, SMTP, WeCom, Bark, and webhook notifications are sent only after configuration, and delivery is not guaranteed. Notification failure does not fail a backup. |
 | Wi-Fi backup | Requires successful USB pairing first, valid persisted lockdown records, reachable networking, and device support for the required wireless communication. Long transfers can fail after sleep or reconnect events; USB is the fallback. |
@@ -32,3 +36,10 @@ Core capabilities still require validation on your device and network. After cha
 The global experimental switch accepts only the strict value `true`. When false, the unpack/delete controls are hidden and their APIs return `403` before backup state or filesystem access. Enabling the switch does not remove CSRF, validation, concurrency, or confirmation checks.
 
 Do not enable restore, unpack, or delete on important data until you have an isolated test, a current copy of `/backups`, `/configs`, and `/var/lib/lockdown`, and a rollback plan.
+
+
+## Historical restore points: development implementation, acceptance pending
+
+The development branch includes credential generations, isolated working copies, durable publication/recovery, retention and enable/disable migration, plus history APIs, streaming full export and integrated pin/check/delete/settings controls. History is disabled by default per device; the default window is three calendar days including today, configurable, with pinned points retained separately. See [history usage](manual/backup-history.md). Target NAS storage and its fast-clone support, power-loss durability and physical-device restore still require acceptance; passing a check or export does not prove restorability.
+
+Local tests cover copy isolation, interruption and transactional recovery. The storage suite passed on disposable XFS and Btrfs filesystems with real clones, including a low-space case where cloning succeeds, ordinary copying and per-file fallback are rejected, and saved points remain unchanged. Linux clone support is still probed on each actual target path; deployment filesystem compatibility and NAS durability require separate validation. Process-exit tests do not establish power-loss durability.

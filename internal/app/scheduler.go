@@ -119,26 +119,8 @@ func (app *application) checkAndBackup(udid string, config backupConfig, deviceS
 		return
 	}
 
-	now := nowBeijing()
-
-	// 检查是否在备份时间段内
-	startTime, _ := time.Parse("15:04", config.StartTime)
-	endTime, _ := time.Parse("15:04", config.EndTime)
-
-	currentTime := time.Date(0, 1, 1, now.Hour(), now.Minute(), 0, 0, beijingLocation)
-	startTime = time.Date(0, 1, 1, startTime.Hour(), startTime.Minute(), 0, 0, beijingLocation)
-	endTime = time.Date(0, 1, 1, endTime.Hour(), endTime.Minute(), 0, 0, beijingLocation)
-
-	inBackupWindow := false
-	if startTime.Before(endTime) {
-		// 同一天内的时间段：开始时间 <= 当前时间 < 结束时间
-		inBackupWindow = !currentTime.Before(startTime) && currentTime.Before(endTime)
-	} else {
-		// 跨天的时间段：当前时间 >= 开始时间 OR 当前时间 < 结束时间
-		inBackupWindow = !currentTime.Before(startTime) || currentTime.Before(endTime)
-	}
-
-	if !inBackupWindow {
+	now := app.nowTime()
+	if !inBackupWindow(now, config.StartTime, config.EndTime) {
 		return
 	}
 
