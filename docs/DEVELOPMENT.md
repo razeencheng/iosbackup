@@ -134,6 +134,14 @@ Maintain documents by purpose: `README` provides the overview, `QUICKSTART` the 
 
 From the root of a public checkout, run:
 
+New public manuals must also register both language pages and navigation in `website/content-map.mjs`. Documentation links trigger the separate [website.yml](../.github/workflows/website.yml) checks; passing application tests does not validate the website build. With Node.js 24, run:
+
+```sh
+npm --prefix website ci
+npm --prefix website test
+npm --prefix website run build
+```
+
 ```bash
 ./scripts/check_public_repo.sh --directory .
 ./scripts/verify_licensing.sh

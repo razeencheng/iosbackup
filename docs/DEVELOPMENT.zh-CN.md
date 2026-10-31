@@ -136,6 +136,14 @@ docker compose logs iosbackup
 
 公开检出的仓库根目录可运行：
 
+新增公开手册时，需要同时在 `website/content-map.mjs` 登记双语页面和导航。文档链接变更也会触发独立的 [website.yml](../.github/workflows/website.yml) 检查；应用测试通过不代表网站构建通过。使用 Node.js 24 执行：
+
+```sh
+npm --prefix website ci
+npm --prefix website test
+npm --prefix website run build
+```
+
 ```bash
 ./scripts/check_public_repo.sh --directory .
 ./scripts/verify_licensing.sh
