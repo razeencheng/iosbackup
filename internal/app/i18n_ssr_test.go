@@ -20,8 +20,8 @@ func TestPagesRenderSelectedLanguageBeforeJavaScript(t *testing.T) {
 	}{
 		{"/login", "en", []string{`>Home again.</span>`, `>Sign in</h2>`, `placeholder="Enter administrator password"`, `aria-label="Product features"`}, []string{"回到家。", "输入管理员密码"}},
 		{"/login", "zh-CN", []string{`>回到家。</span>`, `>身份验证</h2>`, `placeholder="输入管理员密码"`, `aria-label="产品特点"`}, []string{">Home again.</span>"}},
-		{"/", "en", []string{`>iOS Device Backup</div>`, `>Backup settings</span>`, `>Minimum battery</div>`, "用户命名的 iPhone"}, nil},
-		{"/", "zh-CN", []string{`>iOS 设备备份</div>`, `>备份设置</span>`, `>最低电量</div>`, "用户命名的 iPhone"}, nil},
+		{"/", "en", []string{`>iOS Device Backup</div>`, `>Device settings</span>`, `>Minimum battery</div>`, "用户命名的 iPhone"}, nil},
+		{"/", "zh-CN", []string{`>iOS 设备备份</div>`, `>设备设置</span>`, `>最低电量</div>`, "用户命名的 iPhone"}, nil},
 		{"/notifications", "en", []string{`>Notifications</div>`, `>Notification language</label>`, `aria-label="Console"`}, nil},
 		{"/notifications", "zh-CN", []string{`>通知设置</div>`, `>通知语言</label>`, `aria-label="备份控制台"`}, nil},
 		{"/onboarding", "en", []string{`>Get this iPhone backing up at home</h1>`, `>0 of 4 steps completed</strong>`, `alt="Connect the phone to a computer and enable Wi-Fi visibility"`, `>Waiting for a USB device</b>`}, []string{"让这台 iPhone 开始在家自动备份", "准备以后通过 Wi-Fi 备份"}},

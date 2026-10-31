@@ -202,10 +202,25 @@ func (s *Store) Snapshot() (Catalog, error) {
 	if s.closed {
 		return Catalog{}, os.ErrClosed
 	}
+	return s.snapshotUnsafe(), nil
+}
+
+// ReadSnapshot 在同一锁内验证存储可读取及挂载身份，再返回目录副本。
+// Snapshot 继续允许恢复流程观察缓存；对外读取不能据此推断存储在线。
+func (s *Store) ReadSnapshot() (Catalog, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if err := s.checkReady(); err != nil {
+		return Catalog{}, err
+	}
+	return s.snapshotUnsafe(), nil
+}
+
+func (s *Store) snapshotUnsafe() Catalog {
 	c := s.catalog
 	c.Points = maps.Clone(c.Points)
 	c.Baselines = maps.Clone(c.Baselines)
-	return c, nil
+	return c
 }
 func (s *Store) loadCatalog() error {
 	var c Catalog

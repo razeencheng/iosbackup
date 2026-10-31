@@ -12,6 +12,18 @@ assert.deepEqual(Array.from(events,e=>e.cursor),[2,3],'repeated pulls must not d
 console.log('backup task timeline is bounded and deduplicated');
 
 (async()=>{
+ const views=[],existing='bkp-000000000004',missing='bkp-000000000005';
+ const controller=api.createController({
+  get(url){if(url.startsWith('/api/backup-jobs/'))return Promise.resolve({jobs:[{id:existing,last_cursor:0}],recording_status:'available'});assert.ok(!url.includes(missing),'missing task must not be queried as a different task');return Promise.resolve({job:{id:existing},events:[]});},
+  render(view){views.push(view)},error(error){throw error},schedule(){return 1},cancel(){}
+ });
+ await controller.open('PHONE');await controller.select(missing);
+ assert.equal(views.at(-1).job,null,'following an expired link must not silently open the latest task');
+ assert.equal(views.at(-1).missing,true);
+ controller.close();console.log('expired task links do not open unrelated jobs');
+})().catch(error=>{console.error(error);process.exitCode=1;});
+
+(async()=>{
  let releaseA;
  const views=[],errors=[];
  const bID='bkp-000000000002';
@@ -52,6 +64,7 @@ console.log('backup task timeline is bounded and deduplicated');
  assert.equal(views.at(-1).selected,'','expired selection must be cleared instead of retrying it forever');
  assert.equal(views.at(-1).job,null);
  assert.equal(views.at(-1).events.length,0);
+ assert.equal(views.at(-1).missing,true,'410 must preserve the expired-task state across future refreshes');
  assert.equal(errors.length,1);
  controller.close();
  console.log('expired task selection is cleared');

@@ -29,7 +29,7 @@ Resetting the login password does not unlock an encrypted backup. Generating a n
 
 ## Read the current state first
 
-1. **In the Web UI** , find the device and open **Encryption** . Wait for **Currently: backup encryption ON** or **Currently: backups not encrypted** .
+1. **In the Web UI** , find the device and open **Device settings → Backup encryption → Edit** . Wait for **Currently: backup encryption ON** or **Currently: backups not encrypted** .
 2. If the state is offline, still loading, or unreadable, resolve the connection problem first. Do not infer the state from an old screenshot.
 3. If a local backup exists, open **Backups** and read its information and file list. Record whether they are readable using [View backups](inspection.md).
 
@@ -49,10 +49,10 @@ Keep the original password if encryption was enabled in Finder, Apple Devices, i
 ## When you intend to enable encryption
 
 1. Confirm encryption is currently off, complete the preparation above, and save the intended backup password outside the application.
-2. **In Web UI → Encryption** , enter that password in **Device backup password** , select **Turn on** , and read and accept the warning about losing the password.
+2. **In Web UI → Device settings → Backup encryption** , enter that password in **Device backup password** , select **Turn on** , and read and accept the warning about losing the password.
 3. **On the phone** , respond to unlock or authorization prompts. The submission message only acknowledges a background operation. A cleared password field is not a completion signal.
 4. **In the host deployment directory** , run `docker compose logs --tail=200 iosbackup`. Wait for the operation to finish, look for `event=encryption.completed state=on`, and also check that operation for a password-storage failure. Do not repeatedly submit the request.
-5. Reopen **Encryption** to read the device state. After confirming that encryption is on and the logs show no password-save error, perform a [manual USB backup](usb-backup.md), then check that its information and encrypted list are readable.
+5. Reopen **Device settings → Backup encryption → Edit** to read the device state. After confirming that encryption is on and the logs show no password-save error, perform a [manual USB backup](usb-backup.md), then check that its information and encrypted list are readable.
 
 Expected results are separate: the device accepts encryption, the application saves the password, a later backup finishes, and that backup is readable. If any check fails, record the result and stop further changes. An “on” state alone is not enough to resume the automatic schedule.
 
@@ -67,7 +67,7 @@ Back up the complete configuration volume, including `secrets.enc`, the original
 ## When you intend to change the backup password
 
 1. Confirm encryption is on, you know the old password, independent copies are protected, and the device is idle and connected over USB.
-2. **In Web UI → Encryption → Change backup password** , fill **Current password** and **New password** . Retain both outside the application with a record of their associated copies, then select **Change password** .
+2. **In Web UI → Device settings → Backup encryption → Change backup password** , fill **Current password** and **New password** . Retain both outside the application with a record of their associated copies, then select **Change password** .
 3. **On the phone** , authorize the operation if asked. Wait for `event=encryption.password_changed` or an error in the logs, and check for a new-password storage failure. A submission acknowledgment is not the final result.
 4. Once state is normal, perform a manual USB backup and read its information and list. Retain independent old copies and their passwords until each copy you need is confirmed readable. Do not assume one password change makes all older copies use the new password.
 
@@ -75,7 +75,7 @@ Back up the complete configuration volume, including `secrets.enc`, the original
 ## When you intend to disable encryption
 
 1. Confirm the current encrypted backup and its password are stored independently. Disabling device encryption does not replace the password needed to read an older encrypted copy.
-2. **In Web UI → Encryption** , enter the current backup password, select **Turn off** , and respond to the phone when asked.
+2. **In Web UI → Device settings → Backup encryption** , enter the current backup password, select **Turn off** , and respond to the phone when asked.
 3. Wait for the background operation to end, inspect the logs, and read the device state again. The expected state is unencrypted. After a failure or timeout, reread the state rather than assuming nothing changed.
 4. After successful disabling, the application removes the current-device password alias. Versioned credentials remain encrypted in the secret store; retain your independent password records as well. Keep the original password and independent old copies rather than discarding them because the device now reports encryption off.
 5. With independent copies preserved, validate the subsequent USB backup and reading results before deciding whether to resume the automatic schedule.

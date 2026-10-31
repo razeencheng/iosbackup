@@ -47,6 +47,7 @@ func (app *application) historyService() *historyService {
 }
 
 type historyPointView struct {
+	JobID             string            `json:"job_id"`
 	ID                string            `json:"id"`
 	StoreID           string            `json:"store_id"`
 	UDID              string            `json:"udid"`
@@ -75,7 +76,7 @@ type historyPointView struct {
 }
 
 func pointView(p backupstore.Point, c backupstore.Catalog, busy bool, reason string) historyPointView {
-	return historyPointView{ID: p.ID, StoreID: p.StoreID, UDID: p.UDID, Revision: c.Revision, CompletedAt: p.CompletedAt, CommittedAt: p.CommittedAt, CompletionUnknown: p.CompletionUnknown, Day: p.Day, Timezone: p.Timezone, State: p.State, Encryption: p.Generation.Kind, GenerationID: p.Generation.ID, Check: p.Check, Review: p.Review, Pinned: p.Pinned, Manual: p.Manual, Baseline: c.Baselines[p.Generation.ID] == p.ID, Reason: reason, InUse: busy, Bytes: p.Bytes, BytesKnown: p.BytesKnown, CanDelete: !busy, CanPin: true, CanCheck: !busy, CanExport: true}
+	return historyPointView{JobID: p.JobID, ID: p.ID, StoreID: p.StoreID, UDID: p.UDID, Revision: c.Revision, CompletedAt: p.CompletedAt, CommittedAt: p.CommittedAt, CompletionUnknown: p.CompletionUnknown, Day: p.Day, Timezone: p.Timezone, State: p.State, Encryption: p.Generation.Kind, GenerationID: p.Generation.ID, Check: p.Check, Review: p.Review, Pinned: p.Pinned, Manual: p.Manual, Baseline: c.Baselines[p.Generation.ID] == p.ID, Reason: reason, InUse: busy, Bytes: p.Bytes, BytesKnown: p.BytesKnown, CanDelete: !busy, CanPin: true, CanCheck: !busy, CanExport: true}
 }
 func (app *application) historyLocations(udid string) []historyLocation {
 	if app.backupStorage == nil {
@@ -253,7 +254,7 @@ func (app *application) handleBackupHistory(w http.ResponseWriter, r *http.Reque
 	if end < total {
 		next = end
 	}
-	writeJSON(w, 200, map[string]any{"udid": udid, "policy": policy, "phase": st.Phase, "points": points[offset:end], "total": total, "next_offset": next, "unavailable_stores": unavailable, "busy": busy, "can_edit_policy": !busy && !removed && len(unavailable) == 0, "logical_bytes": bytes, "bytes_known": allKnown, "legacy_bytes": st.LegacyBytes})
+	writeJSON(w, 200, map[string]any{"udid": udid, "policy": policy, "phase": st.Phase, "points": points[offset:end], "total": total, "next_offset": next, "unavailable_stores": unavailable, "busy": busy, "can_edit_policy": !busy && !removed && len(unavailable) == 0, "logical_bytes": bytes, "bytes_known": allKnown, "legacy_bytes": st.LegacyBytes, "current_source": app.historyCurrentSource(r.Context(), udid, cfg), "storage": app.historyStorageStatus(cfg)})
 }
 func (app *application) handleHistoryPolicy(w http.ResponseWriter, r *http.Request, udid, action string) {
 	if action != "policy-preview" && action != "policy" {

@@ -6,7 +6,12 @@ import (
 	"time"
 )
 
+const backupJobPointLinkVersion = 1
+
 type backupJobSummary struct {
+	PointLinkVersion     int                `json:"point_link_version,omitempty"`
+	HistoryPhase         string             `json:"history_phase,omitempty"`
+	HistoryCommitted     bool               `json:"history_committed"`
 	PointID              string             `json:"point_id,omitempty"`
 	ExecutionState       string             `json:"execution_state,omitempty"`
 	HistoryState         string             `json:"history_state,omitempty"`
@@ -70,6 +75,17 @@ func (app *application) recordBackupActivity(id string, update backupProgressUpd
 }
 
 func validBackupJobSummary(summary backupJobSummary) bool {
+	if summary.PointLinkVersion != 0 && summary.PointLinkVersion != backupJobPointLinkVersion {
+		return false
+	}
+	switch summary.HistoryPhase {
+	case "", "commit", "reference", "cleanup", "completed":
+	default:
+		return false
+	}
+	if summary.HistoryCommitted && summary.PointID == "" {
+		return false
+	}
 	if summary.PointID != "" && !backupstore.ValidID(summary.PointID) {
 		return false
 	}

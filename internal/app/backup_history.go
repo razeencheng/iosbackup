@@ -572,6 +572,7 @@ func (app *application) finishBackupHistory(job *backupJob, run *backupHistoryRu
 	ctx, cancel := context.WithTimeout(app.rootCtx, historyIOTimeout)
 	defer cancel()
 	gen := run.generation
+	app.setHistoryJobPhase(job, "commit", "")
 	var err error
 	if check.State == "passed" {
 		gen, err = app.generationForHistoryResult(ctx, job.udid, run.work.Directory, gen)
@@ -581,6 +582,8 @@ func (app *application) finishBackupHistory(job *backupJob, run *backupHistoryRu
 		saved, err = run.store.Commit(ctx, run.work.ID, app.historyPoint(run.state, gen, at, *check))
 	}
 	if err == nil {
+		// 可靠提交后立即记录点 ID，后续引用保存或清理失败不能抹去已保存的事实。
+		app.setHistoryJobPhase(job, "reference", saved.ID)
 		if saved.State == "normal" {
 			run.state.LatestStore, run.state.LatestPoint = saved.StoreID, saved.ID
 			run.state.CurrentDeleted = false
@@ -588,6 +591,7 @@ func (app *application) finishBackupHistory(job *backupJob, run *backupHistoryRu
 			err = app.backupStorage.saveDevice(job.udid, run.state)
 		}
 		if err == nil {
+			app.setHistoryJobPhase(job, "cleanup", saved.ID)
 			err = app.collectBackupHistory(ctx, job.udid, run.state, gen)
 		}
 	}
@@ -604,6 +608,7 @@ func (app *application) finishBackupHistory(job *backupJob, run *backupHistoryRu
 	if saved.State == "pending" {
 		state = "pending"
 	}
+	app.setHistoryJobPhase(job, "completed", saved.ID)
 	app.setHistoryJobState(job, state)
 	// The immutable point replaces the work source identity in the check result.
 	src, sourceErr := resolveBackupIndexSourceAt(ctx, job.udid, filepath.Join(filepath.Dir(filepath.Dir(run.work.Parent)), "objects", saved.ID))
@@ -697,46 +702,57 @@ func (app *application) historyUnpackRoot(udid, source string) (string, error) {
 // acquireHistoryRead pins an immutable source for a complete external query.
 // The configured root is never replaced with an old legacy source on an error.
 func (app *application) acquireHistoryRead(udid, configuredRoot string) (string, func(), error) {
+	root, release, _, err := app.acquireHistorySource(udid, configuredRoot)
+	return root, release, err
+}
+
+// 来源身份与读取租约一次解析，避免把旧代基线误标为当前数据。
+func (app *application) acquireHistorySource(udid, configuredRoot string) (string, func(), historyCurrentSourceView, error) {
 	app.mu.RLock()
 	m := app.backupStorage
 	app.mu.RUnlock()
 	noop := func() {}
+	source := historyCurrentSourceView{Kind: "current"}
 	if m == nil {
-		return configuredRoot, noop, nil
+		return configuredRoot, noop, source, nil
 	}
 	st, err := m.deviceState(udid)
 	if err != nil {
-		return "", nil, err
+		return "", nil, source, err
 	}
 	if st.EpochID == "" || st.Root != filepath.Clean(configuredRoot) {
-		return configuredRoot, noop, nil
+		return configuredRoot, noop, source, nil
 	}
 	if st.CurrentDeleted {
-		return "", nil, os.ErrNotExist
+		source.Kind = "missing"
+		return "", nil, source, os.ErrNotExist
 	}
 	if st.Phase == "disabled" {
+		source.StoreID = st.WritableStore
 		store, err := m.store(st.WritableStore)
 		if err != nil {
-			return "", nil, err
+			return "", nil, source, err
 		}
 		work, err := store.WorkLocation(st.WritableID)
 		if err != nil {
-			return "", nil, err
+			return "", nil, source, err
 		}
-		return work.Parent, noop, nil
+		return work.Parent, noop, source, nil
 	}
 	if st.Phase != "active" || st.LatestPoint == "" {
-		return "", nil, backupstore.ErrBusy
+		source.Kind = "missing"
+		return "", nil, source, backupstore.ErrBusy
 	}
+	source.Kind, source.PointID, source.StoreID = "point", st.LatestPoint, st.LatestStore
 	s, err := m.store(st.LatestStore)
 	if err != nil {
-		return "", nil, err
+		return "", nil, source, err
 	}
 	lease, err := s.Acquire(st.LatestPoint)
 	if err != nil {
-		return "", nil, err
+		return "", nil, source, err
 	}
-	return filepath.Dir(lease.Directory), func() { _ = lease.Close() }, nil
+	return filepath.Dir(lease.Directory), func() { _ = lease.Close() }, source, nil
 }
 
 // Restore may update backup metadata. A managed source is therefore copied to

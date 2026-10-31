@@ -22,6 +22,7 @@ func (app *application) handleBackupJobs(w http.ResponseWriter, r *http.Request)
 	status := "unavailable"
 	if app.backupJobRecords != nil {
 		summaries = app.backupJobRecords.list(udid)
+		app.linkHistoricalJobs(udid, summaries)
 		status = app.backupJobRecords.recordingStatus()
 	}
 	w.Header().Set("Cache-Control", "no-store")
@@ -68,6 +69,9 @@ func (app *application) handleBackupJob(w http.ResponseWriter, r *http.Request) 
 		writeError(w, 410, i18n.BackupRecordsExpired)
 		return
 	}
+	linked := []backupJobSummary{summary}
+	app.linkHistoricalJobs(summary.UDID, linked)
+	summary = linked[0]
 	w.Header().Set("Cache-Control", "no-store")
 	if parts[1] == "export" {
 		w.Header().Set("Content-Type", "application/x-ndjson; charset=utf-8")

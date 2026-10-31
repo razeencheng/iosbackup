@@ -20,7 +20,7 @@ Device restore is a separate [Experimental operation](experimental.md) that chan
 
 Check the device name, connection type, and save location. Wait for backup, pairing, checks, encryption, unpacking, restore, or other device operations to finish. [Back up the instance](instance-recovery.md) if you need to preserve its current state for later recovery.
 
-If you want automatic scheduling to stay paused after you re-add the device, first open **Backup settings** , turn **Automatic backup** off, and select **Save settings** . Removing a device preserves the original settings; it does not turn that switch off.
+If you want automatic scheduling to stay paused after you re-add the device, first open **Device settings** , turn **Automatic backup** off, and select **Save settings** . Removing a device preserves the original settings; it does not turn that switch off.
 
 ## Remove an unused device
 
@@ -40,7 +40,7 @@ If the device is busy, wait for its operation to finish. Do not delete configura
 2. If automatic backup was previously enabled and you want to review settings first, keep the device offline. Re-adding a device does not clear its old schedule.
 3. Select **Restore to device list** for the device and wait for success.
 4. Return to the home page and inspect its card. It may initially show offline until a later device check updates its connection state; re-adding the device does not itself establish a USB or Wi-Fi connection.
-5. Open **Backup settings** , review and save the desired automatic switch and path, then reconnect the device. Before using it again, confirm online state, pairing, and [backup reading](inspection.md).
+5. Open **Device settings** , review and save the desired automatic switch and path, then reconnect the device. Before using it again, confirm online state, pairing, and [backup reading](inspection.md).
 
 
 ## Identify where backups are actually stored
@@ -60,7 +60,7 @@ Preserving a particular state requires a separate consistent copy or volume snap
 ## Set a location for a device that has not been backed up yet
 
 1. **On the host** , confirm the target storage is persistently mounted into the container through Compose, writable, and large enough. With the official configuration, choose a subdirectory under `/backups`, such as `/backups/family`.
-2. **In Web UI → Backup settings** , keep automatic backup off, enter **Save location** , and select **Check** beside it. This can create the destination directory and a temporary write-test file. It does not validate space for a full device backup.
+2. **In Web UI → Device settings** , keep automatic backup off, enter **Save location** , and select **Check** beside it. This can create the destination directory and a temporary write-test file. It does not validate space for a full device backup.
 3. When the location is reported usable, select **Save settings** and wait for success. The default deployment accepts only `/backups` or its descendants; a custom deployment uses `IOSBK_BACKUPS_DIR` as the root. Another mount can pass the check but still be rejected when saving.
 4. Reopen settings to verify the persisted path, then complete a [manual USB backup](usb-backup.md) and inspect its result.
 

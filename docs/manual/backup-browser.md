@@ -2,13 +2,13 @@
 
 [简体中文](backup-browser.zh-CN.md) · [Back to the operations manual](../OPERATIONS.md)
 
-Open a device's **Backups** tab to read the backup stored on the server or NAS. The phone can be offline: the overview and an unencrypted file list are read locally. Starting a backup, changing its encryption password, and restoring a device still require an available device connection.
+In **Backups**, open the date marked **Current backup source**, then **Browse the current backup file list**. When history is off, use the separate **Current backup set** entry. This reads the current backup stored on the server or NAS. The phone can be offline: the overview and an unencrypted file list are read locally. Starting a backup, changing its encryption password, and restoring a device still require an available device connection.
 
 The list contains paths and metadata, not the contents of photos, messages, or other files. A readable list does not establish that the backup can be restored. Check backup completion, file-list readability, file contents, and a recovery rehearsal separately.
 
 ## Read and refresh
 
-1. Open the device card and select **Backups**. Existing backups are indexed on first viewing; starting the application does not scan every device's backup.
+1. Open **Backups → the current source’s Details → Browse the current backup file list**. Existing backups are indexed when the file list is first opened; starting the application does not scan every device's backup.
 2. Wait for the local read to finish. The page shows the overview and a file-list preview automatically. **Refresh** requests another local read; no phone connection is needed.
 3. Check the status strip and both read times. The overview and list can have different timestamps when only one part of an update succeeds. **Last successful backup** is the application's separate success record, not the time the information was read.
 4. Use **Retry reading** after checking the backup location, mount, permissions, and free space if a read fails. `—` means unknown or unavailable, not zero or unencrypted.
@@ -61,11 +61,11 @@ See [Encryption and credentials](encryption.md), [Devices and storage](device-st
 
 ## Task records and backup mode
 
-Select **View task records** under **Backups** to inspect a job's requested mode, execution outcome, phase events and last confirmed backup activity. Records survive restarts and remain available while the device is offline. Page refreshes and connection heartbeats do not advance backup activity time.
+Open the device's **Task records** tab, filter by type or result, and select a job to inspect its requested mode, execution outcome, phase events and last confirmed backup activity. Records survive restarts and remain available while the device is offline. Page refreshes and connection heartbeats do not advance backup activity time.
 
 The page displays up to 1,000 recent events. **Copy logs** produces readable text; **Download logs** exports a JSONL summary and all retained events. Retention is up to 30 days, capped by 1,000 completed jobs, 10,000 events / 1 MiB per job, and a 256 MiB total budget, whichever is reached first. Active summaries are protected separately; atomic writes need temporary space. Corrupt or orphaned records also have age and capacity limits. Truncation, expiration and saving failures are shown explicitly; exporting cannot recover already-pruned events. Review device names and identifiers in the summary before sharing it.
 
-Under **Advanced options for the next manual backup**, the default **Automatic selection** lets the device and tool choose a compatible mode. You can request **Full backup** instead. The choice resets after admission and does not change the automatic schedule. Observed mode remains **Unknown** without reliable evidence. A full request still updates the current backup set, and task records do not represent historical restore points.
+Select **Back up now**. In the mode options for this request, the default **Automatic selection** lets the device and tool choose a compatible mode. You can request **Full backup** instead. The choice resets after admission and does not change the automatic schedule. Observed mode remains **Unknown** without reliable evidence. A full request still updates the current backup set, and task records do not represent historical restore points.
 
 ## Read-only backup checks
 

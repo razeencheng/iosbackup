@@ -22,7 +22,7 @@ See [Feature status](../FEATURE_STATUS.md) for maturity levels and default gates
    ```
 
    Recreate only when no operations are active. This switch does not enable device restore or bypass authentication, CSRF, state, or concurrency checks.
-3. Expand the selected device in the UI and open **Backups** . **Unpack…** and **Delete backup…** appear only with the global gate enabled. The current UI disables the whole management area when the device is offline; an offline-capable local API does not mean its UI button is available offline.
+3. Expand the selected device and open **Backups → the current source’s Details → Browse the current backup file list**. **Unpack…** and **Delete backup…** appear only with the global gate enabled. Local reads and operations do not require the phone to be online; storage availability and active-operation restrictions still apply.
 4. To inspect controls or take screenshots, stop before triggering an operation. Return the global gate to `false` afterward and wait for any experiment to finish before recreating the container.
 
 ![Local backup unpacking controls](images/09-iosbk-unpkg.png)

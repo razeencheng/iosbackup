@@ -28,7 +28,7 @@ Windows use the deployment `TZ` (default `Asia/Shanghai`), regardless of browser
 
 ## Set an overnight schedule
 
-1. **In the Web UI** , find the target device and open **Backup settings** . Check its name and connection type so that you do not change another device.
+1. **In the Web UI** , find the target device and open **Device settings → Automatic backup schedule** . Check its name and connection type so that you do not change another device.
 2. Set **Backup window** to `18:00`–`06:00` and **Backup interval** to **Every 24 hours** . This is an overnight example; adjust the window to a time when you can respond to phone authorization prompts.
 3. Set **Minimum battery** to `20%` and leave **Only back up while charging** on. **On the phone** , connect power, then check the charging state reported on its device card.
 4. Keep **Save location** at the container path you have already validated, such as the default `/backups`. Do not move the backup directory as part of this schedule change.
@@ -58,7 +58,7 @@ Windows use the deployment `TZ` (default `Asia/Shanghai`), regardless of browser
 | Authorization wait ends in failure | Check the phone and [State reference](states.md), address the cause, then retry when the device is available |
 | Repeated failures | Turn automatic backup off and save, preserve the evidence, and follow [Troubleshooting](troubleshooting.md). Failure does not replace the last successful backup timestamp |
 
-To disable future automatic jobs, turn **Automatic backup** off in **Backup settings** and save. This does not stop an active backup; closing the browser does not stop it either.
+To disable future automatic jobs, turn **Automatic backup** off in **Device settings → Automatic backup schedule** and save. This does not stop an active backup; closing the browser does not stop it either.
 
 ## Stop a backup and hold automatic scheduling
 

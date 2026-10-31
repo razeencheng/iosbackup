@@ -38,7 +38,7 @@ These computer-side routes were checked against official Apple documentation on 
 1. **In the Web UI** , confirm this deployment has paired with the device and completed a USB backup. Otherwise, return to [USB backup](usb-backup.md).
 2. **On the phone** , join a Wi-Fi network that can reach the host and connect a charger. Do not leave a USB data cable connected to the NAS: the application prefers USB when it is available.
 3. **In the Web UI** , wait for discovery to update. With no job running, you can select **Refresh devices** from the upper-right menu. Confirm the target card shows **Wi-Fi connected** .
-4. Open **Backup settings** . Leave **Device IP** blank when local-network discovery works. If a manual address is necessary, complete the next section and return here.
+4. Open **Device settings → Connection and backup location** . Leave **Device IP** blank when local-network discovery works. If a manual address is necessary, complete the next section and return here.
 5. Check the minimum battery, charging requirement, and save location, then select **Back up now** . **On the phone** , enter the device passcode if a white passcode screen appears when the backup wakes it, or unlock it and tap **Trust** if prompted. Maintain Wi-Fi and power throughout the job; keeping the phone unlocked or its screen on is not required.
 6. Wait for an explicit success or failure state. On success, check the completion time, then try reading information and the list under [View backups](inspection.md). Record whether an encrypted list was actually readable.
 
@@ -50,7 +50,7 @@ These computer-side routes were checked against official Apple documentation on 
 A manual IP helps connect an already paired, reachable device. It does not bypass a firewall or supply missing trust or wireless preparation. The test attempts a device connection; it is not merely a latency display.
 
 1. **On the phone or router management page** , identify this device's current IP. Do not guess, use the NAS address, or enter a hostname or a URL with a port.
-2. Ensure no Wi-Fi job is active. **In Web UI → Backup settings** , enter **Device IP** and select **Test connection** .
+2. Ensure no Wi-Fi job is active. **In Web UI → Device settings → Connection and backup location** , enter **Device IP** and select **Test connection** .
 3. Wait for **Device connected. Save settings to keep this IP.** , then select **Save settings** and confirm the save. A successful test alone does not persist the address from the input field.
 4. Confirm the card shows Wi-Fi and run the complete manual backup above. Recheck, test, and save if the address changes. Updating or clearing an existing saved address can restart the wireless connection service, so do it only while idle.
 

@@ -4,6 +4,65 @@ const window={document:{addEventListener(){}},addEventListener(){}};
 vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../static/backup-history.js'),'utf8'),{window,AbortController,console});
 const api=window.IOSBKHistory;
 (async()=>{
+ async function deleteAfterNavigation(destination){
+  const listeners={},closed=[],dialogs=[],first='a'.repeat(32),second='b'.repeat(32);
+  let resolveDelete,deleted=false;
+  const document={
+   activeElement:{isConnected:true,focus(){}},
+   addEventListener(type,listener){listeners[type]=listener;},
+   getElementById(){return null;},querySelector(){return null;},
+   createElement(tag){return {tag,dataset:{},children:[],classList:{add(){}},setAttribute(){},addEventListener(){},appendChild(child){this.children.push(child);},showModal(){dialogs.push(this);},close(){},remove(){},focus(){}};},
+   body:{appendChild(){}}
+  };
+  const host={document,addEventListener(){},setTimeout(){return 1;},clearTimeout(){},
+   IOSBKI18n:{t:key=>key,has:()=>true,message:()=>'',formatDate:value=>value},
+   IOSBKConsole:{updateHistory(){},pointDrawer(){},closePoint(u){closed.push(['point',u]);},closeLayers(){closed.push(['all']);}},
+   csrfFetch(url,options){
+    if(options.method==='DELETE')return new Promise(resolve=>{resolveDelete=resolve;});
+    return Promise.resolve({ok:true,json:async()=>({policy:{enabled:true,days:3},points:(deleted?[second]:[first,second]).map(id=>({id,revision:1})),unavailable_stores:[],logical_bytes:0,bytes_known:true,total:deleted?1:2})});
+   }
+  };
+  vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../static/backup-history.js'),'utf8'),{window:host,AbortController,console});
+  const history=host.IOSBKHistory;
+  function click(action,point){const button={dataset:{historyAction:action,point},closest(){return this;}};listeners.click({target:button});}
+  history.section('A','backups');await history.refresh();await history.navigate('A',first);
+  click('delete');
+  const confirmation=dialogs.at(-1);
+  assert.ok(confirmation,'deletion must require confirmation');
+  confirmation.children.at(-1).children.find(button=>button.dataset.historyAction==='dialogConfirm').onclick();
+  await new Promise(setImmediate);
+  assert.equal(typeof resolveDelete,'function','deletion must still be in flight while navigating');
+  history.back();
+  if(destination==='settings')history.section('A','settings');
+  else click('select',second);
+  deleted=true;resolveDelete({ok:true,json:async()=>({})});
+  await new Promise(setImmediate);
+  assert.deepEqual(closed,[],destination==='settings'?'a late deletion cannot close a settings window':'a late deletion cannot close another point on the same device');
+  assert.equal(history.isPending(),false);
+  history.hide();
+ }
+ await deleteAfterNavigation('settings');
+ console.log('late deletion preserves the new settings window');
+ await deleteAfterNavigation('point');
+ console.log('late deletion preserves another point on the same device');
+})().catch(e=>{console.error(e);process.exitCode=1});
+(async()=>{
+ const pending=[],drawers=[];
+ const host={document:{addEventListener(){},getElementById(){return null}},addEventListener(){},setTimeout(){return 1},clearTimeout(){},IOSBKI18n:{t:k=>k,has:()=>true,message:()=>''},IOSBKConsole:{updateHistory(){},pointDrawer(u){drawers.push(u)}},csrfFetch(url,opts){return new Promise((resolve,reject)=>{pending.push({url,resolve});opts.signal.addEventListener('abort',()=>reject(Object.assign(Error('aborted'),{name:'AbortError'})),{once:true})})}};
+ vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../static/backup-history.js'),'utf8'),{window:host,AbortController,console});
+ host.IOSBKHistory.section('A','backups');const nav=host.IOSBKHistory.navigate('A','target');
+ host.IOSBKHistory.section('A','settings');await new Promise(setImmediate);
+ pending.at(-1).resolve({ok:true,json:async()=>({policy:{enabled:true,days:3},points:[{id:'target'}],unavailable_stores:[],logical_bytes:0,bytes_known:true,total:1})});
+ await nav;assert.deepEqual(drawers,[],'late navigation cannot open a backup drawer over settings');
+ console.log('same-device cross-section navigation remains cancelled');
+})().catch(e=>{console.error(e);process.exitCode=1});
+(async()=>{
+ const views=[];const c=api.createController({get(){return Promise.resolve({policy:{enabled:true,days:3},points:[]})},render(v){views.push(v)},error(e){throw e}});
+ await c.open('A');c.edit({enabled:false,days:12});c.discard('A');
+ assert.equal(views.at(-1).draft.days,3);assert.equal(views.at(-1).draft.enabled,true);assert.equal(c.hasDirty(),false,'cancel discards the unsaved policy without changing the saved policy');
+ c.close();console.log('history settings cancellation restores saved policy');
+})().catch(e=>{console.error(e);process.exitCode=1});
+(async()=>{
  let resolveA,calls=0;const views=[],errors=[];
  const c=api.createController({get(url){calls++;if(url.endsWith('/A'))return new Promise(r=>{resolveA=r});return Promise.resolve({udid:'B',policy:{enabled:true,days:3},points:[{id:'b'.repeat(32)},{id:'c'.repeat(32)}],total:2})},render(v){views.push(v)},error(e){errors.push(e)}});
  const old=c.open('A');c.refresh();assert.equal(calls,1,'deduplicate concurrent reads');await c.open('B');resolveA({udid:'A',policy:{days:1},points:[]});await old;assert.equal(views.at(-1).udid,'B');
