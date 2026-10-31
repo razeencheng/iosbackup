@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"strconv"
 	"strings"
 	"sync"
@@ -26,12 +27,17 @@ type backupActivity struct {
 	lastFile     string
 	lastProgress backupProgressUpdate
 	success      bool
+	deviceLocked bool
 }
 
 func (a *backupActivity) observe(line, stream string, at time.Time) (backupProgressUpdate, bool) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	line = strings.TrimSpace(ansiRE.ReplaceAllString(line, ""))
+	// Keep only a known terminal diagnostic; never persist raw tool output.
+	if line == "ErrorCode 208: Device locked (MBErrorDomain/208)" {
+		a.deviceLocked = true
+	}
 	if stream == "STDERR" && strings.HasPrefix(line, "IOSBK_ACTIVITY ") {
 		parts := strings.Fields(line)
 		if len(parts) != 3 {
@@ -245,6 +251,10 @@ func (app *application) runBackupCommand(ctx context.Context, cancel context.Can
 	}
 	readers.Wait() // 旧输出必须在终态与下一任务前全部收束。
 	if commandErr != nil {
+		var exitErr *exec.ExitError
+		if activity.deviceLocked && errors.As(commandErr, &exitErr) {
+			return fmt.Errorf("device locked: %w", commandErr)
+		}
 		return commandErr
 	}
 	if !activity.success {
