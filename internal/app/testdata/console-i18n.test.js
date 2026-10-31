@@ -212,6 +212,32 @@ test('backup terminal metadata relocalizes and unknown codes retain legacy fallb
   app.run("patchDevice({udid:'PHONE',last_backup_error_code:'backup_stalled',last_backup_message_code:'vendor.unknown',backup_progress:{state:'failed'}})");
   assert.equal(app.get('bkprogress-status-hint-PHONE').textContent,apiCatalog['zh-CN']['api.backup_stalled']);
 });
+test('backup terminal results remain visible and local operations cannot appear as a phone backup',()=>{
+  const app=page();
+  for(const state of ['failed','interrupted','stopped','completed']){
+    app.context.fixture={udid:'PHONE',backing_up:false,backup_progress:{state}};
+    app.run('patchDevice(fixture)');
+    assert.equal(app.get('bkbar-PHONE').classList.contains('hidden'),false,state+' must remain visible');
+  }
+  for(const operation of ['check','local']){
+    app.context.fixture={udid:'PHONE',backing_up:true,active_operation:operation,backup_progress:{state:'completed'}};
+    app.run('patchDevice(fixture)');
+    assert.equal(app.get('bkbar-PHONE').classList.contains('hidden'),true,operation+' must not use the backup panel');
+  }
+  app.run("patchDevice({udid:'PHONE',backing_up:false})");
+  assert.equal(app.get('bkbar-PHONE').classList.contains('hidden'),true,'no invented result');
+});
+test('primary backup starts automatic mode without a mode dialog',async()=>{
+  const app=page();let request,dialogs=0;
+  app.window.IOSBKConsole.backup=()=>{dialogs++;};
+  app.window.fetch=(url,options)=>{request={url,body:JSON.parse(options.body)};return Promise.resolve(response({}));};
+  app.run("startBackup('PHONE',document.getElementById('backupBtn-PHONE'))");
+  await tick();
+  assert.equal(dialogs,0,'ordinary backup must not require a mode selection');
+  assert.ok(request,'ordinary backup must submit immediately');
+  assert.equal(request.url,'/api/backup/PHONE');
+  assert.equal(request.body.mode,'auto');
+});
 test('onboarding toast and backup terminal use live language without raw diagnostics',()=>{
   const app=page('en',true);
   app.get('startBackup').handlers.click();app.advance(1000);app.api.setLocale('zh-CN');

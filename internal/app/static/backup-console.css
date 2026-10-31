@@ -1,4 +1,6 @@
 /* B 方案：设备卡保留上下文，操作围绕所选备份或任务展开。 */
+.backup-advanced{width:34px;min-height:42px;padding:0;flex:none}
+@media(max-width:540px){.device-action-row{column-gap:8px}.device-action-row .backup-action{min-width:0!important;padding-inline:12px!important}.device-action-row .connection-badge{font-size:11px!important;gap:5px!important;padding-inline:7px!important}}
 .console-tabs{display:flex;gap:12px;padding:0 22px;border-bottom:1px solid #d8e2ea;background:#fff}
 .console-tabs .snav{padding:15px 4px;margin-right:20px;border-radius:0;background:transparent;box-shadow:none;border-bottom:2px solid transparent}
 .console-tabs .snav.active{border-bottom-color:#2c62c6}

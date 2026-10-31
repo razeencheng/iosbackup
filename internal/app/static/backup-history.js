@@ -1,6 +1,6 @@
 (function(global){
  'use strict';
- var doc=global.document,visible='',mode='',latest=null,timer=null,pending=false,exportSession=null,reviewSession=null,archiveDialog=null,archiveOriginal=null,pollEpoch=0,pollAbort=null,pollBusy=false;
+ var doc=global.document,visible='',mode='',latest=null,timer=null,pending=false,exportSession=null,reviewSession=null,archiveDialog=null,archiveOriginal=null,pollEpoch=0,pollAbort=null,pollBusy=false,policyTracking={};
  function createController(options){
   var states={},current='',generation=0,inflight=null,abort=null;
   function state(u){return states[u]||(states[u]={udid:u,selected:'',points:[],data:null,draft:null,dirty:false,loading:false});}
@@ -50,12 +50,14 @@
   enabled.disabled=days.disabled=pending||!v.data||!v.data.can_edit_policy;
   var save=doc.getElementById('historyPolicySave-'+v.udid);save.disabled=pending||!v.data||!v.data.can_edit_policy||!v.draft||!Number.isInteger(Number(v.draft.days))||Number(v.draft.days)<1||Number(v.draft.days)>365;
   set('historyDirty-'+v.udid,v.dirty?tr('bset.unsaved'):'');
-  set('historyPolicyOperation-'+v.udid,policyNotice(v.data));
+  set('historyPolicyOperation-'+v.udid,v.dirty?'':policyNotice(v.data));
   var retry=show('historyPolicyRetry-'+v.udid,!!(v.data&&v.data.can_retry_policy));if(retry)retry.disabled=pending;
  }
- function policyNotice(data){var state=data&&data.policy_operation&&data.policy_operation.state;return ['running','failed','interrupted'].indexOf(state)>=0?tr('history.policyOperation.'+state):'';}
+ function policyNotice(data){var op=data&&data.policy_operation,state=op&&op.state;if(['running','failed','interrupted','succeeded'].indexOf(state)<0)return '';return tr('history.policyOperation.'+state)+(op.error_code&&global.IOSBKI18n.has(op.error_code)?' '+tr(op.error_code):'');}
  function render(v){
-  latest=v;var u=v.udid;policyFields(v);if(!v.data)return;
+  latest=v;var u=v.udid,op=v.data&&v.data.policy_operation;
+  if(op&&op.state==='succeeded'&&policyTracking[u]===op.id){delete policyTracking[u];if(global.toast)global.toast('bset.saved');}
+  policyFields(v);if(!v.data)return;
   var data=v.data;if(global.IOSBKConsole)global.IOSBKConsole.updateHistory(v);set('historySummaryText-'+u,tr(data.policy.enabled?'history.summary':'history.summaryOff',{days:data.policy.days,count:data.total})+(policyNotice(data)?'\n'+policyNotice(data):''));
   set('historyStorage-'+u,tr('history.storage',{size:bytes(data.logical_bytes||0)})+(data.bytes_known?'':' · '+tr('history.sizePartial')));
   var warning=[];if(data.unavailable_stores.length)warning.push(tr('history.unavailable'));if(data.busy)warning.push(tr('history.busy'));if(data.phase==='enabling'||data.phase==='disabling')warning.push(tr('history.transition'));if(data.phase==='disabled'&&data.total)warning.push(tr('history.manualHint'));
@@ -112,7 +114,8 @@
   function finish(yes){d.close();d.remove();if(prior&&prior.isConnected)prior.focus();resolve(yes);}cancel.onclick=function(){finish(false)};ok.onclick=function(){finish(true)};d.addEventListener('cancel',function(e){e.preventDefault();finish(false)});d.showModal();cancel.focus();
  });}
  async function act(action,buttonNode){
-  if(action==='open'){open(buttonNode.dataset.udid);return;}if(action==='back'){close(true);return;}if(action==='settings'){var u=visible;close(false);global.switchSection(u,'backup');var n=doc.getElementById('historySettings-'+u);if(n)n.scrollIntoView({block:'start',behavior:'smooth'});return;}
+  var autoDownload=action==='downloadPoint';
+  if(action==='open'){open(buttonNode.dataset.udid);return;}if(action==='back'){close(true);return;}if(action==='settings'){var u=visible;global.switchSection(u,'settings');global.IOSBKConsole.settings(u,'history');return;}
   if(action==='select'||action==='downloadPoint'){controller.select(buttonNode.dataset.point);global.IOSBKConsole.pointDrawer(visible);if(action==='select')return;action='export';}if(action==='list'){global.IOSBKConsole.closeLayers();controller.back();return;}if(action==='more'){controller.refresh(true);return;}if(action==='refresh'){controller.refresh();return;}
   if(pending||!latest)return;var actionEpoch=pollEpoch,u=latest.udid,p=latest.points.find(function(p){return p.id===latest.selected;}),draft=Object.assign({},latest.draft),originalPoints=latest.points.slice();pending=true;controller.repaint();
   try{
@@ -120,14 +123,14 @@
     draft.days=Number(draft.days);var preview=await request('/api/backup-history/'+encodeURIComponent(u)+'/policy-preview',null,'POST',{policy:draft});var text=tr(draft.enabled?'history.enableConfirm':'history.disableHint')+'\n\n'+tr('history.previewCount',{count:preview.affected_count});
     var affected=[];Object.keys(preview.preview.stores).forEach(function(s){(preview.preview.stores[s].delete||[]).forEach(function(id){var point=originalPoints.find(function(p){return p.id===id});affected.push(point?pointDate(point):id);});});if(affected.length)text+='\n'+affected.join('\n');
     if(!await confirmAction(tr('history.policyTitle'),text))return;
-    await request('/api/backup-history/'+encodeURIComponent(u)+'/policy',null,'PUT',{policy:draft,token:preview.token});controller.saved(u);if(global.toast)global.toast('history.policyStarted');
+    var saved=await request('/api/backup-history/'+encodeURIComponent(u)+'/policy',null,'PUT',{policy:draft,token:preview.token});if(saved.operation)policyTracking[u]=saved.operation.id;controller.saved(u);if(global.toast)global.toast('history.policyStarted');
    }else if(action==='retryPolicy'){
-    await request('/api/backup-history/'+encodeURIComponent(u)+'/policy-retry',null,'POST',{});if(global.toast)global.toast('history.policyStarted');
+    var retry=await request('/api/backup-history/'+encodeURIComponent(u)+'/policy-retry',null,'POST',{});if(retry.operation)policyTracking[u]=retry.operation.id;if(global.toast)global.toast('history.policyStarted');
    }else if(p){var base='/api/backup-point/'+p.id+'?udid='+encodeURIComponent(u);
     if(action==='pin'){if(p.pinned&&!await confirmAction(tr('console.unpinTitle'),tr('console.unpinHint')))return;await request('/api/backup-point/'+p.id+'/pin?udid='+encodeURIComponent(u),null,'POST',{revision:p.revision,pinned:!p.pinned});}
     else if(action==='delete'){if(!await confirmAction(tr('history.deleteTitle'),pointDate(p)+'\n'+tr('history.deleteConfirm')+(p.pinned?'\n'+tr('history.deletePin'):'')+(p.baseline?'\n'+tr('history.deleteBaseline'):'')))return;await request(base,null,'DELETE',{revision:p.revision,confirm:p.id});if(actionEpoch===pollEpoch&&visible===u&&latest&&latest.selected===p.id)global.IOSBKConsole.closePoint(u);}
     else if(action==='check'){var result=await request('/api/backup-point/'+p.id+'/check',null,'POST',{revision:p.revision,action:'start'});reviewSession={id:result.id,point_id:p.id,result:{kind:'manifest',state:'running',freshness:'current'}};}
-    else if(action==='export'){exportSession=await request('/api/backup-point/'+p.id+'/exports',null,'POST',{});}
+    else if(action==='export'){var prepared=await request('/api/backup-point/'+p.id+'/exports',null,'POST',{});if(actionEpoch===pollEpoch&&visible===u&&latest&&latest.selected===p.id){exportSession=prepared;if(autoDownload&&prepared.state==='ready'&&prepared.can_download===true){var frame=doc.getElementById('historyDownloadFrame');if(frame)frame.src='/api/backup-export/'+encodeURIComponent(prepared.id)+'/download';}}}
     else if(action==='cancelExport'&&exportSession)await request('/api/backup-export/'+exportSession.id,null,'DELETE',{});
     else if(action==='cancelCheck'&&reviewSession)await request('/api/backup-point/'+p.id+'/check',null,'POST',{action:'cancel',id:reviewSession.id});
    }

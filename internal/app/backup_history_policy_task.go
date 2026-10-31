@@ -24,7 +24,7 @@ func (app *application) historyPolicyStatus(udid string, cfg *backupConfig) hist
 	service := app.historyService()
 	service.mu.Lock()
 	defer service.mu.Unlock()
-	if run := service.policies[udid]; run != nil && (run.State == "running" || cfg != nil && cfg.HistoryPolicyPending) {
+	if run := service.policies[udid]; run != nil {
 		view.ID, view.State, view.ErrorCode = run.ID, run.State, run.ErrorCode
 	}
 	return view

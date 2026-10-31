@@ -4,6 +4,32 @@ const window={document:{addEventListener(){}},addEventListener(){}};
 vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../static/backup-history.js'),'utf8'),{window,AbortController,console});
 const api=window.IOSBKHistory;
 (async()=>{
+ for(const [canDownload,leave] of [[true,false],[false,false],[true,true]]){
+  const listeners={},frame={src:''},point='a'.repeat(32),requests=[];let finishExport;
+  const host={document:{activeElement:{isConnected:true},addEventListener(type,fn){listeners[type]=fn;},getElementById:id=>id==='historyDownloadFrame'?frame:null,querySelector(){return null;}},addEventListener(){},setTimeout(){return 1;},clearTimeout(){},IOSBKI18n:{t:key=>key,has:()=>true,message:()=>''},IOSBKConsole:{updateHistory(){},pointDrawer(){}},csrfFetch:async(url,options)=>{requests.push(url);if(leave&&url.endsWith('/exports'))await new Promise(resolve=>{finishExport=resolve;});return {ok:true,json:async()=>url.endsWith('/exports')?{id:'export-1',point_id:point,state:'ready',can_download:canDownload}:{policy:{enabled:true,days:3},points:[{id:point,can_export:true}],unavailable_stores:[],total:1}};}};
+  vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../static/backup-history.js'),'utf8'),{window:host,AbortController,console});
+  host.IOSBKHistory.section('A','backups');await host.IOSBKHistory.refresh();
+  listeners.click({target:{closest(){return {dataset:{historyAction:'downloadPoint',point}};}}});
+  if(leave){host.IOSBKHistory.hide();finishExport();}
+  await new Promise(setImmediate);
+  assert.ok(requests.includes('/api/backup-point/'+point+'/exports'));
+  assert.equal(frame.src,canDownload&&!leave?'/api/backup-export/export-1/download':'','row download starts only when a transfer can start and the selected view is still active');
+  host.IOSBKHistory.hide();
+ }
+ console.log('row downloads start directly and respect the transfer limit');
+})().catch(e=>{console.error(e);process.exitCode=1});
+(async()=>{
+ const listeners={},notices=[];let state='interrupted';
+ const host={document:{addEventListener(type,fn){listeners[type]=fn;},getElementById(){return null;},querySelector(){return null;}},addEventListener(){},setTimeout(){return 1;},clearTimeout(){},toast:key=>notices.push(key),IOSBKI18n:{t:key=>key,has:()=>true,message:()=>''},csrfFetch:async(url)=>({ok:true,json:async()=>url.endsWith('/policy-retry')?{operation:{id:'policy-1',state:'running'}}:{policy:{enabled:true,days:3},policy_operation:{id:'policy-1',state},can_retry_policy:state==='interrupted',points:[],unavailable_stores:[],total:0}})};
+ vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../static/backup-history.js'),'utf8'),{window:host,AbortController,console});
+ host.IOSBKHistory.section('A','settings');await host.IOSBKHistory.refresh();
+ listeners.click({target:{closest(){return {dataset:{historyAction:'retryPolicy'}};}}});
+ await new Promise(setImmediate);state='succeeded';await host.IOSBKHistory.refresh();await host.IOSBKHistory.refresh();
+ assert.equal(notices.filter(key=>key==='bset.saved').length,1,'completion must be acknowledged once, not just task acceptance');
+ host.IOSBKHistory.hide();
+ console.log('history policy reports saved after background completion');
+})().catch(e=>{console.error(e);process.exitCode=1});
+(async()=>{
  const listeners={},requests=[];
  const host={document:{addEventListener(type,listener){listeners[type]=listener;},getElementById(){return null;},querySelector(){return null;}},addEventListener(){},setTimeout(){return 1;},clearTimeout(){},
   IOSBKI18n:{t:key=>key,has:()=>true,message:()=>''},

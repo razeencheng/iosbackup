@@ -210,19 +210,23 @@
     var host=get('consoleRecent-'+u),job=recent[u]&&recent[u].job;if(!host)return;
     host.replaceChildren();host.classList.toggle('hidden',!job||!needsAttention(job));
     if(job&&needsAttention(job)){
-      var stateText=job.error_code&&global.IOSBKI18n.has('api.'+job.error_code)?tr('api.'+job.error_code):tr('console.attention');
+      var stateText;
+      if(job.error_code&&global.IOSBKI18n.has('api.'+job.error_code))stateText=tr('api.'+job.error_code);
+      else if(['failed','uncertain'].indexOf(job.history_state)>=0)stateText=tr(job.history_committed?'console.savedWithIssue':'console.historyIssue',{phase:tr('console.historyPhase.'+(job.history_phase||'unknown'))});
+      else if(job.check&&job.check.reason&&global.IOSBKI18n.has('check.reason.'+job.check.reason))stateText=tr('check.reason.'+job.check.reason);
+      else if(job.check&&['issues','unavailable','cancelled'].indexOf(job.check.state)>=0)stateText=tr('check.state.'+job.check.state);
+      else if(job.history_state==='pending')stateText=tr('history.state.pending');
+      else stateText=tr('jobs.state.'+job.state);
       host.append(el('span',tr('console.recentIssue',{state:stateText})),button(tr('console.viewJob'),function(){openJob(u,job.id);},'console-text-button history-button'));
     }
   }
   function backup(u) {
     var content = el('div', undefined, 'console-layer-body');
     content.append(el('p', tr('console.backupHint'), 'history-note'));
-    var label = el('label',tr('jobs.requestedMode')), select = el('select',undefined,'iosbk-in');
-    ['auto','full'].forEach(function (mode) { var option = el('option',tr('jobs.mode.'+mode));option.value=mode;select.append(option); });
-    select.setAttribute('aria-label',tr('jobs.requestedMode')); label.append(select); content.append(label,el('p',tr('jobs.fullHint'),'history-warning'));
+    content.append(el('p',tr('jobs.fullHint'),'history-warning'));
     var actions = el('div',undefined,'history-actions'), entry;
-    actions.append(button(tr('history.cancel'),function(){entry.close();}),button(tr('device.backupNow'),function(){var mode=select.value;entry.close();global.submitBackup(u,get('backupBtn-'+u),mode);},'history-button primary'));
-    content.append(actions); entry=layer(content,tr('device.backupNow'));
+    actions.append(button(tr('history.cancel'),function(){entry.close();}),button(tr('jobs.mode.full'),function(){entry.close();global.submitBackup(u,get('backupBtn-'+u),'full');},'history-button primary'));
+    content.append(actions); entry=layer(content,tr('console.advancedBackup'));
   }
   function init() {
     doc.querySelectorAll('[data-udid-card]').forEach(function (card) {

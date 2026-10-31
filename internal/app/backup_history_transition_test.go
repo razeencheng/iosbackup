@@ -194,6 +194,9 @@ func TestHistoryPolicyContinuesAfterRequestCancellation(t *testing.T) {
 	if app.configs["CONTROL"].HistoryPolicyPending {
 		t.Fatal("client cancellation interrupted the background task")
 	}
+	if status := app.historyPolicyStatus("CONTROL", app.configs["CONTROL"]); status.State != "succeeded" || status.ID == "" {
+		t.Fatal("completed policy operation is not visible", status)
+	}
 	if len(historyPoints(t, app)) != 1 {
 		t.Fatal("original backup not imported")
 	}

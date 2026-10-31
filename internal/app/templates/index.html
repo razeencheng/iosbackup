@@ -269,6 +269,7 @@
               {{else}}<span class="connection-badge" style="gap:7px;padding:5px 11px;background:#F3F7FA;color:#718090;border:1px solid #D8E2EA;font-size:12.5px;font-weight:600;white-space:nowrap"><svg class="connection-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2.6v6.1M5.5 5.7a6.2 6.2 0 1 0 9 0" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path></svg><span data-i18n="status.offline">{{t $.Locale "status.offline"}}</span></span>{{end}}
             </div>
             <button id="backupBtn-{{$d.UDID}}" class="backup-action" onclick="event.stopPropagation();startBackup('{{$d.UDID}}',this)" {{if or (eq $conn "offline") $backingUp}}disabled{{end}} style="gap:9px;padding:10px 17px;font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit;border:none;white-space:nowrap;min-width:132px;{{if or (eq $conn "offline") $backingUp}}background:#F3F7FA;color:#ADB9C2;cursor:not-allowed;{{else}}background:#2C62C6;color:#fff;{{end}}">{{if $backingUp}}<span data-i18n="{{$busyKey}}">{{t $.Locale $busyKey}}</span>{{else}}<span data-i18n="device.backupNow">{{t $.Locale "device.backupNow"}}</span>{{end}}</button>
+            <button id="backupAdvanced-{{$d.UDID}}" type="button" class="backup-control-button backup-advanced" {{if or (eq $conn "offline") $backingUp}}disabled{{end}} onclick="event.stopPropagation();IOSBKConsole.backup('{{$d.UDID}}')" data-i18n-title="console.advancedBackup" data-i18n-aria="console.advancedBackup" title="{{t $.Locale "console.advancedBackup"}}" aria-label="{{t $.Locale "console.advancedBackup"}}">⋯</button>
             <button id="stopBackup-{{$d.UDID}}" type="button" class="backup-control-button stop hidden" disabled onclick="event.stopPropagation();openStopBackup('{{$d.UDID}}')" data-i18n="control.stop">{{t $.Locale "control.stop"}}</button>
             <svg id="chev-{{$d.UDID}}" class="ui-icon" style="color:#ADB9C2;width:15px;height:15px" aria-hidden="true"><use href="/static/ui-icons.svg#icon-chevron-down"></use></svg>
           </div>
@@ -636,7 +637,7 @@
   <svg id="toastIcon" class="ui-icon" style="color:#5FD0A0" aria-hidden="true"><use href="/static/ui-icons.svg#icon-check-circle"></use></svg><span id="toastMsg" data-toast-message></span>
 </div>
 
-<iframe name="history-download" data-i18n-title="history.downloadFrame" title="{{t $.Locale "history.downloadFrame"}}" hidden></iframe>
+<iframe id="historyDownloadFrame" name="history-download" data-i18n-title="history.downloadFrame" title="{{t $.Locale "history.downloadFrame"}}" hidden></iframe>
 <script>
 /* ============== i18n runtime ============== */
 const INITIAL_STATUS = {{.InitialStatus}};
@@ -1142,7 +1143,8 @@ function renderBackupProgress(d){
   if(!progress){ panel.classList.add('hidden'); panel.removeAttribute('data-progress-mode'); return; }
 
   var mode=d.backup_state==='stopping'?'stopping':(d.backup_state==='stopped'?'stopped':backupProgressMode(progress)), copy=backupProgressCopy(mode,d);
-  panel.classList.toggle('hidden',!running); panel.setAttribute('data-progress-mode',mode);
+  var terminal=['completed','failed','stopped','interrupted'].indexOf(mode)>=0;
+  panel.classList.toggle('hidden',!running && (d.backing_up || !terminal)); panel.setAttribute('data-progress-mode',mode);
   var title=document.getElementById('bkprogress-title-'+u), subtitle=document.getElementById('bkprogress-subtitle-'+u), value=document.getElementById('bkprogress-value-'+u);
   var track=document.getElementById('bkprogress-track-'+u), fill=document.getElementById('bkprogress-fill-'+u);
   var overall=isBackupProgressNumber(progress.overall_percent) && progress.overall_percent<=100 ? progress.overall_percent : null;
@@ -1195,6 +1197,7 @@ function patchDevice(d){
     btn.style.opacity='';
   }
   renderBackupControl(d);
+  var advanced=document.getElementById('backupAdvanced-'+u);if(advanced)advanced.disabled=!!btn.disabled;
 }
 
 /* ============== header actions ============== */
@@ -1346,10 +1349,11 @@ function gateMsg(d){
   if(!key) return 'gate.cant';
   return {message_code:key,params:{b:d.battery,m:d.min_battery}};
 }
-function startBackup(udid, btn){ IOSBKConsole.backup(udid); }
+function startBackup(udid, btn){ submitBackup(udid, btn, 'auto'); }
 function submitBackup(udid, btn, mode){
   btn.disabled=true; btn.style.opacity='.6';
-  function fail(payload){ toast(payload,true,'gate.cant'); btn.disabled=false; btn.style.opacity=''; }
+  var advanced=document.getElementById('backupAdvanced-'+udid);if(advanced)advanced.disabled=true;
+  function fail(payload){ toast(payload,true,'gate.cant'); btn.disabled=false; btn.style.opacity=''; if(advanced)advanced.disabled=false; }
   csrfFetch('/api/backup/'+udid,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode:mode||'auto'})}).then(function(r){return r.json();}).then(function(data){
     if(data.error_code || (data.error && data.code)){ fail(gateMsg(data)); }          // 被限制（未充电/电量低/离线/正忙）→ 说明原因
     else if(data.error){ fail(data); }

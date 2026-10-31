@@ -31,6 +31,39 @@ assert.equal(api.busyLabel({active_operation:'check'}),'console.checkingBackup')
 assert.equal(api.busyLabel({active_operation:'local'}),'console.deviceBusy');
 console.log('console group saves, task filtering and current-source identity passed');
 
+{
+  const dialogs=[],submitted=[];
+  function node(){return {children:[],classList:{add(){},remove(){}},setAttribute(){},addEventListener(){},append(...children){this.children.push(...children);},querySelector(){return this.children.at(-1);},showModal(){dialogs.push(this);},close(){},remove(){},focus(){}};}
+  const primary=node(),page={document:{addEventListener(){},getElementById:()=>primary,createElement:node,body:node()},addEventListener(){},IOSBKI18n:{t:key=>key},submitBackup(...args){submitted.push(args);}};
+  vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../static/backup-console.js'),'utf8'),{window:page});
+  page.IOSBKConsole.backup('A');
+  assert.equal(submitted.length,0,'advanced entry must require confirmation');
+  dialogs.at(-1).children[1].children.at(-1).children[0].onclick();
+  assert.equal(submitted.length,0,'cancel must not start a full backup');
+  page.IOSBKConsole.backup('A');
+  dialogs.at(-1).children[1].children.at(-1).children[1].onclick();
+  assert.equal(submitted.length,1);
+  assert.equal(submitted[0][0],'A');assert.equal(submitted[0][2],'full');
+  console.log('force-full remains behind its own confirmation');
+}
+
+(async()=>{
+  const messages=JSON.parse(fs.readFileSync(path.join(__dirname,'../static/ui-messages.json'),'utf8')).en;
+  for(const [job,expected] of [
+    [{state:'succeeded',history_state:'failed',history_phase:'publish'},/History could not be saved/],
+    [{state:'succeeded',history_state:'pending',check:{state:'unavailable',reason:'encrypted_manifest'}},/Encrypted manifest/],
+    [{state:'failed',error_code:'unknown_vendor'},/failed/i]
+  ]){
+    const host={classList:{toggle(){}},replaceChildren(){this.children=[];},append(...children){this.children=children;}};
+    const page={document:{addEventListener(){},getElementById:id=>id==='consoleRecent-A'?host:null,createElement:()=>({})},addEventListener(){},formatBackupBytes:()=>'',IOSBKI18n:{t:(key,params={})=>(messages[key]||key).replace(/\{(\w+)\}/g,(_,key)=>params[key]),has:key=>key in messages,fetch:async()=>({ok:true,json:async()=>({jobs:[{id:'task',...job}]})})}};
+    vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../static/backup-console.js'),'utf8'),{window:page});
+    page.IOSBKConsole.updateHistory({udid:'A',points:[],data:{policy:{enabled:false},current_source:{kind:'missing'},storage:{},total:0,logical_bytes:0,bytes_known:true}});
+    await new Promise(setImmediate);
+    assert.match(host.children[0].textContent,expected,'the banner must show a concrete reason');
+    assert.doesNotMatch(host.children[0].textContent,/needs attention: Needs attention/i);
+  }
+})().catch(error=>{console.error(error);process.exitCode=1});
+
 (async()=>{
   let locale='en',fetches=0;const listeners={};
   const host={classList:{toggle(){}},replaceChildren(){this.children=[];},append(...children){this.children=children;}};

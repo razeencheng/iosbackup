@@ -62,6 +62,7 @@ jobs:
       - name: History and accessible term behavior
         run: |
           node internal/app/testdata/backup-history.test.js
+          node internal/app/testdata/backup-console.test.js
           node internal/app/testdata/term-hints.test.js
       - name: Test
         run: go test -count=1 ./...

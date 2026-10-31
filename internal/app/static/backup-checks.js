@@ -3,11 +3,11 @@
  var doc=global.document,devices={},pending={};
  function tr(key,params){return global.IOSBKI18n.t(key,params);}
  function label(key,value){var name='check.'+key+'.'+value;return global.IOSBKI18n.has(name)?tr(name):tr('check.unknown');}
- function summary(result){
+ function summary(result,options){
   if(!result)return tr('check.none');
-  var text=label('kind',result.kind)+' · '+label('state',result.state);
+  var text=label('kind',result.kind)+(options&&options.detailsOnly?'':' · '+label('state',result.state));
   if(result.reason)text+=' · '+label('reason',result.reason);
-  text+='\n'+tr('check.coverage',{metadata:tr(result.metadata_complete?'check.yes':'check.no'),manifest:tr(result.manifest_complete?'check.yes':'check.no'),records:result.records_checked||0,objects:result.objects_checked||0,missing:result.missing_objects||0});
+  text+='\n'+tr(result.kind==='quick'?'check.quickCoverage':'check.coverage',{metadata:tr(result.metadata_complete?'check.yes':'check.no'),manifest:tr(result.manifest_complete?'check.yes':'check.no'),records:result.records_checked||0,objects:result.objects_checked||0,missing:result.missing_objects||0});
   if(result.completed_at&&!result.completed_at.startsWith('0001-'))text+='\n'+global.IOSBKI18n.formatDate(result.completed_at);
   if(result.freshness==='stale'||result.freshness==='unknown')text+='\n'+label('freshness',result.freshness);
   if(result.last_completed)text+='\n\n'+tr('check.lastCompleted')+'\n'+summary(Object.assign({},result.last_completed,{last_completed:null}));
