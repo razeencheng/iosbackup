@@ -780,6 +780,19 @@ func (app *application) handleSaveConfig(w http.ResponseWriter, r *http.Request)
 		writeOperationError(w, http.StatusBadRequest, err, i18n.ConfigInvalid)
 		return
 	}
+	if oldDirectory != candidate.BackupDirectory {
+		if candidate.HistoryPolicyPending {
+			writeError(w, http.StatusConflict, i18n.Busy)
+			return
+		}
+		// 占用持续到落盘和内存切换完成，避免检查忙状态后又启动旧来源任务。
+		release, err := app.acquireHistoryMutation(udid)
+		if err != nil {
+			writeOperationError(w, http.StatusConflict, err, i18n.Busy)
+			return
+		}
+		defer release()
+	}
 	if err := app.configStore.Put(candidate); err != nil {
 		writeOperationError(w, http.StatusInternalServerError, err, i18n.ConfigSaveFailed)
 		return

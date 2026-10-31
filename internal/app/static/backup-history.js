@@ -43,15 +43,20 @@
    ['cost','retention','disableHint'].forEach(function(key){var n=el('p',tr('history.'+key),'history-note');n.dataset.i18n='history.'+key;host.appendChild(n);});
    var clone=el('p',undefined,'history-note'),cloneLabel=el('span',tr('term.clone.title'));cloneLabel.dataset.i18n='term.clone.title';clone.appendChild(cloneLabel);clone.appendChild(hint('clone'));host.appendChild(clone);
    var save=button(tr('history.preview'),'policy');save.id='historyPolicySave-'+v.udid;save.dataset.i18n='history.preview';host.appendChild(save);var dirty=el('span','', 'history-note');dirty.id='historyDirty-'+v.udid;host.appendChild(dirty);
+   var operation=el('p','','history-note');operation.id='historyPolicyOperation-'+v.udid;operation.setAttribute('role','status');host.appendChild(operation);
+   var retry=button(tr('history.policyRetry'),'retryPolicy');retry.id='historyPolicyRetry-'+v.udid;retry.dataset.i18n='history.policyRetry';host.appendChild(retry);
   }
   if(v.draft){enabled.checked=!!v.draft.enabled;if(days.value!==String(v.draft.days))days.value=v.draft.days;}
   enabled.disabled=days.disabled=pending||!v.data||!v.data.can_edit_policy;
   var save=doc.getElementById('historyPolicySave-'+v.udid);save.disabled=pending||!v.data||!v.data.can_edit_policy||!v.draft||!Number.isInteger(Number(v.draft.days))||Number(v.draft.days)<1||Number(v.draft.days)>365;
   set('historyDirty-'+v.udid,v.dirty?tr('bset.unsaved'):'');
+  set('historyPolicyOperation-'+v.udid,policyNotice(v.data));
+  var retry=show('historyPolicyRetry-'+v.udid,!!(v.data&&v.data.can_retry_policy));if(retry)retry.disabled=pending;
  }
+ function policyNotice(data){var state=data&&data.policy_operation&&data.policy_operation.state;return ['running','failed','interrupted'].indexOf(state)>=0?tr('history.policyOperation.'+state):'';}
  function render(v){
   latest=v;var u=v.udid;policyFields(v);if(!v.data)return;
-  var data=v.data;if(global.IOSBKConsole)global.IOSBKConsole.updateHistory(v);set('historySummaryText-'+u,tr(data.policy.enabled?'history.summary':'history.summaryOff',{days:data.policy.days,count:data.total}));
+  var data=v.data;if(global.IOSBKConsole)global.IOSBKConsole.updateHistory(v);set('historySummaryText-'+u,tr(data.policy.enabled?'history.summary':'history.summaryOff',{days:data.policy.days,count:data.total})+(policyNotice(data)?'\n'+policyNotice(data):''));
   set('historyStorage-'+u,tr('history.storage',{size:bytes(data.logical_bytes||0)})+(data.bytes_known?'':' · '+tr('history.sizePartial')));
   var warning=[];if(data.unavailable_stores.length)warning.push(tr('history.unavailable'));if(data.busy)warning.push(tr('history.busy'));if(data.phase==='enabling'||data.phase==='disabling')warning.push(tr('history.transition'));if(data.phase==='disabled'&&data.total)warning.push(tr('history.manualHint'));
   set('historyWarning-'+u,warning.join(' '));show('historyWarning-'+u,warning.length>0);
@@ -113,7 +118,9 @@
     draft.days=Number(draft.days);var preview=await request('/api/backup-history/'+encodeURIComponent(u)+'/policy-preview',null,'POST',{policy:draft});var text=tr(draft.enabled?'history.enableConfirm':'history.disableHint')+'\n\n'+tr('history.previewCount',{count:preview.affected_count});
     var affected=[];Object.keys(preview.preview.stores).forEach(function(s){(preview.preview.stores[s].delete||[]).forEach(function(id){var point=originalPoints.find(function(p){return p.id===id});affected.push(point?pointDate(point):id);});});if(affected.length)text+='\n'+affected.join('\n');
     if(!await confirmAction(tr('history.policyTitle'),text))return;
-    await request('/api/backup-history/'+encodeURIComponent(u)+'/policy',null,'PUT',{policy:draft,token:preview.token});controller.saved(u);
+    await request('/api/backup-history/'+encodeURIComponent(u)+'/policy',null,'PUT',{policy:draft,token:preview.token});controller.saved(u);if(global.toast)global.toast('history.policyStarted');
+   }else if(action==='retryPolicy'){
+    await request('/api/backup-history/'+encodeURIComponent(u)+'/policy-retry',null,'POST',{});if(global.toast)global.toast('history.policyStarted');
    }else if(p){var base='/api/backup-point/'+p.id+'?udid='+encodeURIComponent(u);
     if(action==='pin'){if(p.pinned&&!await confirmAction(tr('console.unpinTitle'),tr('console.unpinHint')))return;await request('/api/backup-point/'+p.id+'/pin?udid='+encodeURIComponent(u),null,'POST',{revision:p.revision,pinned:!p.pinned});}
     else if(action==='delete'){if(!await confirmAction(tr('history.deleteTitle'),pointDate(p)+'\n'+tr('history.deleteConfirm')+(p.pinned?'\n'+tr('history.deletePin'):'')+(p.baseline?'\n'+tr('history.deleteBaseline'):'')))return;await request(base,null,'DELETE',{revision:p.revision,confirm:p.id});if(actionEpoch===pollEpoch&&visible===u&&latest&&latest.selected===p.id)global.IOSBKConsole.closePoint(u);}

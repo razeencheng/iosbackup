@@ -34,6 +34,7 @@ type historyService struct {
 	previews   map[string]historyPreviewToken
 	exports    map[string]*backupExport
 	reviews    map[string]*historyReviewRun
+	policies   map[string]*historyPolicyRun
 	exportSlot chan struct{}
 }
 
@@ -42,6 +43,7 @@ func (app *application) historyService() *historyService {
 	defer app.mu.Unlock()
 	if app.historyHTTP == nil {
 		app.historyHTTP = &historyService{previews: map[string]historyPreviewToken{}, exports: map[string]*backupExport{}, reviews: map[string]*historyReviewRun{}, exportSlot: make(chan struct{}, 1)}
+		app.historyHTTP.policies = make(map[string]*historyPolicyRun)
 	}
 	return app.historyHTTP
 }
@@ -254,10 +256,11 @@ func (app *application) handleBackupHistory(w http.ResponseWriter, r *http.Reque
 	if end < total {
 		next = end
 	}
-	writeJSON(w, 200, map[string]any{"udid": udid, "policy": policy, "phase": st.Phase, "points": points[offset:end], "total": total, "next_offset": next, "unavailable_stores": unavailable, "busy": busy, "can_edit_policy": !busy && !removed && len(unavailable) == 0, "logical_bytes": bytes, "bytes_known": allKnown, "legacy_bytes": st.LegacyBytes, "current_source": app.historyCurrentSource(r.Context(), udid, cfg), "storage": app.historyStorageStatus(cfg)})
+	pending := cfg != nil && cfg.HistoryPolicyPending
+	writeJSON(w, 200, map[string]any{"udid": udid, "policy": policy, "policy_operation": app.historyPolicyStatus(udid, cfg), "phase": st.Phase, "points": points[offset:end], "total": total, "next_offset": next, "unavailable_stores": unavailable, "busy": busy, "can_retry_policy": pending && !busy && !removed, "can_edit_policy": !pending && !busy && !removed && len(unavailable) == 0, "logical_bytes": bytes, "bytes_known": allKnown, "legacy_bytes": st.LegacyBytes, "current_source": app.historyCurrentSource(r.Context(), udid, cfg), "storage": app.historyStorageStatus(cfg)})
 }
 func (app *application) handleHistoryPolicy(w http.ResponseWriter, r *http.Request, udid, action string) {
-	if action != "policy-preview" && action != "policy" {
+	if action != "policy-preview" && action != "policy" && action != "policy-retry" {
 		writeError(w, 404, i18n.NotFound)
 		return
 	}
@@ -267,6 +270,30 @@ func (app *application) handleHistoryPolicy(w http.ResponseWriter, r *http.Reque
 	}
 	if r.Method != expected {
 		writeError(w, 405, i18n.MethodNotAllowed)
+		return
+	}
+	if action == "policy-retry" {
+		var request struct{}
+		if !historyBody(w, r, &request) {
+			return
+		}
+		app.mu.RLock()
+		cfg := cloneBackupConfig(app.configs[udid])
+		app.mu.RUnlock()
+		if cfg == nil {
+			historyError(w, errDeviceNotFound)
+			return
+		}
+		if !cfg.HistoryPolicyPending {
+			historyError(w, backupstore.ErrConflict)
+			return
+		}
+		operation, err := app.startHistoryPolicy(r.Context(), udid, cfg.History, nil)
+		if err != nil {
+			historyError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusAccepted, map[string]any{"policy": cfg.History, "operation": operation})
 		return
 	}
 	var request struct {
@@ -330,11 +357,12 @@ func (app *application) handleHistoryPolicy(w http.ResponseWriter, r *http.Reque
 		historyError(w, backupstore.ErrConflict)
 		return
 	}
-	if e = app.applyHistoryPolicy(r.Context(), udid, policy, &token.Preview); e != nil {
+	operation, e := app.startHistoryPolicy(r.Context(), udid, policy, &token.Preview)
+	if e != nil {
 		historyError(w, e)
 		return
 	}
-	writeJSON(w, 200, map[string]any{"policy": policy})
+	writeJSON(w, http.StatusAccepted, map[string]any{"policy": policy, "operation": operation})
 }
 func (app *application) acquireHistoryMutation(udid string) (func(), error) {
 	app.mu.Lock()

@@ -65,6 +65,10 @@ func originalEntry(path string) bool {
 
 // walkTree 使用有界目录批次；拒绝链接和特殊文件。调用方持有来源读占用。
 func walkTree(ctx context.Context, root *os.Root, visit func(string, os.FileInfo) error) error {
+	return walkTreeDepth(ctx, root, 0, visit)
+}
+
+func walkTreeDepth(ctx context.Context, root *os.Root, initialDepth int, visit func(string, os.FileInfo) error) error {
 	var walk func(string, int) error
 	walk = func(path string, depth int) error {
 		if err := ctx.Err(); err != nil {
@@ -114,7 +118,7 @@ func walkTree(ctx context.Context, root *os.Root, visit func(string, os.FileInfo
 			}
 		}
 	}
-	return walk(".", 0)
+	return walk(".", initialDepth)
 }
 func stampTree(ctx context.Context, root *os.Root) (treeStamp, error) {
 	var stamp treeStamp
@@ -439,7 +443,8 @@ func syncTree(ctx context.Context, root *os.Root) error {
 	if !ok {
 		return ErrUnsafe
 	}
-	return walkTree(ctx, root, func(path string, info fs.FileInfo) error {
+	// 此处根目录是对象容器，UDID 目录才对应复制和摘要扫描的深度零。
+	return walkTreeDepth(ctx, root, -1, func(path string, info fs.FileInfo) error {
 		stat, ok := info.Sys().(*syscall.Stat_t)
 		if !ok || stat.Dev != baseStat.Dev || (!info.IsDir() && stat.Nlink != 1) {
 			return ErrUnsafe

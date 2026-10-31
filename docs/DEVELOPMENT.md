@@ -40,6 +40,8 @@ The project is no longer one root-level `package main`. Target `./internal/app` 
 
 Historical backup implementation notes and lifecycle contracts are in [the backupstore module](../internal/backupstore/README.md). Retention defaults to three natural days including today; policy confirmation, migration and current-source selection live in `internal/app/backup_history*.go`. History HTTP handlers resolve server-side point IDs, with revision checks and one-use policy previews. Exports stream under read leases and idle deadlines. See [history usage](manual/backup-history.md).
 
+History policy updates persist their target and `history_policy_pending` before starting storage preparation. `PUT /api/backup-history/{udid}/policy` returns `202` with a background operation; disconnecting the request does not cancel that operation. The history list exposes `policy_operation` and `can_retry_policy`. `POST /api/backup-history/{udid}/policy-retry` accepts an empty object and resumes only the saved target. A pending transition must finish before changing the target or backup directory. Restarted tasks also resume preparation before writing new device data. Configuration locks never span backup copying, and the last confirmed source remains available until replacement is durable. Store recovery runs under device write admission and respects read leases.
+
 ## Make a local change
 
 1. Read [CONTRIBUTING](../CONTRIBUTING.md) and the affected module. Agree on large behavior changes in an Issue; report vulnerabilities through [SECURITY](../SECURITY.md).

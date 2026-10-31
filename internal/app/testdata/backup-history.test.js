@@ -4,6 +4,20 @@ const window={document:{addEventListener(){}},addEventListener(){}};
 vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../static/backup-history.js'),'utf8'),{window,AbortController,console});
 const api=window.IOSBKHistory;
 (async()=>{
+ const listeners={},requests=[];
+ const host={document:{addEventListener(type,listener){listeners[type]=listener;},getElementById(){return null;},querySelector(){return null;}},addEventListener(){},setTimeout(){return 1;},clearTimeout(){},
+  IOSBKI18n:{t:key=>key,has:()=>true,message:()=>''},
+  csrfFetch(url,options){requests.push([url,options.method,options.body]);return Promise.resolve({ok:true,json:async()=>({policy:{enabled:true,days:3},policy_operation:{state:'interrupted'},can_retry_policy:true,points:[],unavailable_stores:[],total:0})});}
+ };
+ vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../static/backup-history.js'),'utf8'),{window:host,AbortController,console});
+ host.IOSBKHistory.section('A','settings');await host.IOSBKHistory.refresh();
+ listeners.click({target:{closest(){return {dataset:{historyAction:'retryPolicy'}};}}});
+ await new Promise(setImmediate);
+ assert.ok(requests.some(([url,method,body])=>url==='/api/backup-history/A/policy-retry'&&method==='POST'&&body==='{}'),'retry resumes the saved policy without creating a new preview');
+ host.IOSBKHistory.hide();
+ console.log('history policy retry resumes only saved settings');
+})().catch(e=>{console.error(e);process.exitCode=1});
+(async()=>{
  async function deleteAfterNavigation(destination){
   const listeners={},closed=[],dialogs=[],first='a'.repeat(32),second='b'.repeat(32);
   let resolveDelete,deleted=false;

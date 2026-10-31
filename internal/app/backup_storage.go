@@ -74,7 +74,7 @@ func (m *backupStorage) load(ctx context.Context) error {
 		if st.CurrentDeleted && st.DeletedAt.IsZero() || st.CurrentReset && !st.CurrentDeleted {
 			return backupstore.ErrInvalid
 		}
-		if st.TransitionSource != "" && st.TransitionSource != "current" && st.TransitionSource != "normal" {
+		if st.TransitionSource != "" && st.TransitionSource != "current" && st.TransitionSource != "normal" && st.TransitionSource != "legacy" {
 			return backupstore.ErrInvalid
 		}
 		if st.TransitionSource == "current" && (st.WritableStore == "" || st.WritableID == "") {

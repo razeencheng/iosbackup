@@ -256,6 +256,10 @@ func (app *application) closeHistoryHTTP() {
 		r.cancel()
 		waiting = append(waiting, r.done)
 	}
+	for _, run := range service.policies {
+		run.cancel()
+		waiting = append(waiting, run.done)
+	}
 	service.mu.Unlock()
 	for _, done := range waiting {
 		<-done

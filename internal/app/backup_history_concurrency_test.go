@@ -57,7 +57,7 @@ func TestReviewHistoryPolicyConcurrentPreview(t *testing.T) {
 	}
 	a.configPersistMu.Unlock()
 	first, second := <-results, <-results
-	if first == 200 && second == 200 {
+	if first == 202 && second == 202 {
 		t.Fatal("both stale previews applied: concurrent settings overwrite accepted")
 	}
 }

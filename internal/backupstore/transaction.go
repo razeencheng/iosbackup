@@ -127,6 +127,8 @@ func (s *Store) Commit(ctx context.Context, workID string, point Point) (Point, 
 	if err = s.stage("intent", func() error { return s.saveTransaction(tx) }); err != nil {
 		return Point{}, s.uncertainError(err)
 	}
+	// 封存意图落盘后，调用方取消不再中断提交；服务必须完成或留下可恢复事务。
+	ctx = context.WithoutCancel(ctx)
 	if err = s.stage("data", func() error { return s.syncObject(ctx, filepath.Join("work", workID)) }); err != nil {
 		return Point{}, s.uncertainError(err)
 	}
@@ -136,6 +138,9 @@ func (s *Store) Commit(ctx context.Context, workID string, point Point) (Point, 
 	stamp, stampErr := s.objectStamp(ctx, filepath.Join("work", workID))
 	if stampErr != nil {
 		return Point{}, s.uncertainError(stampErr)
+	}
+	if stamp != hex.EncodeToString(stats.Digest[:]) {
+		return Point{}, s.uncertainError(ErrChanged)
 	}
 	tx.SourceStamp = stamp
 	tx.Phase = "ready"
@@ -270,6 +275,9 @@ func cloneBaselines(source map[string]string) map[string]string {
 func (s *Store) AbortWork(ctx context.Context, id string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	if err := s.checkReady(); err != nil {
 		return err
 	}
@@ -286,7 +294,8 @@ func (s *Store) AbortWork(ctx context.Context, id string) error {
 	if _, err = s.root.Lstat(filepath.Join("objects", id)); !errors.Is(err, os.ErrNotExist) {
 		return ErrUncertain
 	}
-	if err = removeTree(ctx, s.root, filepath.Join("work", id)); err != nil {
+	// 已确认工作副本归属后完成清理，原 work/sealing 事务保护中途崩溃。
+	if err = removeTree(context.WithoutCancel(ctx), s.root, filepath.Join("work", id)); err != nil {
 		return s.uncertainError(err)
 	}
 	if err = s.root.Remove(filepath.Join("descriptors", id+".json")); err != nil && !errors.Is(err, os.ErrNotExist) {

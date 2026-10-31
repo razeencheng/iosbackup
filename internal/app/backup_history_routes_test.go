@@ -130,9 +130,14 @@ func TestBackupHistoryHTTPPolicy(t *testing.T) {
 	}
 	body["token"] = response.Token
 	w = historyRequest(t, a, h, "PUT", "/api/backup-history/CONTROL/policy", body)
-	if w.Code != 200 {
+	if w.Code != http.StatusAccepted {
 		t.Fatal(w.Code, w.Body)
 	}
+	service := a.historyService()
+	service.mu.Lock()
+	done := service.policies["CONTROL"].done
+	service.mu.Unlock()
+	<-done
 	if a.configs["CONTROL"].History.Days != 1 {
 		t.Fatal("policy not saved")
 	}

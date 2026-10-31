@@ -101,6 +101,24 @@ func (m *backupStorage) deviceStores(udid string) ([]*backupstore.Store, error) 
 	return stores, nil
 }
 
+// 调用方必须独占设备写入；读租约由 Recover 再次检查，不能越过仍在使用的来源。
+func (m *backupStorage) recoverDevice(ctx context.Context, udid string) error {
+	stores, err := m.deviceStores(udid)
+	if err != nil {
+		return err
+	}
+	for _, store := range stores {
+		if _, err := store.ReadSnapshot(); errors.Is(err, backupstore.ErrUncertain) {
+			if _, err = store.Recover(ctx); err != nil {
+				return err
+			}
+		} else if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // sourceRoot is a memory-only lookup. The actual reader still validates identity.
 func (m *backupStorage) sourceRoot(udid, root string) (string, error) {
 	m.mu.Lock()
@@ -147,6 +165,18 @@ func (app *application) historySourceRoot(udid, root string) (string, error) {
 
 // Called only while the common device admission and index writer are held.
 func (app *application) prepareBackupHistory(job *backupJob, root string) (*backupHistoryRun, error) {
+	if job.config.HistoryPolicyPending && !job.historyPolicyOnly {
+		// 重启或迁移中断后先完成已保存的目标策略，不能按旧来源模式开始写手机数据。
+		transition := *job
+		transition.historyPolicyOnly = true
+		if _, err := app.prepareBackupHistory(&transition, root); err != nil {
+			return nil, err
+		}
+		if err := app.completeHistoryPolicy(&transition); err != nil {
+			return nil, err
+		}
+		job.config.HistoryPolicyPending = false
+	}
 	policy, err := job.config.History.Normalize()
 	if err != nil {
 		return nil, err
@@ -159,6 +189,9 @@ func (app *application) prepareBackupHistory(job *backupJob, root string) (*back
 			return nil, backupstore.ErrUncertain
 		}
 		return nil, nil
+	}
+	if err := m.recoverDevice(job.ctx, job.udid); err != nil {
+		return nil, err
 	}
 	st, err := m.reconcileHistoryLatest(job.udid)
 	if err != nil {
@@ -217,7 +250,7 @@ func (app *application) prepareBackupHistory(job *backupJob, root string) (*back
 		}
 		return &backupHistoryRun{state: st, store: store, work: work, forceFull: st.CurrentDeleted}, nil
 	}
-	if st.Phase != "disabled" && st.EpochID != "" && policy.Days < st.Days {
+	if st.Phase != "disabled" && st.EpochID != "" && policy.Days < st.Days && !job.config.HistoryPolicyPending {
 		return nil, backupstore.ErrConflict
 	}
 	if st.Phase == "disabling" {
@@ -347,6 +380,9 @@ func (app *application) disableBackupHistory(ctx context.Context, job *backupJob
 	m := app.backupStorage
 	if st.Phase != "disabling" {
 		st.TransitionSource = "normal"
+		if st.Phase == "enabling" && !st.MigrationDone && st.LatestPoint == "" && st.WritableID == "" {
+			st.TransitionSource = "legacy"
+		}
 		if st.Phase == "disabled" && st.WritableID != "" && !st.CurrentDeleted {
 			st.TransitionSource = "current"
 		}
@@ -398,6 +434,28 @@ func (app *application) disableBackupHistory(ctx context.Context, job *backupJob
 			return st, ctx.Err()
 		}
 		_, err = backupstore.CopyTree(ctx, oldWork.Directory, work.Directory, backupstore.CopyOptions{PreferClone: true})
+		<-m.slot
+		if err != nil {
+			_ = target.AbortWork(context.Background(), work.ID)
+			return st, err
+		}
+	} else if previous.TransitionSource == "legacy" {
+		// 兼容旧版本遗留的首次迁移中断：原目录仍是来源，不能改用空副本。
+		target, e := m.store(id)
+		if e != nil {
+			return st, e
+		}
+		work, e = target.NewWork(job.id)
+		if e != nil {
+			return st, e
+		}
+		select {
+		case m.slot <- struct{}{}:
+		case <-ctx.Done():
+			_ = target.AbortWork(context.Background(), work.ID)
+			return st, ctx.Err()
+		}
+		_, err = backupstore.CopyTree(ctx, filepath.Join(previous.Root, job.udid), work.Directory, backupstore.CopyOptions{PreferClone: true})
 		<-m.slot
 		if err != nil {
 			_ = target.AbortWork(context.Background(), work.ID)
@@ -727,7 +785,7 @@ func (app *application) acquireHistorySource(udid, configuredRoot string) (strin
 		source.Kind = "missing"
 		return "", nil, source, os.ErrNotExist
 	}
-	if st.Phase == "disabled" {
+	if st.Phase == "disabled" || (st.Phase == "enabling" && !st.MigrationDone && st.WritableID != "") || (st.Phase == "disabling" && st.TransitionSource == "current") {
 		source.StoreID = st.WritableStore
 		store, err := m.store(st.WritableStore)
 		if err != nil {
@@ -739,7 +797,10 @@ func (app *application) acquireHistorySource(udid, configuredRoot string) (strin
 		}
 		return work.Parent, noop, source, nil
 	}
-	if st.Phase != "active" || st.LatestPoint == "" {
+	if (st.Phase == "enabling" && !st.MigrationDone && st.LatestPoint == "") || (st.Phase == "disabling" && st.TransitionSource == "legacy") {
+		return configuredRoot, noop, source, nil
+	}
+	if st.LatestPoint == "" {
 		source.Kind = "missing"
 		return "", nil, source, backupstore.ErrBusy
 	}

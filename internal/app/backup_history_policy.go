@@ -34,6 +34,9 @@ func (app *application) previewHistoryPolicy(ctx context.Context, udid string, p
 	if cfg == nil {
 		return historyPolicyPreview{}, errDeviceNotFound
 	}
+	if cfg.HistoryPolicyPending && cfg.History != policy {
+		return historyPolicyPreview{}, errDeviceBusy
+	}
 	if m == nil {
 		return historyPolicyPreview{}, backupstore.ErrUncertain
 	}
@@ -89,26 +92,41 @@ func sameHistoryPreview(a, b historyPolicyPreview) bool {
 	}
 	return true
 }
-func (app *application) applyHistoryPolicy(ctx context.Context, udid string, policy backupstore.Policy, confirmed *historyPolicyPreview) (retErr error) {
+
+type historyPolicyWork struct {
+	job     *backupJob
+	root    string
+	release func()
+}
+
+// 先持久化目标策略并占用设备，再把耗时转换交给任务执行；配置锁不跨越复制。
+func (app *application) prepareHistoryPolicyChange(ctx context.Context, udid string, policy backupstore.Policy, confirmed *historyPolicyPreview) (_ *historyPolicyWork, retErr error) {
 	policy, err := policy.Normalize()
 	if err != nil {
-		return err
+		return nil, err
+	}
+	if err = ctx.Err(); err != nil {
+		return nil, err
 	}
 	app.configPersistMu.Lock()
 	defer app.configPersistMu.Unlock()
 	app.mu.Lock()
 	if err = app.deviceRemovalBlockedUnsafe(udid); err != nil {
 		app.mu.Unlock()
-		return err
+		return nil, err
 	}
 	cfg := cloneBackupConfig(app.configs[udid])
 	if cfg == nil {
 		app.mu.Unlock()
-		return errDeviceNotFound
+		return nil, errDeviceNotFound
+	}
+	if cfg.HistoryPolicyPending && cfg.History != policy {
+		app.mu.Unlock()
+		return nil, errDeviceBusy
 	}
 	if app.backupInProgress[udid] || app.checkInProgress[udid] {
 		app.mu.Unlock()
-		return errDeviceBusy
+		return nil, errDeviceBusy
 	}
 	app.backupInProgress[udid] = true
 	app.mu.Unlock()
@@ -121,10 +139,10 @@ func (app *application) applyHistoryPolicy(ctx context.Context, udid string, pol
 		app.mu.Lock()
 		delete(app.backupInProgress, udid)
 		app.mu.Unlock()
-		return err
+		return nil, err
 	}
 	app.beginBackupIndexWrite(udid, root, true)
-	defer func() {
+	release := func() {
 		manager := app.lockBackupIndexFinish()
 		app.mu.Lock()
 		delete(app.backupInProgress, udid)
@@ -134,40 +152,79 @@ func (app *application) applyHistoryPolicy(ctx context.Context, udid string, pol
 			lease = manager.releaseWriteUnsafe(udid)
 			manager.mu.Unlock()
 		}
-		app.afterBackupIndexWrite(manager, lease, retErr == nil)
+		app.afterBackupIndexWrite(manager, lease, false)
 		app.broadcastStatus()
-	}()
-	preview, err := app.previewHistoryPolicy(ctx, udid, policy)
-	if err != nil {
-		return err
 	}
-	if confirmed != nil && (!sameHistoryPreview(preview, *confirmed) || preview.Root != confirmed.Root) {
-		return backupstore.ErrConflict
-	}
-	st, err := app.backupStorage.deviceState(udid)
-	if err != nil {
-		return err
-	}
-	if policy.Enabled && st.Phase == "active" && policy.Days < st.Days {
-		if confirmed == nil || !sameHistoryPreview(preview, *confirmed) {
-			return backupstore.ErrConflict
+	defer func() {
+		if retErr != nil {
+			release()
 		}
-		st.Days = policy.Days
-		if err = app.backupStorage.saveDevice(udid, st); err != nil {
-			return err
+	}()
+	// 仅重试已持久化且未改变的目标可跳过预览；故障中的存储由后台任务恢复。
+	if !cfg.HistoryPolicyPending {
+		preview, err := app.previewHistoryPolicy(ctx, udid, policy)
+		if err != nil {
+			return nil, err
+		}
+		if confirmed != nil && (!sameHistoryPreview(preview, *confirmed) || preview.Root != confirmed.Root) {
+			return nil, backupstore.ErrConflict
+		}
+		st, err := app.backupStorage.deviceState(udid)
+		if err != nil {
+			return nil, err
+		}
+		if policy.Enabled && st.Phase == "active" && policy.Days < st.Days && confirmed == nil {
+			return nil, backupstore.ErrConflict
 		}
 	}
 	cfg.History = policy
-	job := &backupJob{udid: udid, id: newBackupSessionID(), config: cfg, ctx: ctx, request: backupRequest{Mode: "auto"}, historyPolicyOnly: true}
-	if _, err = app.prepareBackupHistory(job, root); err != nil {
-		return err
-	}
+	cfg.HistoryPolicyPending = true
 	if err = app.configStore.Put(*cfg); err != nil {
-		return err
+		return nil, err
 	}
 	app.mu.Lock()
 	app.overlayBackupHoldUnsafe(cfg)
 	app.configs[udid] = cfg
 	app.mu.Unlock()
+	job := &backupJob{udid: udid, id: newBackupSessionID(), config: cloneBackupConfig(cfg), ctx: ctx, request: backupRequest{Mode: "auto"}, historyPolicyOnly: true}
+	return &historyPolicyWork{job: job, root: root, release: release}, nil
+}
+
+func (app *application) completeHistoryPolicy(job *backupJob) error {
+	app.configPersistMu.Lock()
+	defer app.configPersistMu.Unlock()
+	app.mu.RLock()
+	cfg := cloneBackupConfig(app.configs[job.udid])
+	app.mu.RUnlock()
+	if cfg == nil || cfg.History != job.config.History {
+		return backupstore.ErrConflict
+	}
+	if !cfg.HistoryPolicyPending {
+		return nil
+	}
+	cfg.HistoryPolicyPending = false
+	if err := app.configStore.Put(*cfg); err != nil {
+		return err
+	}
+	app.mu.Lock()
+	app.overlayBackupHoldUnsafe(cfg)
+	app.configs[job.udid] = cfg
+	app.mu.Unlock()
 	return nil
+}
+
+func (app *application) runHistoryPolicy(work *historyPolicyWork) error {
+	defer work.release()
+	if _, err := app.prepareBackupHistory(work.job, work.root); err != nil {
+		return err
+	}
+	return app.completeHistoryPolicy(work.job)
+}
+
+func (app *application) applyHistoryPolicy(ctx context.Context, udid string, policy backupstore.Policy, confirmed *historyPolicyPreview) error {
+	work, err := app.prepareHistoryPolicyChange(ctx, udid, policy, confirmed)
+	if err != nil {
+		return err
+	}
+	return app.runHistoryPolicy(work)
 }

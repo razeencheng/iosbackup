@@ -46,6 +46,7 @@ type device struct {
 
 // BackupConfig 备份配置结构
 type backupConfig struct {
+	HistoryPolicyPending  bool               `json:"history_policy_pending,omitempty"`
 	History               backupstore.Policy `json:"history"`
 	UDID                  string             `json:"udid"`
 	Name                  string             `json:"name"`

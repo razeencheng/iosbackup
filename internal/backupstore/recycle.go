@@ -63,7 +63,8 @@ func (s *Store) deleteLocked(ctx context.Context, id string, revision uint64, ex
 	if err := s.stage("recycle-intent", func() error { return s.saveTransaction(tx) }); err != nil {
 		return s.uncertainError(err)
 	}
-	if err := s.finishRecycle(ctx, tx); err != nil {
+	// 意图已持久化，调用者离开不能截断回收；崩溃仍由事务恢复收尾。
+	if err := s.finishRecycle(context.WithoutCancel(ctx), tx); err != nil {
 		return s.uncertainError(err)
 	}
 	return nil

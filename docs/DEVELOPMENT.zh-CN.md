@@ -41,6 +41,8 @@ go list -m all
 
 历史备份的生命周期和存储约定见 [backupstore 模块说明](../internal/backupstore/README.md)。默认保留含当天的 3 个自然日；策略确认、迁移与当前来源选择位于 `internal/app/backup_history*.go`。历史 HTTP 接口由服务端解析点 ID，变更检查版本号，策略使用一次性预览确认。导出持有读取占用并设置写入空闲期限。使用流程见[历史恢复点](manual/backup-history.zh-CN.md)。
 
+历史策略变更先保存目标和 `history_policy_pending`，再准备存储。`PUT /api/backup-history/{udid}/policy` 返回 `202` 及后台操作；请求断开不会取消操作。历史列表提供 `policy_operation` 和 `can_retry_policy`。`POST /api/backup-history/{udid}/policy-retry` 接收空对象，只继续已保存的目标。未完成转换前不能改变目标或备份目录；重启后的新备份也先继续准备，再写入手机数据。配置锁不跨越整份复制，新来源可靠保存前保留已确认来源。存储恢复在设备独占写入期间执行，并尊重读取占用。
+
 
 ## 完成一次本地修改
 
