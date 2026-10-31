@@ -7,6 +7,8 @@
   };
   var fields = {start_time:'startTime',end_time:'endTime',backup_interval:'backupInterval',min_battery_level:'minBattery',only_when_charging:'chargingToggle',auto_backup_enabled:'autoBackupToggle',backup_directory:'backupDir',network_address:'networkAddress'};
   var saved = {}, history = {}, layers = [], sequence = 0, recent = {};
+  function isBackupRunning(device) { return !!device.backing_up && (!device.active_operation || device.active_operation === 'backup'); }
+  function busyLabel(device) { return device.active_operation === 'check' ? 'console.checkingBackup' : (device.active_operation === 'local' ? 'console.deviceBusy' : 'device.backingUp'); }
   function configPayload(group, config) {
     if (!groups[group]) throw new Error('Unknown settings group');
     var result = {};
@@ -195,16 +197,20 @@
     try {
       var response = await global.IOSBKI18n.fetch('/api/backup-jobs/' + encodeURIComponent(u));
       if (!response.ok) return;
-      var result = await response.json(), job = (result.jobs || []).find(function (j) { return j.operation !== 'check'; });
-      var host = get('consoleRecent-' + u); if (!host) return;
-      host.replaceChildren(); host.classList.toggle('hidden', !job || !needsAttention(job));
-      if (job && needsAttention(job)) {
-        var stateText = job.error_code && global.IOSBKI18n.has('api.' + job.error_code) ? tr('api.' + job.error_code) : tr('console.attention');
-        host.append(el('span',tr('console.recentIssue',{state:stateText})),button(tr('console.viewJob'),function(){openJob(u,job.id);},'console-text-button history-button'));
-      }
+      var result = await response.json();
+      state.job = (result.jobs || []).find(function (j) { return j.operation !== 'check'; });
+      renderRecent(u);
       state.at = Date.now();
     } catch (_) { /* 任务接口失败由任务页提示，不覆盖已读取的备份。 */ }
     finally { state.pending = false; }
+  }
+  function renderRecent(u) {
+    var host=get('consoleRecent-'+u),job=recent[u]&&recent[u].job;if(!host)return;
+    host.replaceChildren();host.classList.toggle('hidden',!job||!needsAttention(job));
+    if(job&&needsAttention(job)){
+      var stateText=job.error_code&&global.IOSBKI18n.has('api.'+job.error_code)?tr('api.'+job.error_code):tr('console.attention');
+      host.append(el('span',tr('console.recentIssue',{state:stateText})),button(tr('console.viewJob'),function(){openJob(u,job.id);},'console-text-button history-button'));
+    }
   }
   function backup(u) {
     var content = el('div', undefined, 'console-layer-body');
@@ -245,10 +251,10 @@
     if(content)global.clearConnectionResults(content.dataset.udid);
   });
   doc.addEventListener('change',function(event){changed(event.target);});
-  global.addEventListener('iosbk:localechange',function(){Object.keys(saved).forEach(settingsSummary);});
+  global.addEventListener('iosbk:localechange',function(){Object.keys(saved).forEach(settingsSummary);Object.keys(recent).forEach(renderRecent);});
   global.addEventListener('beforeunload',function(event){
     var dirty=Object.keys(saved).some(function(u){return Object.keys(groups).some(function(group){var content=get('setting-'+group+'-'+u);return content&&content.closest('dialog[open]')&&JSON.stringify(configPayload(group,readConfig(u)))!==JSON.stringify(configPayload(group,saved[u]));});});
     if(dirty){event.preventDefault();event.returnValue='';}
   });
-  global.IOSBKConsole={configPayload:configPayload,filterJobs:filterJobs,needsAttention:needsAttention,isCurrentPoint:isCurrentPoint,init:init,settings:settings,backup:backup,pointDrawer:pointDrawer,closePoint:closePoint,taskDrawer:taskDrawer,openJob:openJob,openPoint:openPoint,current:current,updateHistory:updateHistory,closeLayers:closeLayers,layer:layer};
+  global.IOSBKConsole={isBackupRunning:isBackupRunning,busyLabel:busyLabel,configPayload:configPayload,filterJobs:filterJobs,needsAttention:needsAttention,isCurrentPoint:isCurrentPoint,init:init,settings:settings,backup:backup,pointDrawer:pointDrawer,closePoint:closePoint,taskDrawer:taskDrawer,openJob:openJob,openPoint:openPoint,current:current,updateHistory:updateHistory,closeLayers:closeLayers,layer:layer};
 })(window);

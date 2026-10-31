@@ -159,7 +159,8 @@ type application struct {
 	htmlTemplate              *template.Template
 	loginTemplate             *template.Template
 	onboardingTemplate        *template.Template
-	backupInProgress          map[string]bool // 跟踪正在备份的设备
+	backupInProgress          map[string]bool // 备份及其他互斥操作共用的占用标志
+	historyReviewInProgress   map[string]bool // 仅用于区分历史检查的界面状态
 	backupStorage             *backupStorage
 	backupGenerations         *generationStore
 	backupJobRecords          *backupJobStore

@@ -18,6 +18,7 @@ type homePayload struct {
 	Devices                       []*device
 	Configs                       map[string]*backupConfig
 	BackupStatuses                map[string]bool
+	ActiveOperations              map[string]string
 	HasBackupInProgress           bool
 	EncryptionAvailable           bool
 	ExperimentalOperationsEnabled bool

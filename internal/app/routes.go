@@ -445,6 +445,7 @@ func (app *application) handleHome(w http.ResponseWriter, r *http.Request) {
 	devices := make([]*device, 0, len(app.devices))
 	configs := make(map[string]*backupConfig)
 	backupStatuses := make(map[string]bool)
+	activeOperations := make(map[string]string)
 	hasBackupInProgress := len(app.backupInProgress) > 0
 
 	for udid, device := range app.devices {
@@ -469,6 +470,7 @@ func (app *application) handleHome(w http.ResponseWriter, r *http.Request) {
 		}
 		// 记录备份状态
 		backupStatuses[udid] = app.backupInProgress[udid]
+		activeOperations[udid] = app.activeOperationUnsafe(udid)
 	}
 	app.mu.RUnlock()
 
@@ -494,6 +496,7 @@ func (app *application) handleHome(w http.ResponseWriter, r *http.Request) {
 		Devices                       []*device
 		Configs                       map[string]*backupConfig
 		BackupStatuses                map[string]bool
+		ActiveOperations              map[string]string
 		HasBackupInProgress           bool
 		EncryptionAvailable           bool
 		ExperimentalOperationsEnabled bool
@@ -511,6 +514,7 @@ func (app *application) handleHome(w http.ResponseWriter, r *http.Request) {
 		Devices:                       devices,
 		Configs:                       configs,
 		BackupStatuses:                backupStatuses,
+		ActiveOperations:              activeOperations,
 		HasBackupInProgress:           hasBackupInProgress,
 		EncryptionAvailable:           app.secretStore != nil && app.secretStore.Available(),
 		ExperimentalOperationsEnabled: app.enableExperimentalOperations,

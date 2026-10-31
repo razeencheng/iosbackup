@@ -23,7 +23,24 @@ assert.equal(api.filterJobs(jobs, 'all', 'succeeded').length, 3, 'execution filt
 assert.equal(api.isCurrentPoint({ current_source: { kind: 'point', point_id: 'new', available: true } }, { id: 'old', baseline: true }), false, 'an old-generation baseline is not the current source');
 assert.equal(api.isCurrentPoint({ current_source: { kind: 'current', available: true } }, { id: 'new', baseline: true }), false);
 assert.equal(api.isCurrentPoint({ current_source: { kind: 'point', point_id: 'new', available: true } }, { id: 'new' }), true);
+assert.equal(api.isBackupRunning({backing_up:true,active_operation:'check'}),false,'a read-only check must not display phone backup progress');
+assert.equal(api.isBackupRunning({backing_up:true,active_operation:'local'}),false);
+assert.equal(api.isBackupRunning({backing_up:true,active_operation:'backup'}),true);
+assert.equal(api.busyLabel({active_operation:'check'}),'console.checkingBackup');
+assert.equal(api.busyLabel({active_operation:'local'}),'console.deviceBusy');
 console.log('console group saves, task filtering and current-source identity passed');
+
+(async()=>{
+  let locale='en',fetches=0;const listeners={};
+  const host={classList:{toggle(){}},replaceChildren(){this.children=[];},append(...children){this.children=children;}};
+  const page={document:{addEventListener(){},getElementById:id=>id==='consoleRecent-A'?host:null,createElement:()=>({})},addEventListener(name,fn){listeners[name]=fn;},formatBackupBytes:()=>'',IOSBKI18n:{t:key=>locale+':'+key,has:()=>true,fetch:async()=>{fetches++;return {ok:true,json:async()=>({jobs:[{id:'task',state:'failed',error_code:'busy'}]})};}}};
+  vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../static/backup-console.js'),'utf8'),{window:page});
+  page.IOSBKConsole.updateHistory({udid:'A',points:[],data:{policy:{enabled:false},current_source:{kind:'missing'},storage:{},total:0,logical_bytes:0,bytes_known:true}});
+  await new Promise(setImmediate);assert.equal(host.children[1].textContent,'en:console.viewJob');
+  locale='zh-CN';listeners['iosbk:localechange']();
+  assert.equal(host.children[1].textContent,'zh-CN:console.viewJob','the recent issue translates immediately');
+  assert.equal(fetches,1,'language changes reuse retained task data without another request');
+})().catch(error=>{console.error(error);process.exitCode=1});
 
 // A connection result belongs to the draft that started it, including after
 // cancel restores the same value and a second request is started.

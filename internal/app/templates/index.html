@@ -242,6 +242,8 @@
     {{range $d := .Devices}}
     {{$cfg := index $.Configs $d.UDID}}
     {{$backingUp := index $.BackupStatuses $d.UDID}}
+    {{$operation := ""}}{{if $.ActiveOperations}}{{$operation = index $.ActiveOperations $d.UDID}}{{end}}
+    {{$busyKey := "device.backingUp"}}{{if eq $operation "check"}}{{$busyKey = "console.checkingBackup"}}{{else if eq $operation "local"}}{{$busyKey = "console.deviceBusy"}}{{end}}
     {{$disc := index $.DiscoveredIPs $d.UDID}}
     {{$conn := "offline"}}{{if $d.IsOnline}}{{if eq $d.Connection "usb"}}{{$conn = "usb"}}{{else}}{{$conn = "wifi"}}{{end}}{{end}}
     {{if $d.PresenceUnknown}}{{$conn = "unknown"}}{{end}}
@@ -266,7 +268,7 @@
               {{else if eq $conn "wifi"}}<span class="connection-badge" style="gap:7px;padding:5px 11px;background:#E2F3EF;color:#0B7565;border:1px solid #B9E2DA;font-size:12.5px;font-weight:600;white-space:nowrap"><svg class="connection-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M3 7.6a10.7 10.7 0 0 1 14 0M5.7 10.5a6.7 6.7 0 0 1 8.6 0M8.4 13.3a2.7 2.7 0 0 1 3.2 0" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path><circle cx="10" cy="16" r="1.25" fill="currentColor"></circle></svg><span data-i18n="status.wifi">{{t $.Locale "status.wifi"}}</span></span>
               {{else}}<span class="connection-badge" style="gap:7px;padding:5px 11px;background:#F3F7FA;color:#718090;border:1px solid #D8E2EA;font-size:12.5px;font-weight:600;white-space:nowrap"><svg class="connection-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2.6v6.1M5.5 5.7a6.2 6.2 0 1 0 9 0" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path></svg><span data-i18n="status.offline">{{t $.Locale "status.offline"}}</span></span>{{end}}
             </div>
-            <button id="backupBtn-{{$d.UDID}}" class="backup-action" onclick="event.stopPropagation();startBackup('{{$d.UDID}}',this)" {{if or (eq $conn "offline") $backingUp}}disabled{{end}} style="gap:9px;padding:10px 17px;font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit;border:none;white-space:nowrap;min-width:132px;{{if or (eq $conn "offline") $backingUp}}background:#F3F7FA;color:#ADB9C2;cursor:not-allowed;{{else}}background:#2C62C6;color:#fff;{{end}}">{{if $backingUp}}<span data-i18n="device.backingUp">{{t $.Locale "device.backingUp"}}</span>{{else}}<span data-i18n="device.backupNow">{{t $.Locale "device.backupNow"}}</span>{{end}}</button>
+            <button id="backupBtn-{{$d.UDID}}" class="backup-action" onclick="event.stopPropagation();startBackup('{{$d.UDID}}',this)" {{if or (eq $conn "offline") $backingUp}}disabled{{end}} style="gap:9px;padding:10px 17px;font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit;border:none;white-space:nowrap;min-width:132px;{{if or (eq $conn "offline") $backingUp}}background:#F3F7FA;color:#ADB9C2;cursor:not-allowed;{{else}}background:#2C62C6;color:#fff;{{end}}">{{if $backingUp}}<span data-i18n="{{$busyKey}}">{{t $.Locale $busyKey}}</span>{{else}}<span data-i18n="device.backupNow">{{t $.Locale "device.backupNow"}}</span>{{end}}</button>
             <button id="stopBackup-{{$d.UDID}}" type="button" class="backup-control-button stop hidden" disabled onclick="event.stopPropagation();openStopBackup('{{$d.UDID}}')" data-i18n="control.stop">{{t $.Locale "control.stop"}}</button>
             <svg id="chev-{{$d.UDID}}" class="ui-icon" style="color:#ADB9C2;width:15px;height:15px" aria-hidden="true"><use href="/static/ui-icons.svg#icon-chevron-down"></use></svg>
           </div>
@@ -277,7 +279,7 @@
           <button id="retryHold-{{$d.UDID}}" type="button" class="backup-control-button hidden" onclick="retryBackupHold('{{$d.UDID}}')" data-i18n="control.retrySave">{{t $.Locale "control.retrySave"}}</button>
           <button id="resumeBackup-{{$d.UDID}}" type="button" class="backup-control-button" disabled onclick="resumeAutomaticBackup('{{$d.UDID}}')" data-i18n="control.resume">{{t $.Locale "control.resume"}}</button>
         </div>
-        <div id="bkbar-{{$d.UDID}}" class="backup-progress-panel{{if not $backingUp}} hidden{{end}}" data-progress-mode="preparing">
+        <div id="bkbar-{{$d.UDID}}" class="backup-progress-panel{{if or (not $backingUp) (eq $operation "check") (eq $operation "local")}} hidden{{end}}" data-progress-mode="preparing">
           <div class="backup-progress-heading">
             <div class="backup-progress-heading-copy"><strong id="bkprogress-title-{{$d.UDID}}" data-i18n="progress.preparingTitle">{{t $.Locale "progress.preparingTitle"}}</strong><span id="bkprogress-subtitle-{{$d.UDID}}" data-i18n="progress.preparingSubtitle">{{t $.Locale "progress.preparingSubtitle"}}</span></div>
             <span id="bkprogress-value-{{$d.UDID}}" class="backup-progress-value">—</span>
@@ -1070,11 +1072,12 @@ function backupProgressCopy(mode,d){
 function renderBackupProgress(d){
   var u=d.udid, panel=document.getElementById('bkbar-'+u); if(!panel) return;
   var progress=d.backup_progress;
-  if(!progress && (d.backing_up || d.backup_state==='stopped')) progress={state:'preparing'};
+  var running=window.IOSBKConsole?IOSBKConsole.isBackupRunning(d):!!d.backing_up;
+  if(!progress && (running || d.backup_state==='stopped')) progress={state:'preparing'};
   if(!progress){ panel.classList.add('hidden'); panel.removeAttribute('data-progress-mode'); return; }
 
   var mode=d.backup_state==='stopping'?'stopping':(d.backup_state==='stopped'?'stopped':backupProgressMode(progress)), copy=backupProgressCopy(mode,d);
-  panel.classList.toggle('hidden',!d.backing_up); panel.setAttribute('data-progress-mode',mode);
+  panel.classList.toggle('hidden',!running); panel.setAttribute('data-progress-mode',mode);
   var title=document.getElementById('bkprogress-title-'+u), subtitle=document.getElementById('bkprogress-subtitle-'+u), value=document.getElementById('bkprogress-value-'+u);
   var track=document.getElementById('bkprogress-track-'+u), fill=document.getElementById('bkprogress-fill-'+u);
   var overall=isBackupProgressNumber(progress.overall_percent) && progress.overall_percent<=100 ? progress.overall_percent : null;
@@ -1122,7 +1125,7 @@ function patchDevice(d){
     btn.disabled = dis;
     btn.setAttribute('style','gap:9px;padding:10px 17px;font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit;border:none;white-space:nowrap;min-width:132px;'+(dis?'background:#F3F7FA;color:#ADB9C2;cursor:not-allowed;':'background:#2C62C6;color:#fff;'));
     var retry=d.backup_progress && (d.backup_progress.state==='interrupted'||d.backup_progress.state==='failed');
-    btn.innerHTML = d.backing_up ? '<span data-i18n="device.backingUp"></span>' : (d.auto_backup_hold?'<span data-i18n="control.manualOnce"></span>':(retry?'<span data-i18n="progress.retry"></span>':'<span data-i18n="device.backupNow"></span>'));
+    btn.innerHTML = d.backing_up ? '<span data-i18n="'+IOSBKConsole.busyLabel(d)+'"></span>' : (d.auto_backup_hold?'<span data-i18n="control.manualOnce"></span>':(retry?'<span data-i18n="progress.retry"></span>':'<span data-i18n="device.backupNow"></span>'));
     btn.style.opacity='';
   }
   renderBackupControl(d);

@@ -353,6 +353,7 @@ func (app *application) acquireHistoryMutation(udid string) (func(), error) {
 		manager := app.lockBackupIndexFinish()
 		app.mu.Lock()
 		delete(app.backupInProgress, udid)
+		delete(app.historyReviewInProgress, udid)
 		app.mu.Unlock()
 		var lease *backupIndexWrite
 		if manager != nil {
@@ -528,11 +529,18 @@ func (app *application) startHistoryReview(s *backupstore.Store, p backupstore.P
 	}
 	service.reviews[p.ID] = run
 	service.mu.Unlock()
+	app.mu.Lock()
+	if app.historyReviewInProgress == nil {
+		app.historyReviewInProgress = make(map[string]bool)
+	}
+	app.historyReviewInProgress[p.UDID] = true
+	app.mu.Unlock()
 	if app.backupJobRecords != nil {
 		app.backupJobRecords.start(&backupJobSeed{ID: run.ID, UDID: p.UDID, DeviceName: p.UDID, PointID: p.ID, Source: "manual", RequestedMode: "auto", Operation: "check", StartedAt: run.Result.StartedAt})
 		app.backupJobRecords.setCheck(run.ID, run.Result)
 		app.backupJobRecords.transition(run.ID, backupStateRunning)
 	}
+	app.broadcastStatus()
 	go func() {
 		defer manager.workers.Done()
 		defer cancel()

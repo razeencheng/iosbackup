@@ -91,7 +91,7 @@ function dom(app) {
 function pageScript(name) {
  const html=fs.readFileSync(path.join(root,'templates',name),'utf8');
  const scripts=[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)];
- return (name==='index.html'?fs.readFileSync(path.join(root,'static/backup-browser.js'),'utf8')+'\n':'')+scripts.at(-1)[1].replace('{{.InitialStatus}}','{"devices":[]}');
+ return (name==='index.html'?fs.readFileSync(path.join(root,'static/backup-browser.js'),'utf8')+'\n'+fs.readFileSync(path.join(root,'static/backup-console.js'),'utf8')+'\nvar IOSBKConsole=window.IOSBKConsole;\n':'')+scripts.at(-1)[1].replace('{{.InitialStatus}}','{"devices":[]}');
 }
 const login=boot(), loginDOM=dom(login);
 vm.runInContext(pageScript('login.html'),login.context);
@@ -110,6 +110,12 @@ const passwordAction=consoleDOM.get('changeBackupPw-PHONE');passwordAction.setAt
 for(const [conn,available,backingUp,disabled] of [['usb',true,false,false],['offline',false,false,true],['usb',true,true,true],['usb',true,false,false]]) {
  vm.runInContext('patchDevice('+JSON.stringify({udid:'PHONE',conn,operations_available:available,backing_up:backingUp})+')',consoleApp.context);
  assert.equal(passwordAction.disabled,disabled,'password action gating for '+conn+' / backing_up='+backingUp);
+}
+for(const operation of ['check','local','backup']) {
+ vm.runInContext('patchDevice('+JSON.stringify({udid:'PHONE',conn:'usb',operations_available:true,backing_up:true,active_operation:operation})+')',consoleApp.context);
+ assert.equal(passwordAction.disabled,true,'busy operation must retain device action protection');
+ assert.equal(consoleDOM.get('bkbar-PHONE').classList.contains('hidden'),operation!=='backup','only phone backups show progress/authorization hints');
+ assert.match(consoleDOM.get('backupBtn-PHONE').innerHTML,new RegExp(operation==='check'?'console.checkingBackup':operation==='local'?'console.deviceBusy':'device.backingUp'));
 }
 
 vm.runInContext(`latestEncryptionStatuses.PHONE={online:true,will_encrypt:true};backupEncryptionStates.PHONE=false;listState.PHONE={all:[],filtered:[],page:0,pageSize:200,total:0};showInlineResult(document.getElementById('ipResult-PHONE'),true,'bset.testOk');dirtyCards.add('PHONE');`,consoleApp.context);

@@ -77,6 +77,7 @@ func (h *eventHub) clientCount() int {
 // ---- 状态快照 ----
 
 type deviceStatusDTO struct {
+	ActiveOperation           string             `json:"active_operation"`
 	BackupCheck               *backupCheckResult `json:"backup_check,omitempty"`
 	BackupCheckActive         bool               `json:"backup_check_active"`
 	RequestedMode             string             `json:"requested_mode,omitempty"`
@@ -128,6 +129,20 @@ type statusSnapshot struct {
 	BackupInProgress   int                    `json:"backup_in_progress"`
 	RemovedDeviceCount int                    `json:"removed_device_count"`
 	Version            string                 `json:"version"` // 构建版本；前端比对以检测「已部署新版本」（SSE 重连即拿到新版本）
+}
+
+// activeOperationUnsafe 只解释现有占用，不替代任何准入/互斥判断；调用方持有 app.mu。
+func (app *application) activeOperationUnsafe(udid string) string {
+	if !app.backupInProgress[udid] {
+		return ""
+	}
+	if job := app.backupJobs[udid]; job != nil && !job.finished {
+		return "backup"
+	}
+	if app.backupChecks[udid] != nil || app.historyReviewInProgress[udid] {
+		return "check"
+	}
+	return "local"
 }
 
 // connCode maps internal connection identifiers to public status codes.
@@ -214,7 +229,8 @@ func (app *application) buildStatusSnapshot() statusSnapshot {
 			jobActive = !job.finished
 		}
 		devs = append(devs, deviceStatusDTO{
-			BackupCheck: app.backupCheckSnapshotUnsafe(udid), BackupCheckActive: app.backupChecks[udid] != nil,
+			ActiveOperation: app.activeOperationUnsafe(udid),
+			BackupCheck:     app.backupCheckSnapshotUnsafe(udid), BackupCheckActive: app.backupChecks[udid] != nil,
 			BackupIndex: indexStatus, RequestedMode: requestedMode, ObservedMode: observedMode, BackupJobActive: jobActive,
 			BackupJobID:               jobID,
 			AutoBackupHold:            hold.Held,
