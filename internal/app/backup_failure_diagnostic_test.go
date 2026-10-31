@@ -2,6 +2,8 @@ package app
 
 import (
 	"context"
+	"fmt"
+	"iosbackup/internal/backupstore"
 	"strings"
 	"testing"
 )
@@ -41,5 +43,12 @@ exit 1`, "backup_failed"},
 				t.Fatal("raw tool diagnostic escaped into public error")
 			}
 		})
+	}
+}
+
+func TestBackupCapacityFailureDiagnosis(t *testing.T) {
+	state, code := backupFailureState(fmt.Errorf("prepare backup work: %w", backupstore.ErrCapacity))
+	if state != backupStateFailed || code != "storage_unavailable" {
+		t.Fatalf("capacity failure reported as %s/%s", state, code)
 	}
 }

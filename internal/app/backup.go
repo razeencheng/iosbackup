@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"iosbackup/internal/backupstore"
 	"iosbackup/internal/i18n"
 	"os"
 	"strings"
@@ -71,7 +72,7 @@ func backupFailureState(err error) (stateCode, errorCode string) {
 	}
 	message := strings.ToLower(err.Error())
 	switch {
-	case strings.Contains(message, "no space"), strings.Contains(message, "read-only file system"), strings.Contains(message, "permission denied"):
+	case errors.Is(err, backupstore.ErrCapacity), strings.Contains(message, "no space"), strings.Contains(message, "read-only file system"), strings.Contains(message, "permission denied"):
 		return backupStateFailed, "storage_unavailable"
 	case strings.Contains(message, "device locked"), strings.Contains(message, "passcode"):
 		return backupStateFailed, "device_locked"
