@@ -19,10 +19,10 @@ import (
 	"iosbackup/internal/persistence"
 )
 
-type backupJobLimits struct{ Days, Jobs, Events, EventBytes, TotalBytes, Queue int }
+type backupJobLimits struct{ Days, Jobs, Events, EventBytes, TotalBytes int }
 
 func defaultBackupJobLimits() backupJobLimits {
-	return backupJobLimits{30, 1000, 10000, 1 << 20, 256 << 20, 256}
+	return backupJobLimits{30, 1000, 10000, 1 << 20, 256 << 20}
 }
 
 var backupJobIDPattern = regexp.MustCompile(`^bkp-[0-9a-f]{12,32}$`)
@@ -39,10 +39,6 @@ type backupJobRecord struct {
 	LastProgressAt         time.Time
 	LastPhase              string
 }
-type queuedBackupEvent struct {
-	ID    string
-	Event backupJobEvent
-}
 type backupJobStore struct {
 	quarantine      map[string]bool
 	quarantineBytes int
@@ -53,7 +49,6 @@ type backupJobStore struct {
 	now             func() time.Time
 	limits          backupJobLimits
 	records         map[string]*backupJobRecord
-	queue           chan queuedBackupEvent
 	wake            chan struct{}
 	flush           chan chan struct{}
 	stop, done      chan struct{}
@@ -66,13 +61,13 @@ type backupJobStore struct {
 }
 
 func openBackupJobStore(root string, now func() time.Time, limits backupJobLimits, callbacks ...func()) (*backupJobStore, error) {
-	if limits.Days < 1 || limits.Jobs < 1 || limits.Events < 1 || limits.EventBytes < 128 || limits.TotalBytes < 4096 || limits.Queue < 1 {
+	if limits.Days < 1 || limits.Jobs < 1 || limits.Events < 1 || limits.EventBytes < 128 || limits.TotalBytes < 4096 {
 		return nil, errors.New("invalid backup job limits")
 	}
 	if err := persistence.EnsurePrivateDirectory(root); err != nil {
 		return nil, err
 	}
-	s := &backupJobStore{root: root, now: now, limits: limits, records: make(map[string]*backupJobRecord), quarantine: make(map[string]bool), queue: make(chan queuedBackupEvent, limits.Queue), wake: make(chan struct{}, 1), flush: make(chan chan struct{}), stop: make(chan struct{}), done: make(chan struct{}), writeFile: writeFileAtomic, removeFile: os.Remove}
+	s := &backupJobStore{root: root, now: now, limits: limits, records: make(map[string]*backupJobRecord), quarantine: make(map[string]bool), wake: make(chan struct{}, 1), flush: make(chan chan struct{}), stop: make(chan struct{}), done: make(chan struct{}), writeFile: writeFileAtomic, removeFile: os.Remove}
 	if len(callbacks) > 0 {
 		s.onChange = callbacks[0]
 	}
@@ -148,19 +143,36 @@ func (s *backupJobStore) enqueueUnsafe(r *backupJobRecord, e backupJobEvent) {
 	}
 	e.Percent = cloneOptionalFloat64(e.Percent)
 	e.Bytes = cloneOptionalInt64(e.Bytes)
-	select {
-	case s.queue <- queuedBackupEvent{r.Summary.ID, e}:
-	default:
+	// 内存事件与摘要由同一把锁同步发布；慢磁盘只延迟持久化，不延迟终态可见性。
+	data, _ := json.Marshal(e)
+	if len(data) > 4096 {
 		r.Summary.Dropped++
 		r.Summary.Truncated = true
 		s.changedUnsafe(r)
+		return
 	}
+	r.Events = append(r.Events, e)
+	r.Bytes += len(data) + 1
+	for len(r.Events) > s.limits.Events || r.Bytes > s.limits.EventBytes {
+		old, _ := json.Marshal(r.Events[0])
+		r.Bytes -= len(old) + 1
+		r.Events = r.Events[1:]
+		r.Summary.Dropped++
+		r.Summary.Truncated = true
+	}
+	if len(r.Events) > 0 {
+		r.Summary.FirstCursor = r.Events[0].Cursor
+		r.Summary.LastCursor = r.Events[len(r.Events)-1].Cursor
+	}
+	r.EventRevision++
+	s.changedUnsafe(r)
 }
 func (s *backupJobStore) emit(id string, e backupJobEvent) {
 	s.mu.Lock()
 	r := s.records[id]
 	if r != nil && !s.closed && r.Summary.CompletedAt.IsZero() {
 		s.enqueueUnsafe(r, e)
+		s.pruneUnsafe(s.now())
 	}
 	s.mu.Unlock()
 	s.signal()
@@ -190,6 +202,7 @@ func (s *backupJobStore) activity(id string, u backupProgressUpdate, at time.Tim
 	}
 	r.LastProgressAt = at
 	s.enqueueUnsafe(r, backupJobEvent{At: at, Code: code, Phase: u.Phase, Percent: u.OverallPercent, Bytes: u.CurrentBytes})
+	s.pruneUnsafe(at)
 }
 func (s *backupJobStore) finish(id, state, code string, at time.Time) {
 	s.mu.Lock()
@@ -239,42 +252,6 @@ func (s *backupJobStore) events(id string, after uint64, limit int) (backupJobSu
 	}
 	return r.Summary, out, true
 }
-func (s *backupJobStore) drain() {
-	for i := 0; i < s.limits.Queue; i++ {
-		select {
-		case item := <-s.queue:
-			s.mu.Lock()
-			r := s.records[item.ID]
-			if r != nil {
-				data, _ := json.Marshal(item.Event)
-				if len(data) > 4096 {
-					r.Summary.Dropped++
-					r.Summary.Truncated = true
-				} else {
-					r.Events = append(r.Events, item.Event)
-					r.Bytes += len(data) + 1
-					for len(r.Events) > s.limits.Events || r.Bytes > s.limits.EventBytes {
-						old, _ := json.Marshal(r.Events[0])
-						r.Bytes -= len(old) + 1
-						r.Events = r.Events[1:]
-						r.Summary.Dropped++
-						r.Summary.Truncated = true
-					}
-					if len(r.Events) > 0 {
-						r.Summary.FirstCursor = r.Events[0].Cursor
-						r.Summary.LastCursor = r.Events[len(r.Events)-1].Cursor
-					}
-					r.EventRevision++
-				}
-				s.changedUnsafe(r)
-			}
-			s.mu.Unlock()
-		default:
-			return
-		}
-	}
-}
-
 func (s *backupJobStore) pruneUnsafe(at time.Time) {
 	ended := make([]*backupJobRecord, 0)
 	total := s.quarantineBytes
@@ -303,20 +280,16 @@ func (s *backupJobStore) worker() {
 	for {
 		select {
 		case <-s.wake:
-			s.drain()
 			s.persist()
 		case <-ticker.C:
-			s.drain()
 			s.persist()
 		case done := <-s.flush:
-			s.drain()
 			s.persist()
 			close(done)
 		case <-s.stop:
 			s.mu.Lock()
 			s.closed = true
 			s.mu.Unlock()
-			s.drain()
 			s.persist()
 			return
 		}

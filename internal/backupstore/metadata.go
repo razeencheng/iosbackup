@@ -132,7 +132,10 @@ func (s *Store) RecordReview(ctx context.Context, id string, check Check, revisi
 		return os.ErrNotExist
 	}
 	next := p
-	next.Review = check
-	next.Review.CheckedAt = check.CheckedAt.UTC()
+	check.CheckedAt = check.CheckedAt.UTC()
+	next.ReviewAttempt = check
+	if check.State == "passed" || check.State == "issues" {
+		next.Review = check
+	}
 	return s.updatePoint(ctx, p, next)
 }

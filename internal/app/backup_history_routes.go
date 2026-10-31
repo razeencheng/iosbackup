@@ -64,6 +64,7 @@ type historyPointView struct {
 	GenerationID      string            `json:"generation_id"`
 	Check             backupstore.Check `json:"check"`
 	Review            backupstore.Check `json:"review"`
+	ReviewAttempt     backupstore.Check `json:"review_attempt"`
 	Pinned            bool              `json:"pinned"`
 	Manual            bool              `json:"manual"`
 	Baseline          bool              `json:"baseline"`
@@ -78,7 +79,7 @@ type historyPointView struct {
 }
 
 func pointView(p backupstore.Point, c backupstore.Catalog, busy bool, reason string) historyPointView {
-	return historyPointView{JobID: p.JobID, ID: p.ID, StoreID: p.StoreID, UDID: p.UDID, Revision: c.Revision, CompletedAt: p.CompletedAt, CommittedAt: p.CommittedAt, CompletionUnknown: p.CompletionUnknown, Day: p.Day, Timezone: p.Timezone, State: p.State, Encryption: p.Generation.Kind, GenerationID: p.Generation.ID, Check: p.Check, Review: p.Review, Pinned: p.Pinned, Manual: p.Manual, Baseline: c.Baselines[p.Generation.ID] == p.ID, Reason: reason, InUse: busy, Bytes: p.Bytes, BytesKnown: p.BytesKnown, CanDelete: !busy, CanPin: true, CanCheck: !busy, CanExport: true}
+	return historyPointView{JobID: p.JobID, ID: p.ID, StoreID: p.StoreID, UDID: p.UDID, Revision: c.Revision, CompletedAt: p.CompletedAt, CommittedAt: p.CommittedAt, CompletionUnknown: p.CompletionUnknown, Day: p.Day, Timezone: p.Timezone, State: p.State, Encryption: p.Generation.Kind, GenerationID: p.Generation.ID, Check: p.Check, Review: p.Review, ReviewAttempt: p.ReviewAttempt, Pinned: p.Pinned, Manual: p.Manual, Baseline: c.Baselines[p.Generation.ID] == p.ID, Reason: reason, InUse: busy, Bytes: p.Bytes, BytesKnown: p.BytesKnown, CanDelete: !busy, CanPin: true, CanCheck: !busy, CanExport: true}
 }
 func (app *application) historyLocations(udid string) []historyLocation {
 	if app.backupStorage == nil {
@@ -562,9 +563,10 @@ func (app *application) startHistoryReview(s *backupstore.Store, p backupstore.P
 		app.historyReviewInProgress = make(map[string]bool)
 	}
 	app.historyReviewInProgress[p.UDID] = true
+	name := app.backupTaskDeviceNameUnsafe(p.UDID)
 	app.mu.Unlock()
 	if app.backupJobRecords != nil {
-		app.backupJobRecords.start(&backupJobSeed{ID: run.ID, UDID: p.UDID, DeviceName: p.UDID, PointID: p.ID, Source: "manual", RequestedMode: "auto", Operation: "check", StartedAt: run.Result.StartedAt})
+		app.backupJobRecords.start(&backupJobSeed{ID: run.ID, UDID: p.UDID, DeviceName: name, PointID: p.ID, Source: "manual", RequestedMode: "auto", Operation: "check", StartedAt: run.Result.StartedAt})
 		app.backupJobRecords.setCheck(run.ID, run.Result)
 		app.backupJobRecords.transition(run.ID, backupStateRunning)
 	}
@@ -581,7 +583,8 @@ func (app *application) startHistoryReview(s *backupstore.Store, p backupstore.P
 			result = app.checkBackupSourceAt(ctx, p.UDID, filepath.Dir(lease.Directory), "manifest")
 			<-manager.slot
 		case <-ctx.Done():
-			result = backupCheckResult{Kind: "manifest", State: "unavailable", Reason: "cancelled", StartedAt: run.Result.StartedAt, CompletedAt: app.nowTime()}
+			state, reason := backupCheckError(ctx.Err())
+			result = backupCheckResult{Kind: "manifest", State: state, Reason: reason, StartedAt: run.Result.StartedAt, CompletedAt: app.nowTime()}
 		}
 		result.ID = run.ID
 		result.Freshness = "current"
@@ -591,7 +594,11 @@ func (app *application) startHistoryReview(s *backupstore.Store, p backupstore.P
 		}
 		if app.backupJobRecords != nil {
 			app.backupJobRecords.setCheck(run.ID, result)
-			app.backupJobRecords.finish(run.ID, backupStateSucceeded, "", app.nowTime())
+			state, code := backupCheckJobOutcome(result)
+			if e != nil {
+				state, code = backupStateFailed, "storage_unavailable"
+			}
+			app.backupJobRecords.finish(run.ID, state, code, app.nowTime())
 		}
 		service.mu.Lock()
 		run.Result = result

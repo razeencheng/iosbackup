@@ -21,23 +21,24 @@ const (
 
 // 检查结果只保存覆盖范围与计数；不保存备份内部路径，也不承诺内容哈希或恢复兼容性。
 type backupCheckResult struct {
-	ID                 string    `json:"id,omitempty"`
-	Kind               string    `json:"kind"`
-	State              string    `json:"state"`
-	Reason             string    `json:"reason,omitempty"`
-	StartedAt          time.Time `json:"started_at"`
-	CompletedAt        time.Time `json:"completed_at,omitempty"`
-	SourceKey          string    `json:"source_key,omitempty"`
-	SourceIdentity     string    `json:"source_identity,omitempty"`
-	SourceFingerprint  string    `json:"source_fingerprint,omitempty"`
-	Freshness          string    `json:"freshness"`
-	MetadataComplete   bool      `json:"metadata_complete"`
-	ManifestComplete   bool      `json:"manifest_complete"`
-	RecordsChecked     int64     `json:"records_checked"`
-	ObjectsChecked     int64     `json:"objects_checked"`
-	MissingObjects     int64     `json:"missing_objects"`
-	InvalidRecords     int64     `json:"invalid_records"`
-	UnsupportedRecords int64     `json:"unsupported_records"`
+	LastCompleted      *backupCheckResult `json:"last_completed,omitempty"`
+	ID                 string             `json:"id,omitempty"`
+	Kind               string             `json:"kind"`
+	State              string             `json:"state"`
+	Reason             string             `json:"reason,omitempty"`
+	StartedAt          time.Time          `json:"started_at"`
+	CompletedAt        time.Time          `json:"completed_at,omitempty"`
+	SourceKey          string             `json:"source_key,omitempty"`
+	SourceIdentity     string             `json:"source_identity,omitempty"`
+	SourceFingerprint  string             `json:"source_fingerprint,omitempty"`
+	Freshness          string             `json:"freshness"`
+	MetadataComplete   bool               `json:"metadata_complete"`
+	ManifestComplete   bool               `json:"manifest_complete"`
+	RecordsChecked     int64              `json:"records_checked"`
+	ObjectsChecked     int64              `json:"objects_checked"`
+	MissingObjects     int64              `json:"missing_objects"`
+	InvalidRecords     int64              `json:"invalid_records"`
+	UnsupportedRecords int64              `json:"unsupported_records"`
 }
 
 func backupCheckError(err error) (string, string) {
@@ -252,6 +253,11 @@ func checkBackupObject(root *os.Root, id string) error {
 }
 
 func validBackupCheckResult(result backupCheckResult) bool {
+	if previous := result.LastCompleted; previous != nil {
+		if previous.LastCompleted != nil || previous.State != "passed" && previous.State != "issues" || !validBackupCheckResult(*previous) {
+			return false
+		}
+	}
 	if result.ID != "" && !backupJobIDPattern.MatchString(result.ID) {
 		return false
 	}
@@ -269,7 +275,7 @@ func validBackupCheckResult(result backupCheckResult) bool {
 		return false
 	}
 	switch result.Reason {
-	case "", "timeout", "cancelled", "metadata_missing", "metadata_invalid", "resource_limit", "unsafe_source", "read_failed", "unsupported_check", "not_finished", "encrypted_manifest", "unsupported_records", "invalid_records", "missing_objects", "source_changed", "process_restarted":
+	case "", "timeout", "cancelled", "metadata_missing", "metadata_invalid", "resource_limit", "unsafe_source", "read_failed", "unsupported_check", "not_finished", "encrypted_manifest", "unsupported_records", "invalid_records", "missing_objects", "source_changed", "process_restarted", "unknown_source_time":
 	default:
 		return false
 	}

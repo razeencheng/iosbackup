@@ -120,9 +120,27 @@ func TestBackupJobsKeepRecentEventsAndTerminalSummary(t *testing.T) {
 	}
 }
 
-func TestBackupJobsQueuePressureAndSlowDiskDoNotBlockProducer(t *testing.T) {
+func TestBackupJobsTerminalEventsVisibleBeforeDiskWorkerRuns(t *testing.T) {
+	// 不启动持久化线程，模拟磁盘长时间不可用；查询仍应读到有序内存事件。
+	s := &backupJobStore{records: map[string]*backupJobRecord{}, limits: defaultBackupJobLimits(), now: func() time.Time { return jobTestNow }}
+	job := jobFixture(99)
+	s.start(job)
+	s.emit(job.ID, backupJobEvent{At: jobTestNow, Code: "progress"})
+	s.finish(job.ID, backupStateFailed, "backup_failed", jobTestNow)
+	summary, events, ok := s.events(job.ID, 0, 100)
+	if !ok || summary.State != backupStateFailed || len(events) != 3 {
+		t.Fatalf("terminal summary precedes events: %+v %+v", summary, events)
+	}
+	for i, code := range []string{"started", "progress", backupStateFailed} {
+		if events[i].Code != code || events[i].Cursor != uint64(i+1) {
+			t.Fatal("out of order", events)
+		}
+	}
+}
+
+func TestBackupJobsMemoryPressureAndSlowDiskDoNotBlockProducer(t *testing.T) {
 	limits := defaultBackupJobLimits()
-	limits.Queue = 2
+	limits.Events = 16
 	s := openJobTestStore(t, t.TempDir(), limits)
 	entered, release := make(chan struct{}), make(chan struct{})
 	var once sync.Once

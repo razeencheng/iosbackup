@@ -1,9 +1,37 @@
 package notification
 
 import (
+	"iosbackup/internal/i18n"
 	"strings"
 	"testing"
 )
+
+func TestAttentionTestNotificationsUseWarningLevel(t *testing.T) {
+	manager, _ := localizedTestManager(t, "en")
+	for _, event := range []Type{BackupCheckAttention, BackupHistoryAttention} {
+		if message := manager.NewTestMessage(event); message == nil || message.Level != LevelWarning {
+			t.Fatal("test severity differs from real attention message", message)
+		}
+	}
+}
+
+func TestHistoryOnlyFailureNotificationLocalizesReason(t *testing.T) {
+	for _, locale := range []string{"en", "zh-CN"} {
+		t.Run(locale, func(t *testing.T) {
+			manager, _ := localizedTestManager(t, locale)
+			manager.SetRules(map[string][]string{string(BackupHistoryAttention): {"capture"}})
+			if err := manager.SetTemplates(map[string]string{string(BackupHistoryAttention): `${reason} | ${diagnostics}`}); err != nil {
+				t.Fatal(err)
+			}
+			params := map[string]any{"battery": 9, "min_battery": 20}
+			tasks := manager.backupOutcomeJobs(BackupOutcome{Execution: "failed", History: "failed", FailureCode: "backup_failed", ReasonMessageCode: i18n.LowBattery, ReasonMessageParams: params, Diagnostics: "original detail"}, "Phone", "PHONE")
+			want := i18n.Text(locale, i18n.LowBattery, params) + " | original detail"
+			if len(tasks) != 1 || tasks[0].message.Content != want {
+				t.Fatal("history-only rule lost localized failure reason", tasks)
+			}
+		})
+	}
+}
 
 func TestBackupOutcomeMergesAttentionRulesPerChannel(t *testing.T) {
 	manager, _ := localizedTestManager(t, "en")

@@ -2,6 +2,7 @@ package app
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -10,6 +11,47 @@ import (
 	"testing"
 	"time"
 )
+
+func TestBackupExportBusyAttemptVisibleInStatus(t *testing.T) {
+	a, h, p := historyHTTPFixture(t)
+	id := exportSessionFixture(t, a, h, p.ID)
+	service := a.historyService()
+	service.exportSlot <- struct{}{}
+	w := historyRequest(t, a, h, "GET", "/api/backup-export/"+id+"/download", nil)
+	if w.Code != http.StatusConflict {
+		t.Fatal(w.Code)
+	}
+	w = historyRequest(t, a, h, "GET", "/api/backup-export/"+id, nil)
+	var view map[string]any
+	if err := json.Unmarshal(w.Body.Bytes(), &view); err != nil {
+		t.Fatal(err)
+	}
+	<-service.exportSlot
+	if view["download_error"] != "busy" {
+		t.Fatal("hidden download response has no visible status", view)
+	}
+}
+
+func TestBackupExportEvictsOldTerminalSessions(t *testing.T) {
+	a, h, p := historyHTTPFixture(t)
+	service := a.historyService()
+	service.mu.Lock()
+	for i := 0; i < 64; i++ {
+		id := fmt.Sprintf("%032x", i+1)
+		done := make(chan struct{})
+		close(done)
+		service.exports[id] = &backupExport{ID: id, State: "transferred", Finished: time.Now().Add(-time.Duration(64-i) * time.Second), done: done, cancel: func() {}}
+	}
+	service.mu.Unlock()
+	id := exportSessionFixture(t, a, h, p.ID)
+	if id == "" {
+		t.Fatal("no new session")
+	}
+	w := historyRequest(t, a, h, "GET", "/api/backup-export/"+fmt.Sprintf("%032x", 1), nil)
+	if w.Code != http.StatusGone {
+		t.Fatal("old terminal session not expired", w.Code)
+	}
+}
 
 func exportSessionFixture(t *testing.T, a *application, h http.Handler, point string) string {
 	t.Helper()

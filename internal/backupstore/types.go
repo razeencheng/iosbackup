@@ -78,6 +78,7 @@ type Point struct {
 	Bytes             int64      `json:"bytes,omitempty"`
 	BytesKnown        bool       `json:"bytes_known,omitempty"`
 	Review            Check      `json:"review,omitempty"`
+	ReviewAttempt     Check      `json:"review_attempt,omitempty"`
 	CompletionUnknown bool       `json:"completion_unknown,omitempty"`
 	ID                string     `json:"id"`
 	StoreID           string     `json:"store_id"`
@@ -134,7 +135,7 @@ func (g Generation) Validate() error {
 	return nil
 }
 func (p Point) Validate(identity Identity) error {
-	if p.Bytes < 0 || (!p.BytesKnown && p.Bytes != 0) || p.Review != (Check{}) && !validReview(p.Review) {
+	if p.Bytes < 0 || (!p.BytesKnown && p.Bytes != 0) || p.Review != (Check{}) && !validReview(p.Review) || p.ReviewAttempt != (Check{}) && !validReview(p.ReviewAttempt) {
 		return ErrInvalid
 	}
 	if !ValidID(p.ID) || p.StoreID != identity.ID || p.UDID != identity.UDID || !ValidID(p.EpochID) || !jobPattern.MatchString(p.JobID) || p.Generation.Validate() != nil || p.CompletedAt.IsZero() || p.CommittedAt.Before(p.CompletedAt) || p.Check.CheckedAt.IsZero() {

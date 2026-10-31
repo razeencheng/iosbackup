@@ -91,7 +91,7 @@ func localizeMessage(message Message, language string) Message {
 		}
 		return message
 	}
-	if message.Type == BackupFailed {
+	if message.Type == BackupFailed || (message.Type == BackupCheckAttention || message.Type == BackupHistoryAttention) && (message.ReasonCode != "" || message.ReasonMessageCode != "") {
 		reason := message.ExtraFields["reason"]
 		if reason != "" {
 			message.ExtraFields["diagnostics"] = reason
@@ -151,7 +151,7 @@ func (manager *Manager) NewTestMessage(event Type) *Message {
 	if event == BackupFailed || event == SystemError {
 		level = LevelError
 	}
-	if event == DeviceOffline {
+	if event == DeviceOffline || event == BackupCheckAttention || event == BackupHistoryAttention {
 		level = LevelWarning
 	}
 	return &Message{Type: event, Level: level, Test: true, DeviceUDID: "test-device"}

@@ -1,6 +1,6 @@
 # Historical backup storage
 
-This internal package stores historical restore points and plans retention. The application backend integrates isolated backup work, migration, policy changes and generation-aware reads. The history API, export and settings UI are separate follow-up stages; history remains disabled by default.
+This internal package stores historical restore points and plans retention. The application backend integrates isolated backup work, migration, policy changes, generation-aware reads, history APIs and complete export. History remains disabled by default.
 
 ## Ownership and lifecycle
 
@@ -51,3 +51,7 @@ Copy and preparation have a six-hour cancellation bound; quick checks retain the
 `Lease.Export` streams a `.tar` rooted at the lease's original source UDID. Required metadata, safe ordinary entries, source stamps and read/write failures are checked; a failure never closes the tar as a successful archive. Hidden backup files are included. Only the already reserved unpack output is excluded; application indexes, logs and credentials live outside this root. Directory batches and copy buffers are bounded. The HTTP layer holds the lease from session creation until expiry, cancellation or the actual end of streaming; four prepared/live sessions and one active stream bound resource usage. Write deadlines measure idle writes, not a short total download time. Server transfer completion does not claim browser filesystem completion.
 
 Explicit deletion has a separate confirmation contract from automatic recycling. Revision and active readers are rechecked under the store lock before the application records a current-source deletion intent. A durable explicit-delete transaction can remove pins/manual points and reselect or remove that generation's baseline. Metadata review transactions persist check reason and coverage with the point without promoting pending data. The original qualification check remains unchanged.
+
+`ReviewAttempt` records the latest manual check, including cancellation, timeout and read failure. `Review` retains the latest completed scan (`passed` or `issues`); incomplete attempts do not replace that evidence. The API exposes both with their own timestamps and coverage. Current-source checks may also expose `last_completed` from retained task records, with source freshness attached. A completed scan that finds missing files is a completed task with an issues result, while cancellation stops the task, timeout interrupts it and read failure fails it.
+
+Task events and summaries become visible together in bounded memory; disk persistence remains asynchronous. A terminal summary therefore includes its terminal event even before the disk worker runs. Task limits still apply during slow disk writes. Export session status includes `can_download` and `download_error`; a busy transfer slot remains visible even when the download was requested through an iframe. At the record limit, only terminal sessions whose workers and leases have finished may be evicted; prepared and active sessions remain protected.

@@ -10,6 +10,7 @@
   text+='\n'+tr('check.coverage',{metadata:tr(result.metadata_complete?'check.yes':'check.no'),manifest:tr(result.manifest_complete?'check.yes':'check.no'),records:result.records_checked||0,objects:result.objects_checked||0,missing:result.missing_objects||0});
   if(result.completed_at&&!result.completed_at.startsWith('0001-'))text+='\n'+global.IOSBKI18n.formatDate(result.completed_at);
   if(result.freshness==='stale'||result.freshness==='unknown')text+='\n'+label('freshness',result.freshness);
+  if(result.last_completed)text+='\n\n'+tr('check.lastCompleted')+'\n'+summary(Object.assign({},result.last_completed,{last_completed:null}));
   return text;
  }
  function render(d){

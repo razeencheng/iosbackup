@@ -1021,13 +1021,17 @@ func (app *application) historyImportCompletion(ctx context.Context, dir string,
 	}
 	defer root.Close()
 	for _, field := range [][2]string{{"Status.plist", "Date"}, {"Info.plist", "Last Backup Date"}} {
-		values, err := readBackupCheckPlist(ctx, root, field[0], nil)
-		if err != nil {
+		if ctx.Err() != nil {
 			return time.Time{}
 		}
+		values, err := readBackupCheckPlist(ctx, root, field[0], nil)
+		if err != nil {
+			continue
+		}
 		if value, ok := values[field[1]]; ok {
-			at, _ := value.(time.Time)
-			return at
+			if at, ok := value.(time.Time); ok && !at.IsZero() {
+				return at
+			}
 		}
 	}
 	return time.Time{}

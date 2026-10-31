@@ -48,10 +48,7 @@ func (app *application) startBackupCheck(udid string) (string, error) {
 		app.backupCheckResults = make(map[string]backupCheckResult)
 	}
 	app.backupCheckResults[udid] = result
-	name := udid
-	if d := app.devices[udid]; d != nil && d.Name != "" {
-		name = d.Name
-	}
+	name := app.backupTaskDeviceNameUnsafe(udid)
 	if app.backupJobRecords != nil {
 		app.backupJobRecords.start(&backupJobSeed{ID: run.id, UDID: udid, DeviceName: name, Source: "manual", RequestedMode: "auto", Operation: "check", StartedAt: result.StartedAt})
 		app.backupJobRecords.setCheck(run.id, result)
@@ -78,7 +75,8 @@ func (app *application) startBackupCheck(udid string) (string, error) {
 		app.markCheckSourceUnsafe(udid, &result)
 		if app.backupJobRecords != nil {
 			app.backupJobRecords.setCheck(run.id, result)
-			app.backupJobRecords.finish(run.id, backupStateSucceeded, "", app.nowTime())
+			state, code := backupCheckJobOutcome(result)
+			app.backupJobRecords.finish(run.id, state, code, app.nowTime())
 		}
 		app.backupCheckResults[udid] = result
 		delete(app.backupChecks, udid)
@@ -228,18 +226,73 @@ func (app *application) backupCheckSnapshotUnsafe(udid string) *backupCheckResul
 	if value, ok := app.backupCheckResults[udid]; ok {
 		copy := value
 		app.markCheckSourceUnsafe(udid, &copy)
-		return &copy
+		return app.attachCompletedCheckUnsafe(udid, &copy)
 	}
 	if app.backupJobRecords != nil {
 		for _, job := range app.backupJobRecords.list(udid) {
 			if job.Check != nil && job.PointID == "" {
 				copy := *job.Check
 				copy.Freshness = "unknown"
-				return &copy
+				return app.attachCompletedCheckUnsafe(udid, &copy)
 			}
 		}
 	}
 	return nil
+}
+
+func (app *application) backupTaskDeviceNameUnsafe(udid string) string {
+	if device := app.devices[udid]; device != nil && device.knownName() != "" {
+		return device.knownName()
+	}
+	if cfg := app.configs[udid]; cfg != nil && cfg.Name != "" {
+		return cfg.Name
+	}
+	return udid
+}
+
+func backupCheckJobOutcome(result backupCheckResult) (string, string) {
+	if result.State == "passed" || result.State == "issues" {
+		return backupStateSucceeded, ""
+	}
+	switch result.Reason {
+	case "cancelled":
+		return backupStateStopped, "check_cancelled"
+	case "timeout":
+		return backupStateInterrupted, "check_timeout"
+	case "process_restarted":
+		return backupStateInterrupted, "process_restarted"
+	default:
+		return backupStateFailed, "check_unavailable"
+	}
+}
+
+// 返回值只供页面展示；最近尝试始终保留，旧完成结果另行显示时间与来源新鲜度。
+func (app *application) attachCompletedCheckUnsafe(udid string, result *backupCheckResult) *backupCheckResult {
+	result.LastCompleted = nil
+	if result.State == "passed" || result.State == "issues" || app.backupJobRecords == nil {
+		return result
+	}
+	for _, job := range app.backupJobRecords.list(udid) {
+		previous := job.Check
+		if previous == nil || previous.ID == result.ID || previous.State != "passed" && previous.State != "issues" || previous.SourceKey != result.SourceKey {
+			continue
+		}
+		// 历史点的独立检查不能冒充当前来源检查。
+		if job.Operation == "check" && job.PointID != "" {
+			continue
+		}
+		copy := *previous
+		copy.LastCompleted = nil
+		if result.SourceIdentity == "" || result.SourceFingerprint == "" {
+			copy.Freshness = "unknown"
+		} else if copy.SourceIdentity != result.SourceIdentity || copy.SourceFingerprint != result.SourceFingerprint {
+			copy.Freshness = "stale"
+		}
+		app.markCheckSourceUnsafe(udid, &copy)
+		result.LastCompleted = &copy
+		break
+	}
+	return result
 }
 
 func (app *application) markCheckSourceUnsafe(udid string, result *backupCheckResult) {

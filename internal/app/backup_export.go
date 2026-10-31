@@ -16,20 +16,21 @@ const backupExportReadyTTL = 5 * time.Minute
 const backupExportIdleTimeout = 60 * time.Second
 
 type backupExport struct {
-	done     chan struct{}
-	ID       string    `json:"id"`
-	PointID  string    `json:"point_id"`
-	UDID     string    `json:"udid"`
-	State    string    `json:"state"`
-	Expires  time.Time `json:"expires_at"`
-	Finished time.Time `json:"finished_at,omitempty"`
-	bytes    atomic.Int64
-	lease    *backupstore.Lease
-	ctx      context.Context
-	cancel   context.CancelFunc
-	timer    *time.Timer
-	stopRoot func() bool
-	once     sync.Once
+	done          chan struct{}
+	ID            string    `json:"id"`
+	PointID       string    `json:"point_id"`
+	UDID          string    `json:"udid"`
+	State         string    `json:"state"`
+	Expires       time.Time `json:"expires_at"`
+	Finished      time.Time `json:"finished_at,omitempty"`
+	DownloadError string    `json:"download_error,omitempty"`
+	bytes         atomic.Int64
+	lease         *backupstore.Lease
+	ctx           context.Context
+	cancel        context.CancelFunc
+	timer         *time.Timer
+	stopRoot      func() bool
+	once          sync.Once
 }
 
 func (e *backupExport) release() {
@@ -59,9 +60,22 @@ func (app *application) createBackupExport(w http.ResponseWriter, r *http.Reques
 				historyError(w, backupstore.ErrBusy)
 				return
 			}
-		} else if now.Sub(e.Finished) > 30*time.Minute {
+		} else if exportReleased(e) && now.Sub(e.Finished) > 30*time.Minute {
 			delete(service.exports, id)
 		}
+	}
+	// 达到记录上限时只淘汰已释放来源的最旧终态，不阻塞新导出或动仍在传输的会话。
+	for len(service.exports) >= 64 {
+		var oldest *backupExport
+		for _, e := range service.exports {
+			if e.State != "ready" && e.State != "streaming" && exportReleased(e) && (oldest == nil || e.Finished.Before(oldest.Finished) || e.Finished.Equal(oldest.Finished) && e.ID < oldest.ID) {
+				oldest = e
+			}
+		}
+		if oldest == nil {
+			break
+		}
+		delete(service.exports, oldest.ID)
 	}
 	if live >= 4 || len(service.exports) >= 64 {
 		historyError(w, backupstore.ErrBusy)
@@ -92,10 +106,18 @@ func (app *application) createBackupExport(w http.ResponseWriter, r *http.Reques
 	}
 	e.timer = time.AfterFunc(backupExportReadyTTL, expire)
 	e.stopRoot = context.AfterFunc(app.rootCtx, expire)
-	writeJSON(w, 201, exportView(e))
+	writeJSON(w, 201, exportView(e, len(service.exportSlot) > 0))
 }
-func exportView(e *backupExport) map[string]any {
-	return map[string]any{"id": e.ID, "point_id": e.PointID, "udid": e.UDID, "state": e.State, "expires_at": e.Expires, "finished_at": e.Finished, "bytes_sent": e.bytes.Load()}
+func exportReleased(e *backupExport) bool {
+	select {
+	case <-e.done:
+		return true
+	default:
+		return false
+	}
+}
+func exportView(e *backupExport, transferBusy bool) map[string]any {
+	return map[string]any{"id": e.ID, "point_id": e.PointID, "udid": e.UDID, "state": e.State, "expires_at": e.Expires, "finished_at": e.Finished, "bytes_sent": e.bytes.Load(), "download_error": e.DownloadError, "can_download": e.State == "ready" && e.Expires.After(time.Now()) && !transferBusy}
 }
 func (app *application) handleBackupExport(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
@@ -131,13 +153,13 @@ func (app *application) handleBackupExport(w http.ResponseWriter, r *http.Reques
 		} else if e.State == "streaming" {
 			e.cancel()
 		}
-		view := exportView(e)
+		view := exportView(e, len(service.exportSlot) > 0)
 		service.mu.Unlock()
 		writeJSON(w, 202, view)
 		return
 	}
 	if len(parts) == 1 {
-		view := exportView(e)
+		view := exportView(e, len(service.exportSlot) > 0)
 		service.mu.Unlock()
 		writeJSON(w, 200, view)
 		return
@@ -150,11 +172,13 @@ func (app *application) handleBackupExport(w http.ResponseWriter, r *http.Reques
 	select {
 	case service.exportSlot <- struct{}{}:
 	default:
+		e.DownloadError = "busy"
 		service.mu.Unlock()
 		historyError(w, backupstore.ErrBusy)
 		return
 	}
 	e.State = "streaming"
+	e.DownloadError = ""
 	e.timer.Stop()
 	service.mu.Unlock()
 	ctx, cancel := context.WithCancel(e.ctx)

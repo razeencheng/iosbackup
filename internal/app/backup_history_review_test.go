@@ -31,8 +31,8 @@ func TestHistoryReviewEvidenceSurvivesRestart(t *testing.T) {
 		t.Fatal("check not completed")
 	}
 	c, _ = s.Snapshot()
-	if c.Points[p.ID].Review.Reason == "" || !c.Points[p.ID].Review.MetadataComplete {
-		t.Fatalf("lost detailed evidence: %+v", c.Points[p.ID].Review)
+	if c.Points[p.ID].ReviewAttempt.Reason == "" || !c.Points[p.ID].ReviewAttempt.MetadataComplete {
+		t.Fatalf("lost detailed evidence: %+v", c.Points[p.ID].ReviewAttempt)
 	}
 	jobs := a.backupJobRecords.list(p.UDID)
 	if len(jobs) != 1 || jobs[0].PointID != p.ID || jobs[0].Check == nil {
@@ -57,7 +57,7 @@ func TestHistoryReviewEvidenceSurvivesRestart(t *testing.T) {
 		t.Fatal(e)
 	}
 	again, e := reopened.Snapshot()
-	if e != nil || again.Points[p.ID].Review != c.Points[p.ID].Review {
+	if e != nil || again.Points[p.ID].Review != c.Points[p.ID].Review || again.Points[p.ID].ReviewAttempt != c.Points[p.ID].ReviewAttempt {
 		t.Fatal("review lost after reopen", e)
 	}
 }

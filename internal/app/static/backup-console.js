@@ -168,7 +168,9 @@
   function storage(u) {
     var data = history[u], content = el('div', undefined, 'console-layer-body'); if (!data) return;
     var s = data.storage || {};
-    content.append(el('p', tr('history.storage', {size:bytes(data.logical_bytes)})), el('p', tr('console.freeSpace', {size:bytes(s.available_bytes)})), el('p', tr('console.copy.' + (s.copy_strategy || 'unknown'))), el('p', tr('console.storageHint'), 'history-warning'), el('p', tr('console.checkedAt',{time:formatDate(s.checked_at)}), 'history-note'));
+    content.append(el('p', tr('history.storage', {size:bytes(data.logical_bytes)})), el('p', tr('console.freeSpace', {size:bytes(s.available_bytes)})));
+    if (s.copy_strategy && s.copy_strategy !== 'unknown') content.append(el('p', tr('console.copy.' + s.copy_strategy)));
+    content.append(el('p', tr('console.storageHint'), 'history-warning'), el('p', tr('console.checkedAt',{time:formatDate(s.checked_at)}), 'history-note'));
     if (!data.bytes_known || (data.unavailable_stores || []).length) content.append(el('p', tr('history.sizePartial'), 'history-warning'));
     if (s.state !== 'available') content.append(el('p',tr('console.storageUnavailable'),'history-warning'));
     layer(content, tr('console.storage'));

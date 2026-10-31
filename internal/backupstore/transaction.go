@@ -48,6 +48,7 @@ func (s *Store) readTransaction(id string) (transaction, error) {
 		}
 		a, b := *tx.Previous, *tx.Point
 		a.Pinned, a.Manual, a.Review = b.Pinned, b.Manual, b.Review
+		a.ReviewAttempt = b.ReviewAttempt
 		if a != b {
 			return tx, ErrInvalid
 		}
