@@ -57,3 +57,24 @@ func TestBackupOutcomeRuleMigrationPreservesExplicitOff(t *testing.T) {
 		t.Fatal("migration invented channel")
 	}
 }
+
+func TestBackupOutcomeSpecificReasonKeepsOneImmutableSummaryPerChannel(t *testing.T) {
+	manager, _ := localizedTestManager(t, "en")
+	manager.SetRules(map[string][]string{string(BackupFailed): {"capture"}, string(BackupHistoryAttention): {"capture"}})
+	params := map[string]any{"battery": 9, "min_battery": 20}
+	tasks := manager.backupOutcomeJobs(BackupOutcome{
+		Execution: "failed", History: "failed", FailureCode: "backup_failed", Diagnostics: "original detail",
+		ReasonMessageCode: "api.low_battery", ReasonMessageParams: params,
+	}, "Phone", "PHONE")
+	params["battery"] = 100
+	if len(tasks) != 1 {
+		t.Fatalf("overlapping failure rules delivered %d summaries", len(tasks))
+	}
+	message := tasks[0].message
+	if message.ReasonCode != "backup_failed" || message.ReasonMessageParams["battery"] != 9 ||
+		message.ExtraFields["diagnostics"] != "original detail" ||
+		!strings.Contains(message.Content, "Battery is at 9%; at least 20% is required.") ||
+		!strings.Contains(message.Content, "History saving: failed") {
+		t.Fatalf("specific reason or final summary lost: %+v", message)
+	}
+}

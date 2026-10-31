@@ -3,18 +3,9 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
-const root = path.resolve(__dirname, '..');
+const {boot,dom,pageScript,root} = require('./i18n-test-helpers');
 const runtime = path.join(root, 'static/i18n.js');
 assert.ok(fs.existsSync(runtime), 'four pages need a shared locale runtime');
-function boot({stored={},cookie='',languages=['en-US'],storageThrows=false,timezone=''}={}) {
-  const values={...stored}, events=[], requests=[], listeners={};
-  const document={cookie,documentElement:{lang:'',dataset:{timezone},setAttribute(k,v){this[k]=v;}},querySelectorAll(){return [];}};
-  const window={document,navigator:{languages,language:languages[0]||''},localStorage:{getItem(k){if(storageThrows)throw Error('blocked');return values[k]||null;},setItem(k,v){if(storageThrows)throw Error('blocked');values[k]=v;},removeItem(k){delete values[k];}},dispatchEvent(e){events.push(e);(listeners[e.type]||[]).forEach(fn=>fn(e));},addEventListener(type,fn){(listeners[type]||=[]).push(fn);},fetch(url,opts){requests.push({url,opts});return Promise.resolve({});}};
-  const context=vm.createContext({...window,window,CustomEvent:class{constructor(type,opts){this.type=type;this.detail=opts.detail;}},Intl,Date,Headers});
-  vm.runInContext(fs.readFileSync(runtime,'utf8'),context);
-  context.IOSBKI18n=window.IOSBKI18n;
-  return {api:window.IOSBKI18n,values,document,events,requests,context,window};
-}
 assert.equal(boot({stored:{iosbk_lang:'zh'}}).api.getLocale(),'zh-CN');
 assert.equal(boot({stored:{iosbk_lang:'en',iosbk_guide_lang:'zh'},languages:['zh-CN']}).api.getLocale(),'en');
 assert.equal(boot({stored:{iosbk_guide_lang:'zh'}}).api.getLocale(),'zh-CN');
@@ -58,41 +49,15 @@ assert.ok(!fs.existsSync(path.join(root,'static/ui-messages.js')),'the script ro
 const catalogs=JSON.parse(fs.readFileSync(ui,'utf8'));
 assert.deepEqual(Object.keys(catalogs.en).sort(),Object.keys(catalogs['zh-CN']).sort(),'locale keys must match');
 for(const [key,value] of Object.entries(catalogs.en)) {
+ assert.ok(typeof value==='string' && value.trim(),key+' English resource must be nonempty');
+ assert.ok(typeof catalogs['zh-CN'][key]==='string' && catalogs['zh-CN'][key].trim(),key+' Chinese resource must be nonempty');
  const params=s=>[...s.matchAll(/\{([\w]+)\}/g)].map(m=>m[1]).sort();
  assert.deepEqual(params(value),params(catalogs['zh-CN'][key]),key+' placeholders must match');
 }
 console.log('shared i18n behaviors passed');
 
 // A small DOM adapter executes real page scripts; state and translations remain production code.
-function dom(app) {
- const nodes=new Map();
- function node(id='') {
-  const attributes={}, children={}, handlers={}, classes=new Set();
-  const result={id,value:'',type:'password',textContent:'',innerHTML:'',hidden:false,style:{},dataset:{},attributes,children,handlers,
-   classList:{toggle(k,v){if(v===undefined)v=!classes.has(k);v?classes.add(k):classes.delete(k);},add(k){classes.add(k);},remove(k){classes.delete(k);},contains(k){return classes.has(k);}},
-   setAttribute(k,v){attributes[k]=String(v);},getAttribute(k){return attributes[k]??null;},removeAttribute(k){delete attributes[k];},
-   querySelector(k){return children[k]||(children[k]=node());},querySelectorAll(){return [];},insertAdjacentHTML(){},appendChild(child){(children.list||=[]).push(child);},addEventListener(type,fn){handlers[type]=fn;},focus(){},getClientRects(){return [1];},replaceChildren(){children.list=[];}};
-  return result;
- }
- app.document.getElementById=id=>nodes.get(id)||(nodes.set(id,node(id)),nodes.get(id));
- app.document.querySelector=()=>null;
- app.document.querySelectorAll=selector=>{
-  const match=selector.match(/^\[([^\]]+)\]$/);
-  return match?[...nodes.values()].filter(n=>Object.hasOwn(n.attributes,match[1])):[];
- };
- app.document.addEventListener=()=>{};
- app.document.createElement=()=>node();
- app.document.body=node('body');app.document.body.dataset={};
- Object.assign(app.context,{setTimeout:()=>1,clearTimeout(){},AbortController,console});
- app.window.setTimeout=()=>1;app.window.clearTimeout=()=>{};
- app.api.register(catalogs);
- return {get:app.document.getElementById,nodes,node};
-}
-function pageScript(name) {
- const html=fs.readFileSync(path.join(root,'templates',name),'utf8');
- const scripts=[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)];
- return (name==='index.html'?fs.readFileSync(path.join(root,'static/backup-browser.js'),'utf8')+'\n'+fs.readFileSync(path.join(root,'static/backup-console.js'),'utf8')+'\nvar IOSBKConsole=window.IOSBKConsole;\n':'')+scripts.at(-1)[1].replace('{{.InitialStatus}}','{"devices":[]}');
-}
+
 const login=boot(), loginDOM=dom(login);
 vm.runInContext(pageScript('login.html'),login.context);
 loginDOM.get('password').value='unsaved secret';
@@ -128,14 +93,18 @@ consoleApp.api.setLocale('en');
 assert.equal(consoleDOM.get('encState-PHONE').querySelector('span').textContent,catalogs.en['enc.stateOn']);
 assert.equal(consoleDOM.get('networkAddress-PHONE').value,'192.0.2.1');
 assert.equal(vm.runInContext(`dirtyCards.has('PHONE')`,consoleApp.context),true);
+async function verifyNotificationDrafts(){
 const notifications=boot(), notificationDOM=dom(notifications);
 vm.runInContext(pageScript('notifications.html'),notifications.context);
-vm.runInContext(`cfg.language='zh-CN';cfg.email_configs=[{name:'Original',password:'',enabled:true}];setField('email_configs',0,'name','Unsaved name',false);setTemplate('backup_success','My custom {device_name}');`,notifications.context);
+notifications.window.fetch=()=>Promise.resolve({ok:true,json:()=>Promise.resolve({enabled:true,language:'zh-CN',email_configs:[{name:'Original',password:'',enabled:true}]})});
+await vm.runInContext('loadConfig()',notifications.context);
+vm.runInContext(`setField('email_configs',0,'name','Unsaved name',false);setTemplate('backup_success','My custom {device_name}');`,notifications.context);
 notifications.api.setLocale('en');
 assert.equal(vm.runInContext('cfg.language',notifications.context),'zh-CN');
 assert.equal(vm.runInContext('cfg.email_configs[0].name',notifications.context),'Unsaved name');
 assert.equal(vm.runInContext('cfg.notification_templates.backup_success',notifications.context),'My custom {device_name}');
 assert.equal(vm.runInContext('notifDirty',notifications.context),true);
+}
 console.log('page language switching preserves live state and unsaved inputs');
 const accessible=boot(), accessibleDOM=dom(accessible);
 const heading=accessibleDOM.get('title'), image=accessibleDOM.get('image'), languageButton=accessibleDOM.get('languageButton');
@@ -207,6 +176,8 @@ async function verifyOperationStateAcrossLanguageChanges(){
  const deliveryApp=boot(),deliveryDOM=dom(deliveryApp);
  deliveryApp.api.register(apiCatalog);
  vm.runInContext(pageScript('notifications.html'),deliveryApp.context);
+ deliveryApp.window.fetch=()=>Promise.resolve({ok:true,status:200,json:()=>Promise.resolve({enabled:true,language:'en'})});
+ await vm.runInContext('loadConfig()',deliveryApp.context);
  for(const result of [
    {status:409,data:{attempted:0,succeeded:0,failed:0},key:'notif.testNoTargets'},
    {status:502,data:{attempted:1,succeeded:0,failed:1},key:'notif.testFailed'},
@@ -220,8 +191,6 @@ async function verifyOperationStateAcrossLanguageChanges(){
  }
  console.log('pending checks, deleted backups and notification delivery results survive localization correctly');
 }
-verifyOperationStateAcrossLanguageChanges().catch(error=>{console.error(error);process.exitCode=1;});
-
 async function verifyBackupControlBehavior(){
  const controls=boot(),nodes=dom(controls);
  controls.api.register(apiCatalog);
@@ -264,4 +233,13 @@ async function verifyBackupControlBehavior(){
  assert.equal(nodes.get('stopBackup-PHONE').disabled,true,'accepted stop must not revert to running after a save error');
  console.log('backup controls preserve task identity, prevent duplicate requests and distinguish stopping, holding and save failures');
 }
-verifyBackupControlBehavior().catch(error=>{console.error(error);process.exitCode=1;});
+async function runAllBehaviorChecks(){
+ await verifyNotificationDrafts();
+ await verifyOperationStateAcrossLanguageChanges();
+ await verifyBackupControlBehavior();
+ require('./context-i18n.test');
+ require('./locale-preferences.test');
+ require('./console-i18n.test');
+ await require('./notifications-i18n.test')();
+}
+runAllBehaviorChecks().catch(error=>{console.error(error);process.exitCode=1;});

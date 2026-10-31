@@ -115,7 +115,7 @@
           var result = await response.json();
           if (!response.ok || result.error) throw new Error(global.IOSBKI18n.message(result, 'common.operationFailed'));
           Object.assign(saved[u], payload); settingsSummary(u);
-          entry.busy = false; entry.close(); global.toast(tr('bset.saved'));
+          entry.busy = false; entry.close(); global.toast('bset.saved');
           if (global.IOSBKHistory) global.IOSBKHistory.refresh();
         } catch (error) { errorNode.textContent = error.message || tr('common.operationFailed'); }
         finally { entry.busy = false; save.disabled = cancel.disabled = entry.closeButton.disabled = false;controls.forEach(function(control,index){control.disabled=disabled[index];}); }
@@ -144,7 +144,7 @@
     global.IOSBKI18n.apply(panel);
   }
   function openJob(u, id) {
-    if (!/^bkp-[0-9a-f]{12,32}$/.test(id || '')) { global.toast(tr('console.jobMissing'),true); return; }
+    if (!/^bkp-[0-9a-f]{12,32}$/.test(id || '')) { global.toast('console.jobMissing',true); return; }
     closeLayers();
     if(get('panel-'+u))global.switchSection(u,'jobs');
     else{ensureArchivedJobs(u);global.IOSBKJobs.open(u);}
@@ -158,7 +158,7 @@
   }
   function current(u) {
     var source = history[u] && history[u].current_source;
-    if (!source || !source.available) { global.toast(tr('console.sourceUnavailable'), true); return; }
+    if (!source || !source.available) { global.toast('console.sourceUnavailable', true); return; }
     closeLayers();
     var content = get('backupOverview-' + u), check = get('currentCheck-' + u);
     if(check)check.classList.toggle('hidden',source.kind==='point');

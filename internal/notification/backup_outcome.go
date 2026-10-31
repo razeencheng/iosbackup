@@ -4,6 +4,8 @@ package notification
 type BackupOutcome struct {
 	Execution, Check, History string
 	FailureCode, Diagnostics  string
+	ReasonMessageCode         string
+	ReasonMessageParams       map[string]any
 }
 
 // 缺失规则才继承失败通知渠道；显式空数组永久表示关闭。
@@ -81,7 +83,9 @@ func (manager *Manager) backupOutcomeJobs(outcome BackupOutcome, name, udid stri
 				code = "backup_final_failed"
 				level = LevelError
 			}
-			message := Message{Type: event, Level: level, EventCode: code, ReasonCode: outcome.FailureCode, DeviceName: name, DeviceUDID: udid, Timestamp: manager.now(), Params: states, ExtraFields: map[string]string{"reason": outcome.Diagnostics, "diagnostics": outcome.Diagnostics}}
+			message := Message{Type: event, Level: level, EventCode: code, ReasonCode: outcome.FailureCode,
+				ReasonMessageCode: outcome.ReasonMessageCode, ReasonMessageParams: cloneReasonMessageParams(outcome.ReasonMessageParams),
+				DeviceName: name, DeviceUDID: udid, Timestamp: manager.now(), Params: states, ExtraFields: map[string]string{"reason": outcome.Diagnostics, "diagnostics": outcome.Diagnostics}}
 			message = localizeMessage(message, language)
 			message.Content = renderTemplate(message, templates)
 			tasks = append(tasks, job{notifier: notifier, message: CloneMessage(message)})

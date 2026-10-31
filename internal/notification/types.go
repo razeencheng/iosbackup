@@ -1,6 +1,9 @@
 package notification
 
-import "time"
+import (
+	"math"
+	"time"
+)
 
 // Type 是通知事件类型。
 type Type string
@@ -27,19 +30,22 @@ const (
 
 // Message 是发送给通知器的消息。
 type Message struct {
-	Locale      string            `json:"locale,omitempty"`
-	EventCode   string            `json:"event_code,omitempty"`
-	ReasonCode  string            `json:"reason_code,omitempty"`
-	Params      map[string]string `json:"-"`
-	Test        bool              `json:"-"`
-	Type        Type              `json:"type"`
-	Level       Level             `json:"level"`
-	Title       string            `json:"title"`
-	Content     string            `json:"content"`
-	DeviceName  string            `json:"device_name,omitempty"`
-	DeviceUDID  string            `json:"device_udid,omitempty"`
-	Timestamp   time.Time         `json:"timestamp"`
-	ExtraFields map[string]string `json:"extra_fields,omitempty"`
+	Locale     string `json:"locale,omitempty"`
+	EventCode  string `json:"event_code,omitempty"`
+	ReasonCode string `json:"reason_code,omitempty"`
+	// 具体原因只参与本地化，不改变 Webhook 的既有 ReasonCode 分类。
+	ReasonMessageCode   string            `json:"-"`
+	ReasonMessageParams map[string]any    `json:"-"`
+	Params              map[string]string `json:"-"`
+	Test                bool              `json:"-"`
+	Type                Type              `json:"type"`
+	Level               Level             `json:"level"`
+	Title               string            `json:"title"`
+	Content             string            `json:"content"`
+	DeviceName          string            `json:"device_name,omitempty"`
+	DeviceUDID          string            `json:"device_udid,omitempty"`
+	Timestamp           time.Time         `json:"timestamp"`
+	ExtraFields         map[string]string `json:"extra_fields,omitempty"`
 }
 
 // Notifier 是通知适配器的最小接口。
@@ -136,15 +142,44 @@ type Config struct {
 	NotificationTemplates map[string]string   `json:"notification_templates"`
 }
 
-// CloneMessage 返回不共享 ExtraFields 的消息副本。
+// CloneMessage 返回不共享参数和 ExtraFields 的消息副本。
 func CloneMessage(message Message) Message {
 	message.Params = CloneStringMap(message.Params)
+	message.ReasonMessageParams = cloneReasonMessageParams(message.ReasonMessageParams)
 	extraFields := message.ExtraFields
 	message.ExtraFields = make(map[string]string, len(extraFields))
 	for key, value := range extraFields {
 		message.ExtraFields[key] = value
 	}
 	return message
+}
+
+// cloneReasonMessageParams 仅保留 JSON 标量，避免队列或不同通知器共享可变引用。
+func cloneReasonMessageParams(params map[string]any) map[string]any {
+	if len(params) == 0 {
+		return nil
+	}
+	clone := make(map[string]any, len(params))
+	for key, value := range params {
+		switch number := value.(type) {
+		case nil, bool, string, int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64:
+		case float64:
+			if math.IsNaN(number) || math.IsInf(number, 0) {
+				continue
+			}
+		case float32:
+			if math.IsNaN(float64(number)) || math.IsInf(float64(number), 0) {
+				continue
+			}
+		default:
+			continue
+		}
+		clone[key] = value
+	}
+	if len(clone) == 0 {
+		return nil
+	}
+	return clone
 }
 
 // CloneRules 返回不共享 map 或 slice 的规则副本。

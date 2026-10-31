@@ -170,7 +170,8 @@
     "api.history_conflict": "This backup or its settings changed. Refresh and review the operation again.",
     "api.history_unavailable": "History storage is unavailable or needs recovery. Check the storage connection and server logs.",
     "api.history_capacity": "There is not enough space for an independent backup. Existing history has been preserved.",
-    "api.history_session_expired": "This session expired or the server restarted. Start the operation again."
+    "api.history_session_expired": "This session expired or the server restarted. Start the operation again.",
+    "api.notification_channel_context": "Notification channel “{name}” ({channel}): {reason}"
   },
   "zh-CN": {
     "api.operation_failed": "操作未能完成，请重试或查看服务日志。",
@@ -343,6 +344,7 @@
     "api.history_conflict": "备份或设置已改变，请刷新后重新核对操作。",
     "api.history_unavailable": "历史存储不可访问或需要恢复，请检查存储连接与服务端日志。",
     "api.history_capacity": "空间不足，无法建立独立备份；已有历史已保留。",
-    "api.history_session_expired": "会话已过期或服务已重启，请重新发起操作。"
+    "api.history_session_expired": "会话已过期或服务已重启，请重新发起操作。",
+    "api.notification_channel_context": "通知渠道“{name}”（{channel}）：{reason}"
   }
 }

@@ -5,11 +5,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"iosbackup/internal/backupstore"
-	"iosbackup/internal/i18n"
+	"math"
 	"os"
 	"strings"
 	"time"
+
+	"iosbackup/internal/backupstore"
+	"iosbackup/internal/i18n"
 )
 
 // PerformBackup 执行备份
@@ -44,6 +46,8 @@ func (app *application) setBackupOperationState(udid, stateCode, errorCode, mess
 	state.BackupState = stateCode
 	state.BackupErrorCode = errorCode
 	state.LastBackupError = message
+	state.LastBackupMessageCode = ""
+	state.LastBackupMessageParams = nil
 	app.deviceOperationStates[udid] = state
 	app.mu.Unlock()
 	app.broadcastStatus()
@@ -82,12 +86,71 @@ func backupFailureState(err error) (stateCode, errorCode string) {
 }
 
 func (app *application) finishBackupState(udid string, err error) {
-	if err == nil {
-		app.setBackupOperationState(udid, backupStateSucceeded, "", "")
-		return
+	app.mu.Lock()
+	app.finishBackupStateUnsafe(udid, err)
+	app.mu.Unlock()
+	app.broadcastStatus()
+}
+
+// finishBackupStateUnsafe 统一终态消息写入；调用者必须持有 app.mu。
+func (app *application) finishBackupStateUnsafe(udid string, err error) {
+	state := app.deviceOperationStates[udid]
+	state.BackupState = backupStateSucceeded
+	state.BackupErrorCode = ""
+	state.LastBackupError = ""
+	state.LastBackupMessageCode = ""
+	state.LastBackupMessageParams = nil
+	if err != nil {
+		state.BackupState, state.BackupErrorCode = backupFailureState(err)
+		state.LastBackupError = err.Error()
+		state.LastBackupMessageCode, state.LastBackupMessageParams = backupFailureMessage(err, state.BackupErrorCode)
 	}
-	stateCode, errorCode := backupFailureState(err)
-	app.setBackupOperationState(udid, stateCode, errorCode, err.Error())
+	app.deviceOperationStates[udid] = state
+}
+
+// backupFailureMessage 保留已知错误的原因与参数，旧分类继续供旧客户端使用。
+func backupFailureMessage(err error, errorCode string) (string, map[string]any) {
+	// 主动停止使用独立状态与提示，不作为失败消息发布。
+	if errors.Is(err, errBackupStoppedByUser) {
+		return "", nil
+	}
+	var message *i18n.Error
+	if errors.As(err, &message) && i18n.HasCode(message.Code) {
+		return message.Code, cloneBackupMessageParams(message.Params)
+	}
+	code := "api." + errorCode
+	if !i18n.HasCode(code) {
+		code = i18n.BackupFailed
+	}
+	return code, nil
+}
+
+// cloneBackupMessageParams 只复制 JSON 标量，阻止参数携带可变引用或使快照编码失败的值。
+func cloneBackupMessageParams(params map[string]any) map[string]any {
+	if len(params) == 0 {
+		return nil
+	}
+	copy := make(map[string]any, len(params))
+	for key, value := range params {
+		switch number := value.(type) {
+		case nil, bool, string, int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64:
+		case float64:
+			if math.IsNaN(number) || math.IsInf(number, 0) {
+				continue
+			}
+		case float32:
+			if math.IsNaN(float64(number)) || math.IsInf(float64(number), 0) {
+				continue
+			}
+		default:
+			continue
+		}
+		copy[key] = value
+	}
+	if len(copy) == 0 {
+		return nil
+	}
+	return copy
 }
 
 // PerformBackup 执行一次手动备份，暂缓自动计划不限制此入口。
@@ -123,7 +186,6 @@ func (app *application) runBackupJob(job *backupJob) (retErr error) {
 			return
 		}
 		backupLog(fmt.Sprintf("event=backup.failed error=%v", retErr))
-
 	}()
 	app.broadcastStatus()
 	if err := context.Cause(job.ctx); err != nil {
@@ -199,6 +261,7 @@ func (app *application) runBackupJob(job *backupJob) (retErr error) {
 			if app.backupJobRecords != nil {
 				app.backupJobRecords.transition(job.id, backupStateRunning)
 			}
+			state.LastBackupMessageCode, state.LastBackupMessageParams = "", nil
 			app.deviceOperationStates[udid] = state
 		}
 		app.mu.Unlock()

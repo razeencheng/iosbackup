@@ -1,6 +1,6 @@
 {
   "en": {
-    "app.title": "iOS Device Backup",
+    "app.title": "iOS Backup",
     "app.subtitle": "Back home on Wi-Fi — your iPhones & iPads back up automatically.",
     "app.version": "Version",
     "header.langName": "English",
@@ -870,10 +870,16 @@
     "console.historyResult.failed": "History processing failed",
     "console.historyResult.uncertain": "Save outcome uncertain",
     "console.historyResult.not_saved": "No new point saved",
-    "console.historyResult.unknown": "Not recorded"
+    "console.historyResult.unknown": "Not recorded",
+    "notif.testUsesSaved": "Test messages use the saved notification settings.",
+    "notif.saveBeforeTest": "Save your changes before sending a test message.",
+    "notif.saving": "Saving notification settings…",
+    "notif.loading": "Loading saved notification settings…",
+    "notif.loadFailed": "Could not load saved settings. Reload them before saving or testing.",
+    "notif.confirmFailed": "Could not confirm the saved settings. Your draft is kept; save again before testing."
   },
   "zh-CN": {
-    "app.title": "iOS 设备备份",
+    "app.title": "iOS Backup",
     "app.subtitle": "回到家连上 Wi-Fi，就自动备份你的 iPhone 和 iPad。",
     "app.version": "版本",
     "header.langName": "中文",
@@ -1743,6 +1749,12 @@
     "console.historyResult.failed": "历史处理异常",
     "console.historyResult.uncertain": "保存结果待确认",
     "console.historyResult.not_saved": "未保存新点",
-    "console.historyResult.unknown": "未记录"
+    "console.historyResult.unknown": "未记录",
+    "notif.testUsesSaved": "测试消息使用已保存的通知设置。",
+    "notif.saveBeforeTest": "请先保存修改，再发送测试消息。",
+    "notif.saving": "正在保存通知设置…",
+    "notif.loading": "正在加载已保存的通知设置…",
+    "notif.loadFailed": "无法加载已保存的设置。请重新加载后再保存或发送测试。",
+    "notif.confirmFailed": "无法确认已保存的设置。草稿已保留，请重新保存后再测试。"
   }
 }

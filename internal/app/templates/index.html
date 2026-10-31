@@ -633,7 +633,7 @@
 
 <!-- ===================== TOAST ===================== -->
 <div id="toast" class="hidden" style="position:fixed;left:50%;top:14px;transform:translateX(-50%);z-index:75;background:#213041;color:#fff;padding:12px 18px;border-radius:var(--iosbk-radius);font-size:13.5px;font-weight:500;box-shadow:0 14px 30px -10px rgba(35,52,68,.5);display:flex;align-items:center;gap:9px;max-width:90vw">
-  <svg id="toastIcon" class="ui-icon" style="color:#5FD0A0" aria-hidden="true"><use href="/static/ui-icons.svg#icon-check-circle"></use></svg><span id="toastMsg"></span>
+  <svg id="toastIcon" class="ui-icon" style="color:#5FD0A0" aria-hidden="true"><use href="/static/ui-icons.svg#icon-check-circle"></use></svg><span id="toastMsg" data-toast-message></span>
 </div>
 
 <iframe name="history-download" data-i18n-title="history.downloadFrame" title="{{t $.Locale "history.downloadFrame"}}" hidden></iframe>
@@ -660,12 +660,15 @@ function applyI18n(){
   document.querySelectorAll('[data-time]').forEach(function(el){ el.textContent=IOSBKI18n.formatDate(el.getAttribute('data-time')); });
   if(removedDevicesCache!==null) renderRemovedDevices(removedDevicesCache,'ready');
   else if(removedDevicesViewState) renderRemovedDevices(null,removedDevicesViewState);
+  renderDeviceOperationButtons();
+  renderToast();
 }
 function setLang(l){ IOSBKI18n.setLocale(l); }
-window.addEventListener('iosbk:localechange', function(){ applyI18n(); document.getElementById('toast').classList.add('hidden'); });
+window.addEventListener('iosbk:localechange', applyI18n);
 
 /* ============== toast ============== */
 let toastTimer, floatingToast=null;
+let toastState=null, toastSequence=0;
 const inlineResults={};
 function iconHTML(name, extraClass){ return '<svg class="ui-icon'+(extraClass?' '+extraClass:'')+'" aria-hidden="true"><use href="/static/ui-icons.svg#icon-'+name+'"></use></svg>'; }
 function setSVGIcon(svg, name){ var use=svg&&svg.querySelector('use'); if(use) use.setAttribute('href','/static/ui-icons.svg#icon-'+name); }
@@ -678,8 +681,23 @@ function showInlineResult(box, ok, payload, fallbackKey){
   var text=document.createElement('span'); text.textContent=message; row.appendChild(text); box.appendChild(row);
   box.style.color=ok===null?'#718090':(ok?'#2E7D5B':'#BD2C24');
 }
-function toast(msg, isErr){
+function toastText(payload, fallbackKey){ return typeof payload==='string'?tr(payload):apiMessage(payload,fallbackKey); }
+function hideToast(){
+  document.getElementById('toast').classList.add('hidden');
   if(floatingToast){floatingToast.remove();floatingToast=null;}
+  toastState=null;
+}
+function renderToast(){
+  if(!toastState) return;
+  if(Date.now()>=toastState.expiresAt){hideToast();return;}
+  var message=toastText(toastState.payload,toastState.fallbackKey);
+  document.getElementById('toastMsg').textContent=message;
+  if(floatingToast)floatingToast.querySelector('[data-toast-message]').textContent=message;
+}
+function toast(payload, isErr, fallbackKey){
+  if(floatingToast){floatingToast.remove();floatingToast=null;}
+  var msg=toastText(payload,fallbackKey), duration=msg.length>16?4600:2600, sequence=++toastSequence;
+  toastState={payload:payload,fallbackKey:fallbackKey,isError:!!isErr,expiresAt:Date.now()+duration,sequence:sequence};
   var box=document.getElementById('toast'), icon=document.getElementById('toastIcon');
   document.getElementById('toastMsg').textContent=msg;
   setSVGIcon(icon, isErr ? 'alert' : 'check-circle');
@@ -692,7 +710,7 @@ function toast(msg, isErr){
     dialogs[dialogs.length-1].appendChild(floatingToast);box=floatingToast;
   }
   box.classList.remove('hidden'); box.style.animation='iosbktoast .25s ease';
-  clearTimeout(toastTimer); toastTimer=setTimeout(function(){ box.classList.add('hidden'); }, msg.length>16?4600:2600);
+  clearTimeout(toastTimer); toastTimer=setTimeout(function(){ if(toastState && toastState.sequence===sequence)hideToast(); },duration);
 }
 
 /* ============== net helpers (same endpoints/payloads as before) ============== */
@@ -736,6 +754,44 @@ function switchSection(udid, sec){
 function openBackupFiles(udid){backupBrowser.open(udid);}
 function closeBackupFiles(udid){backupBrowser.close(udid);}
 
+const deviceOperations=Object.create(null);
+let deviceOperationSequence=0;
+function deviceOperation(kind,udid){ return deviceOperations[kind+'\0'+udid]; }
+function beginDeviceOperation(kind,udid){
+  var previous=deviceOperation(kind,udid); if(previous && previous.pending) return 0;
+  var requestId=++deviceOperationSequence;
+  deviceOperations[kind+'\0'+udid]={kind:kind,udid:udid,pending:true,requestId:requestId};
+  return requestId;
+}
+function finishDeviceOperation(kind,udid,requestId){
+  var state=deviceOperation(kind,udid); if(!state || state.requestId!==requestId) return false;
+  state.pending=false; return true;
+}
+function renderRemoveDeviceButton(){
+  var button=document.getElementById('removeDeviceConfirm'); if(!button) return;
+  var state=deviceOperation('remove',removeDeviceUdid), pending=!!(state && state.pending);
+  button.disabled=pending; button.setAttribute('data-i18n',pending?'remove.removing':'remove.confirm');
+  button.textContent=pending?tr('remove.removing'):tr('remove.confirm');
+}
+function renderRestoreManagedDeviceButton(udid,button){
+  button=button||document.getElementById('restoreManagedDevice-'+udid); if(!button) return;
+  var state=deviceOperation('restore-managed-device',udid), pending=!!(state && state.pending);
+  button.disabled=pending;
+  var label=button.querySelector('span'); if(label) label.textContent=tr(pending?'removed.restoring':'removed.restoreAction');
+}
+function renderDeleteBackupButton(udid){
+  var button=document.getElementById('delBtn-'+udid); if(!button) return;
+  var state=deviceOperation('delete-backup',udid), pending=!!(state && state.pending);
+  var device=latestDeviceStatuses[udid];
+  button.disabled=pending||!!(device && device.backing_up); button.style.opacity=pending?'.7':''; button.style.cursor=pending?'default':'';
+  button.innerHTML=iconHTML(pending?'loader':'trash',pending?'spin':'')+'<span>'+tr(pending?'bmgmt.deleting':'bmgmt.delDataBtn')+'</span>';
+}
+function renderDeviceOperationButtons(){
+  renderRemoveDeviceButton();
+  var deleteDevices=new Set(Object.keys(latestDeviceStatuses));
+  Object.keys(deviceOperations).forEach(function(key){var state=deviceOperations[key];if(state.kind==='delete-backup')deleteDevices.add(state.udid);});
+  deleteDevices.forEach(renderDeleteBackupButton);
+}
 let removeDeviceUdid='', removeDeviceReturnFocus=null;
 function openRemoveDeviceModal(udid, name, model){
   IOSBKConsole.closeLayers();
@@ -743,8 +799,7 @@ function openRemoveDeviceModal(udid, name, model){
   removeDeviceReturnFocus=document.activeElement;
   document.getElementById('removeDeviceName').textContent=name||udid;
   document.getElementById('removeDeviceModel').textContent=model||'';
-  var confirmButton=document.getElementById('removeDeviceConfirm');
-  confirmButton.disabled=false; confirmButton.textContent=tr('remove.confirm');
+  renderRemoveDeviceButton();
   document.getElementById('removeDeviceModal').classList.remove('hidden');
   modalOpen=true;
   setTimeout(function(){ document.getElementById('removeDeviceClose').focus(); },0);
@@ -758,17 +813,19 @@ function closeRemoveDeviceModal(event){
 }
 function submitRemoveDevice(){
   if(!removeDeviceUdid) return;
-  var udid=removeDeviceUdid, button=document.getElementById('removeDeviceConfirm');
-  button.disabled=true; button.textContent=tr('remove.removing');
-  csrfFetch('/api/remove-device/'+encodeURIComponent(udid),{method:'POST'}).then(function(response){
+  var udid=removeDeviceUdid, requestId=beginDeviceOperation('remove',udid); if(!requestId) return;
+  renderRemoveDeviceButton();
+  return csrfFetch('/api/remove-device/'+encodeURIComponent(udid),{method:'POST'}).then(function(response){
     return response.json().then(function(data){ return {ok:response.ok,status:response.status,data:data}; });
   }).then(function(result){
     if(!result.ok){
-      toast(result.status===409 && (result.data.code==='busy' || result.data.code==='api.busy') ? tr('remove.busy') : (apiMessage(result.data,'remove.failed')),true);
-      button.disabled=false; button.textContent=tr('remove.confirm'); return;
+      toast(result.status===409 && (result.data.code==='busy' || result.data.code==='api.busy') ? 'remove.busy' : result.data,true,'remove.failed');
+      return;
     }
-    closeRemoveDeviceModal(); toast(tr('remove.success')); location.reload();
-  }).catch(function(){ toast(tr('remove.failed'),true); button.disabled=false; button.textContent=tr('remove.confirm'); });
+    if(removeDeviceUdid===udid) closeRemoveDeviceModal(); toast('remove.success'); location.reload();
+  }).catch(function(){ toast('remove.failed',true); }).finally(function(){
+    if(finishDeviceOperation('remove',udid,requestId)) renderRemoveDeviceButton();
+  });
 }
 
 let removedDeviceCount=0, removedDevicesCache=null, removedDevicesViewState='', removedDevicesRequestSerial=0, removedDevicesReturnFocus=null;
@@ -816,8 +873,9 @@ function renderRemovedDevices(devices, state){
     card.appendChild(metadata);
     var actions=document.createElement('div'); actions.className='removed-device-actions';
     var info=document.createElement('span'); info.className='removed-device-info'; info.textContent=tr('remove.keepBody');
-    var button=document.createElement('button'); button.type='button'; button.className='removed-device-restore'; button.innerHTML=iconHTML('undo');
+    var button=document.createElement('button'); button.id='restoreManagedDevice-'+device.udid; button.type='button'; button.className='removed-device-restore'; button.innerHTML=iconHTML('undo');
     var buttonText=document.createElement('span'); buttonText.textContent=tr('removed.restoreAction'); button.appendChild(buttonText);
+    renderRestoreManagedDeviceButton(device.udid,button);
     button.addEventListener('click',function(){restoreRemovedDeviceFromDrawer(device.udid,button);});
     actions.appendChild(info);
     var historyButton=document.createElement('button');historyButton.type='button';historyButton.className='history-button';historyButton.textContent=tr('history.open');historyButton.addEventListener('click',function(){if(window.IOSBKHistory)window.IOSBKHistory.openArchived(device.udid);});actions.appendChild(historyButton);
@@ -847,18 +905,20 @@ function closeRemovedDevicesDrawer(event){
 }
 function restoreRemovedDeviceFromDrawer(udid, button){
   if(!udid||!button) return;
-  button.disabled=true; var label=button.querySelector('span'); if(label) label.textContent=tr('removed.restoring');
-  csrfFetch('/api/restore-device/'+encodeURIComponent(udid),{method:'POST'}).then(function(response){
+  var requestId=beginDeviceOperation('restore-managed-device',udid); if(!requestId) return;
+  renderRestoreManagedDeviceButton(udid,button);
+  return csrfFetch('/api/restore-device/'+encodeURIComponent(udid),{method:'POST'}).then(function(response){
     return response.json().then(function(data){return {ok:response.ok,status:response.status,data:data};});
   }).then(function(result){
     if(!result.ok){
-      toast(result.status===409?tr('removed.busy'):(apiMessage(result.data,'removed.restoreFailed')),true);
-      button.disabled=false; if(label) label.textContent=tr('removed.restoreAction'); return;
+      toast(result.status===409?'removed.busy':result.data,true,'removed.restoreFailed'); return;
     }
     removedDevicesCache=(removedDevicesCache||[]).filter(function(device){return device.udid!==udid;});
     updateRemovedDeviceCount(removedDevicesCache.length); renderRemovedDevices(removedDevicesCache,'ready');
-    toast(tr('removed.restoreSuccess')); setTimeout(function(){location.reload();},450);
-  }).catch(function(){ toast(tr('removed.restoreFailed'),true); button.disabled=false; if(label) label.textContent=tr('removed.restoreAction'); });
+    toast('removed.restoreSuccess'); setTimeout(function(){location.reload();},450);
+  }).catch(function(){ toast('removed.restoreFailed',true); }).finally(function(){
+    if(finishDeviceOperation('restore-managed-device',udid,requestId)) renderRestoreManagedDeviceButton(udid);
+  });
 }
 const latestEncryptionStatuses={}, backupEncryptionStates={};
 function renderEncStatus(udid,d){
@@ -1069,6 +1129,11 @@ function backupProgressCopy(mode,d){
   else if(d.last_backup_error_code==='device_locked') hint='progress.lockedHint';
   return {title:'progress.failedTitle',subtitle:'progress.overallSubtitle',hint:hint,tone:'error',icon:'alert'};
 }
+function backupFailureMessage(d,fallbackKey){
+  var code=d.last_backup_message_code;
+  if(code && IOSBKI18n.has(code)) return apiMessage({message_code:code,params:d.last_backup_message_params},fallbackKey);
+  return apiMessage({code:'api.'+(d.last_backup_error_code||'')},fallbackKey);
+}
 function renderBackupProgress(d){
   var u=d.udid, panel=document.getElementById('bkbar-'+u); if(!panel) return;
   var progress=d.backup_progress;
@@ -1096,7 +1161,7 @@ function renderBackupProgress(d){
 
   var status=document.getElementById('bkprogress-status-'+u), statusTitle=document.getElementById('bkprogress-status-title-'+u), statusHint=document.getElementById('bkprogress-status-hint-'+u), statusIcon=document.getElementById('bkprogress-status-icon-'+u);
   status.className='backup-status-message'+(copy.tone?' '+copy.tone:'');
-  statusTitle.textContent=tr(copy.title); statusHint.textContent=tr(copy.hint);
+  statusTitle.textContent=tr(copy.title); statusHint.textContent=(mode==='failed'||mode==='interrupted')?backupFailureMessage(d,copy.hint):tr(copy.hint);
   var activity=document.getElementById('bkprogress-activity-'+u);
   var lastActivity=progress.last_activity_at ? new Date(progress.last_activity_at) : null;
   activity.textContent=lastActivity && !isNaN(lastActivity.getTime()) ? tr('progress.lastActivity')+IOSBKI18n.formatDate(progress.last_activity_at) : tr('progress.noActivity');
@@ -1110,7 +1175,8 @@ function patchDevice(d){
   latestDeviceStatuses[u]=d;
   var backupOffline=document.getElementById('bkOffline-'+u); if(backupOffline) backupOffline.classList.toggle('hidden',d.conn!=='offline');
   backupBrowser.notify(u,d.backup_index);
-  ['unbackBtn-','delBtn-'].forEach(function(prefix){var action=document.getElementById(prefix+u);if(action) action.disabled=!!d.backing_up;});
+  var unback=document.getElementById('unbackBtn-'+u); if(unback) unback.disabled=!!d.backing_up;
+  renderDeleteBackupButton(u);
   document.querySelectorAll('[data-connection-action]').forEach(function(button){if(button.getAttribute('data-connection-action')===u) button.disabled=d.operations_available===false||d.backing_up;});
   var tile=document.getElementById('itile-'+u); if(tile) tile.setAttribute('style', itileStyle(d.conn));
   var name=document.getElementById('name-'+u); if(name) name.style.color = (d.conn==='offline')?'#96A3AE':'#213041';
@@ -1132,14 +1198,14 @@ function patchDevice(d){
 }
 
 /* ============== header actions ============== */
-function refreshDevices(){ csrfFetch('/api/refresh',{method:'POST'}).then(function(r){return r.json();}).then(function(data){ if(data.error) toast(apiMessage(data),true); else location.reload(); }).catch(function(e){ toast(tr('common.operationFailed'),true); }); }
-function restartConnection(){ toast(tr('action.restartConnection.restartingConnectionService')); csrfFetch('/api/restart-usbmuxd',{method:'POST'}).then(function(r){return r.json();}).then(function(data){ toast(data.error?(apiMessage(data)):(tr('action.restartConnection.connectionRestartStarted')), !!data.error); }).catch(function(e){ toast(tr('common.operationFailed'),true); }); }
+function refreshDevices(){ csrfFetch('/api/refresh',{method:'POST'}).then(function(r){return r.json();}).then(function(data){ if(data.error) toast(data,true); else location.reload(); }).catch(function(e){ toast('common.operationFailed',true); }); }
+function restartConnection(){ toast('action.restartConnection.restartingConnectionService'); csrfFetch('/api/restart-usbmuxd',{method:'POST'}).then(function(r){return r.json();}).then(function(data){ toast(data.error?data:'action.restartConnection.connectionRestartStarted', !!data.error); }).catch(function(e){ toast('common.operationFailed',true); }); }
 function logoutSession(){
   IOSBKI18n.fetch('/logout',{method:'POST',headers:{'X-IOSBK-CSRF':IOSBK_CSRF}}).then(function(r){
     if(r.redirected){ window.location.assign(r.url); return; }
     if(r.ok){ window.location.assign('/login'); return; }
-    toast(tr('action.logoutSession.signOutFailedPleaseTry'),true);
-  }).catch(function(){ toast(tr('action.logoutSession.signOutFailedPleaseTry'),true); });
+    toast('action.logoutSession.signOutFailedPleaseTry',true);
+  }).catch(function(){ toast('action.logoutSession.signOutFailedPleaseTry',true); });
 }
 
 /* ============== top-bar 菜单(⚙) ============== */
@@ -1193,71 +1259,102 @@ function testDeviceIP(udid){
   }).catch(function(e){ if(current())showInlineResult(box,false,{},'common.operationFailed'); }).finally(function(){ if(current()){btn.disabled=false;btn.style.opacity='';} });
 }
 function pairingStatusText(d){
+  var request=manualPairingRequests[d.udid];
+  if(request && request.payload) return apiMessage(request.payload,'guide.pairingFailed');
+  if(request && request.phase==='requesting') return tr('action.pairingStatusText.checkingDevicePairing');
+  if(d.pairing_state==='waiting_for_trust') return tr('action.pairingStatusText.tapTrustThisComputerAnd');
+  if(request && request.phase==='tracking') return tr('action.pairingStatusText.checkingDevicePairing');
   if(d.pairing_state==='checking') return tr('action.pairingStatusText.checkingDevicePairing');
   if(d.pairing_state==='paired') return tr('action.pairingStatusText.devicePairingIsValid');
-  if(d.pairing_state==='waiting_for_trust') return tr('action.pairingStatusText.tapTrustThisComputerAnd');
   if(d.pairing_state!=='failed') return '';
   return apiMessage({code:'api.'+(d.pairing_error_code||'')},'guide.pairingFailed');
 }
+const manualPairingRequests=Object.create(null);
+let manualPairingSequence=0;
+function pairingStatusSignature(d){ return JSON.stringify([d.pairing_state||'',d.pairing_error_code||'']); }
 function renderPairingResult(d){
   latestPairingStatuses[d.udid]=d;
+  var request=manualPairingRequests[d.udid];
+  // 仅新的配对进展替换本次请求错误；重复快照和切换语言仍保留错误提示。
+  if(request && request.phase==='failed' && request.failureStatus!==pairingStatusSignature(d)){
+    delete manualPairingRequests[d.udid];
+    request=null;
+  }
+  var pending=request && (request.phase==='requesting'||request.phase==='tracking');
   var box=document.getElementById('pairingResult-'+d.udid);
   if(box){
     var text=pairingStatusText(d);
     box.textContent=text;
     box.classList.toggle('hidden',!text);
-    box.style.color=d.pairing_state==='failed'?'#9A6B66':(d.pairing_state==='paired'?'#0B7565':'#718090');
+    box.style.color=request && request.payload || d.pairing_state==='failed'?'#9A6B66':(d.pairing_state==='paired'?'#0B7565':'#718090');
   }
   var button=document.getElementById('pairBtn-'+d.udid);
-  if(button) button.disabled=d.pairing_state==='checking'||d.operations_available===false||!!d.backing_up;
+  if(button) button.disabled=!!pending||d.pairing_state==='checking'||d.operations_available===false||!!d.backing_up;
 }
-async function trackPairingResult(udid){
+function pairingRequestCurrent(udid,requestId){ return manualPairingRequests[udid] && manualPairingRequests[udid].requestId===requestId; }
+function pairingTrackingError(key){ var error=new Error('pairing_tracking_failed'); error.payload={message_code:key}; return error; }
+async function trackPairingResult(udid,requestId){
   // 手动操作独立跟踪终态，不受“暂停实时更新”或 SSE 断线影响。
   var deadline=Date.now()+240000;
   while(Date.now()<deadline){
+    if(!pairingRequestCurrent(udid,requestId)) return;
     var controller=new AbortController();
     var timeout=setTimeout(function(){controller.abort();},5000);
     try{
       var response=await IOSBKI18n.fetch('/api/status',{signal:controller.signal,cache:'no-store'});
-      if(!response.ok) throw new Error(tr('action.trackPairingResult.cannotReadThePairingResult'));
+      if(!pairingRequestCurrent(udid,requestId)) return;
+      if(!response.ok) throw pairingTrackingError('action.trackPairingResult.cannotReadThePairingResult');
       var status=await response.json();
+      if(!pairingRequestCurrent(udid,requestId)) return;
       var device=(status.devices||[]).find(function(d){return d.udid===udid;});
-      if(!device) throw new Error(tr('action.trackPairingResult.theDeviceIsNoLonger'));
+      if(!device) throw pairingTrackingError('action.trackPairingResult.theDeviceIsNoLonger');
+      var finished=device.pairing_state==='paired'||device.pairing_state==='failed';
+      if(finished) manualPairingRequests[udid].phase='done';
       renderPairingResult(device);
-      if(device.pairing_state==='paired'||device.pairing_state==='failed') return;
+      if(finished) return;
+    }catch(error){
+      if(!pairingRequestCurrent(udid,requestId)) return;
+      throw error.payload?error:pairingTrackingError('action.trackPairingResult.cannotReadThePairingResult');
     }finally{ clearTimeout(timeout); }
     await new Promise(function(resolve){setTimeout(resolve,1000);});
   }
-  throw new Error(tr('action.trackPairingResult.pairingHasNotFinishedRefresh'));
+  throw pairingTrackingError('action.trackPairingResult.pairingHasNotFinishedRefresh');
 }
 function pairDevice(udid){
-  renderPairingResult({udid:udid,pairing_state:'checking'});
-  function failed(message){
-    renderPairingResult({udid:udid,pairing_state:'failed',pairing_error:message});
-    toast(tr('action.failed.pairingCheckFailed')+message,true);
+  var requestId=++manualPairingSequence;
+  manualPairingRequests[udid]={requestId:requestId,phase:'requesting'};
+  renderPairingResult(latestPairingStatuses[udid]||{udid:udid});
+  function failed(payload){
+    if(!pairingRequestCurrent(udid,requestId)) return;
+    var device=latestPairingStatuses[udid]||{udid:udid};
+    manualPairingRequests[udid]={requestId:requestId,phase:'failed',payload:payload,failureStatus:pairingStatusSignature(device)};
+    renderPairingResult(device);
+    toast(payload,true,'guide.pairingFailed');
   }
   return csrfFetch('/api/pair/'+udid,{method:'POST'}).then(function(r){return r.json();}).then(function(data){
-    if(data.error){ failed(apiMessage(data)); return; }
-    toast(tr('action.failed.pairingCheckStartedTheResult'));
-    return trackPairingResult(udid);
-  }).catch(function(e){ failed(tr('common.operationFailed')); });
+    if(!pairingRequestCurrent(udid,requestId)) return;
+    if(data.error){ failed(data); return; }
+    manualPairingRequests[udid].phase='tracking';
+    toast('action.failed.pairingCheckStartedTheResult');
+    return trackPairingResult(udid,requestId);
+  }).catch(function(error){ failed(error.payload||{message_code:'common.operationFailed'}); });
 }
 function gateMsg(d){
-  if(d.code) return apiMessage(d,'gate.cant');
-  if(d.error_code==='connection_unavailable') return tr('action.gateMsg.theConnectionServiceIsUnavailable');
+  if(d.message_code||d.code) return d;
+  if(d.error_code==='connection_unavailable') return 'action.gateMsg.theConnectionServiceIsUnavailable';
   var key={offline:'gate.offline',busy:'gate.busy',not_charging:'gate.notCharging',low_battery:'gate.lowBattery',missing:'gate.missing',backup_busy:'gate.backupBusy'}[d.error_code];
-  if(!key) return tr('gate.cant');
-  return tr(key,{b:d.battery,m:d.min_battery});
+  if(!key) return 'gate.cant';
+  return {message_code:key,params:{b:d.battery,m:d.min_battery}};
 }
 function startBackup(udid, btn){ IOSBKConsole.backup(udid); }
 function submitBackup(udid, btn, mode){
   btn.disabled=true; btn.style.opacity='.6';
-  function fail(msg){ toast(msg,true); btn.disabled=false; btn.style.opacity=''; }
+  function fail(payload){ toast(payload,true,'gate.cant'); btn.disabled=false; btn.style.opacity=''; }
   csrfFetch('/api/backup/'+udid,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode:mode||'auto'})}).then(function(r){return r.json();}).then(function(data){
     if(data.error_code || (data.error && data.code)){ fail(gateMsg(data)); }          // 被限制（未充电/电量低/离线/正忙）→ 说明原因
-    else if(data.error){ fail(apiMessage(data)); }
-    else {toast(tr('action.fail.backupStartedYourDeviceWill'));var mode=document.getElementById('backupMode-'+udid);if(mode)mode.value='auto';}
-  }).catch(function(e){ fail(tr('common.operationFailed')); });
+    else if(data.error){ fail(data); }
+    else toast('action.fail.backupStartedYourDeviceWill');
+  }).catch(function(e){ fail('common.operationFailed'); });
 }
 
 /* ============== backup stopping and automatic holds ============== */
@@ -1315,11 +1412,11 @@ function sendBackupControl(udid,action,body){
       ['backup_state','backing_up','auto_backup_hold','auto_backup_hold_version','auto_backup_hold_persistence'].forEach(function(key){if(Object.prototype.hasOwnProperty.call(data,key))next[key]=data[key];});
       patchDevice(next);applyI18n();
     }
-    if(data.error)toast(apiMessage(data),true);
-    else if(action==='resume')toast(tr('control.resumed'));
-    else if(action==='hold-retry')toast(tr('control.holdSaved'));
-  }).catch(function(){toast(tr('control.unknownResult'),true);}).then(function(){
-    return refreshBackupControlStatus().catch(function(){toast(tr('control.refreshFailed'),true);});
+    if(data.error)toast(data,true);
+    else if(action==='resume')toast('control.resumed');
+    else if(action==='hold-retry')toast('control.holdSaved');
+  }).catch(function(){toast('control.unknownResult',true);}).then(function(){
+    return refreshBackupControlStatus().catch(function(){toast('control.refreshFailed',true);});
   }).finally(function(){delete backupControlPending[udid];if(latestDeviceStatuses[udid])renderBackupControl(latestDeviceStatuses[udid]);});
 }
 function submitStopBackup(){
@@ -1378,15 +1475,16 @@ function renderBackupList(udid){
   document.getElementById('listMeta-'+udid).textContent=meta;
 }
 function confirmDeleteBackup(udid, name){
+  var current=deviceOperation('delete-backup',udid); if(current && current.pending) return;
   var typed=prompt(tr('action.confirmDeleteBackup.thisPermanentlyDeletesThisDevice', {name:name}));
   if(typed===null) return;
-  if(typed.trim()!==name){ toast(tr('action.confirmDeleteBackup.nameDoesnTMatchCancelled'),true); return; }
+  if(typed.trim()!==name){ toast('action.confirmDeleteBackup.nameDoesnTMatchCancelled',true); return; }
   // 删除大备份要删上千个文件、可能耗时；删除期间按钮转为 loading 并禁用，直到成功/失败。
-  var btn=document.getElementById('delBtn-'+udid), orig=btn?btn.innerHTML:'';
-  if(btn){ btn.disabled=true; btn.style.opacity='.7'; btn.style.cursor='default'; btn.innerHTML=iconHTML('loader','spin')+'<span>'+tr('bmgmt.deleting')+'</span>'; }
-  postJSON('/api/delete-backup/'+udid,{confirm_name:typed.trim()}).then(function(d){
-    if(d.error){ toast(apiMessage(d),true); return; }
-    toast(tr('action.confirmDeleteBackup.backupDeleted'));
+  var requestId=beginDeviceOperation('delete-backup',udid); if(!requestId) return;
+  renderDeleteBackupButton(udid);
+  return postJSON('/api/delete-backup/'+udid,{confirm_name:typed.trim()}).then(function(d){
+    if(d.error){ toast(d,true); return; }
+    toast('action.confirmDeleteBackup.backupDeleted');
     if(backupBrowser.state(udid).sequence) {delete listState[udid];backupBrowser.invalidate(udid);return;}
     var s=document.getElementById('bkSize-'+udid); if(s) s.textContent='—';
     var c=document.getElementById('bkCount-'+udid); if(c) c.textContent='—';
@@ -1396,34 +1494,34 @@ function confirmDeleteBackup(udid, name){
     var meta=document.getElementById('listMeta-'+udid); if(meta) meta.textContent='';
     var page=document.getElementById('listPage-'+udid); if(page) page.textContent='';
     renderBackupList(udid);
-  }).catch(function(e){ toast(tr('common.operationFailed'),true); }).finally(function(){
-    if(btn){ btn.disabled=false; btn.style.opacity=''; btn.style.cursor=''; btn.innerHTML=orig; }
+  }).catch(function(e){ toast('common.operationFailed',true); }).finally(function(){
+    if(finishDeviceOperation('delete-backup',udid,requestId)) renderDeleteBackupButton(udid);
   });
 }
 function doUnback(udid){
   if(!confirm(tr('action.doUnback.unpackingCreatesAFullBrowsable'))) return;
   var btn=document.getElementById('unbackBtn-'+udid); btn.disabled=true; btn.style.opacity='.6';
-  postJSON('/api/backup-unback/'+udid).then(function(data){ toast(data.error?(apiMessage(data)):apiMessage(data,'action.doUnback.unpackStartedSeeLogs'), !!data.error); }).catch(function(e){ toast(tr('common.operationFailed'),true); }).finally(function(){ setTimeout(function(){ btn.disabled=false; btn.style.opacity=''; }, 3000); });
+  postJSON('/api/backup-unback/'+udid).then(function(data){ toast(data,!!data.error,data.error?'common.operationFailed':'action.doUnback.unpackStartedSeeLogs'); }).catch(function(e){ toast('common.operationFailed',true); }).finally(function(){ setTimeout(function(){ btn.disabled=false; btn.style.opacity=''; }, 3000); });
 }
 
 /* ============== encryption ============== */
 function setEncryption(udid, enable){
   var pw=document.getElementById('encPw-'+udid).value;
-  if(!pw){ toast(tr('action.setEncryption.enterTheBackupPassword'),true); return; }
+  if(!pw){ toast('action.setEncryption.enterTheBackupPassword',true); return; }
   if(enable && !confirm(tr('action.setEncryption.onceEncryptionIsOnA'))) return;
-  postJSON('/api/encryption/'+udid,{enable:enable,password:pw}).then(function(data){ toast(data.error?(apiMessage(data)):apiMessage(data,'action.setEncryption.submitted'), !!data.error); document.getElementById('encPw-'+udid).value=''; if(!data.error) setTimeout(function(){ loadEncStatus(udid); }, 1500); }).catch(function(e){ toast(tr('common.operationFailed'),true); });
+  postJSON('/api/encryption/'+udid,{enable:enable,password:pw}).then(function(data){ toast(data,!!data.error,data.error?'common.operationFailed':'action.setEncryption.submitted'); document.getElementById('encPw-'+udid).value=''; if(!data.error) setTimeout(function(){ loadEncStatus(udid); }, 1500); }).catch(function(e){ toast('common.operationFailed',true); });
 }
 function changeBackupPw(udid){
   var o=document.getElementById('oldPw-'+udid).value, n=document.getElementById('newPw-'+udid).value;
-  if(!o||!n){ toast(tr('action.changeBackupPw.enterBothCurrentAndNew'),true); return; }
-  postJSON('/api/backup-changepw/'+udid,{old:o,new:n}).then(function(data){ toast(data.error?(apiMessage(data)):apiMessage(data,'action.changeBackupPw.submitted'), !!data.error); document.getElementById('oldPw-'+udid).value=''; document.getElementById('newPw-'+udid).value=''; }).catch(function(e){ toast(tr('common.operationFailed'),true); });
+  if(!o||!n){ toast('action.changeBackupPw.enterBothCurrentAndNew',true); return; }
+  postJSON('/api/backup-changepw/'+udid,{old:o,new:n}).then(function(data){ toast(data,!!data.error,data.error?'common.operationFailed':'action.changeBackupPw.submitted'); document.getElementById('oldPw-'+udid).value=''; document.getElementById('newPw-'+udid).value=''; }).catch(function(e){ toast('common.operationFailed',true); });
 }
 
 /* ============== restore ============== */
 function setRestoreEnabled(udid, enable){
   var msg=enable?tr('action.setRestoreEnabled.allowRestoreForThisDevice'):tr('action.setRestoreEnabled.turnOffRestoreForThis');
   if(!confirm(msg)) return;
-  postJSON('/api/save-config/'+udid,{restore_enabled:enable}).then(function(data){ if(data.error) toast(apiMessage(data),true); else location.reload(); }).catch(function(e){ toast(tr('common.operationFailed'),true); });
+  postJSON('/api/save-config/'+udid,{restore_enabled:enable}).then(function(data){ if(data.error) toast(data,true); else location.reload(); }).catch(function(e){ toast('common.operationFailed',true); });
 }
 let restoreUdid=null, restoreExpect='';
 function openRestoreModal(udid, devName){
@@ -1454,7 +1552,7 @@ function validateRestore(){
 function submitRestore(){
   if(!restoreUdid) return;
   var body={ confirmations:{understand:true, device_name:document.getElementById('rmName').value.trim()}, password:document.getElementById('rmPw').value, options:{ reboot:document.getElementById('rmReboot').checked, settings:document.getElementById('rmSettings').checked, system:document.getElementById('rmSystem').checked } };
-  postJSON('/api/restore/'+restoreUdid, body).then(function(data){ toast(data.error?(apiMessage(data)):apiMessage(data,'action.submitRestore.restoreStarted'), !!data.error); if(!data.error) closeRestoreModal(); }).catch(function(e){ toast(tr('common.operationFailed'),true); });
+  postJSON('/api/restore/'+restoreUdid, body).then(function(data){ toast(data,!!data.error,data.error?'common.operationFailed':'action.submitRestore.restoreStarted'); if(!data.error) closeRestoreModal(); }).catch(function(e){ toast('common.operationFailed',true); });
 }
 
 /* ============== boot ============== */

@@ -94,14 +94,16 @@ const (
 // deviceOperationState 是配对与备份操作的内存态。它通过 /api/events 发布，
 // 不写入配置文件；已有成功备份可由 LastBackup 恢复，瞬时错误在进程重启后清空。
 type deviceOperationState struct {
-	PairingState     string
-	PairingErrorCode string
-	PairingError     string
-	BackupState      string
-	BackupErrorCode  string
-	LastBackupError  string
-	pairingAlert     pairingAlertState
-	pairingCheck     uint64
+	PairingState            string
+	PairingErrorCode        string
+	PairingError            string
+	BackupState             string
+	BackupErrorCode         string
+	LastBackupError         string
+	LastBackupMessageCode   string
+	LastBackupMessageParams map[string]any
+	pairingAlert            pairingAlertState
+	pairingCheck            uint64
 }
 
 type muxLifecycleState uint8

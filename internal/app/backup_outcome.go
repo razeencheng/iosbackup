@@ -16,6 +16,7 @@ func (app *application) notifyBackupOutcome(job *backupJob, err error, check *ba
 	if err != nil {
 		outcome.Execution = "failed"
 		_, outcome.FailureCode = backupFailureState(err)
+		outcome.ReasonMessageCode, outcome.ReasonMessageParams = backupFailureMessage(err, outcome.FailureCode)
 		outcome.Diagnostics = err.Error()
 	}
 	if check != nil {

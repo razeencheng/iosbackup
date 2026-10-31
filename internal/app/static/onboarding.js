@@ -11,6 +11,7 @@
   var snapshot = { devices: [], version: body.dataset.version || '' };
   var eventSource = null;
   var reconnectTimer = null;
+  var toastState = null, toastSequence = 0;
 
 
   function text(id, value) { var node = document.getElementById(id); if (node) node.textContent = value; }
@@ -24,7 +25,17 @@
     badge.querySelector('span').textContent = label;
     text('liveText', label);
   }
-  function showToast(message) { var toast = document.getElementById('toast'); text('toastText', message); toast.hidden = false; window.clearTimeout(showToast.timer); showToast.timer = window.setTimeout(function () { toast.hidden = true; }, 2800); }
+  function renderToast() {
+    if (!toastState) return;
+    if (Date.now() >= toastState.expiresAt) { document.getElementById('toast').hidden = true; toastState = null; return; }
+    text('toastText', typeof toastState.payload === 'string' ? tr(toastState.payload) : IOSBKI18n.message(toastState.payload, 'common.operationFailed'));
+  }
+  function showToast(payload) {
+    var toast = document.getElementById('toast'), sequence = ++toastSequence;
+    toastState = {payload: payload, expiresAt: Date.now() + 2800, sequence: sequence};
+    renderToast(); toast.hidden = false; window.clearTimeout(showToast.timer);
+    showToast.timer = window.setTimeout(function () { if (toastState && toastState.sequence === sequence) { toast.hidden = true; toastState = null; } }, 2800);
+  }
   function post(url) {
     return IOSBKI18n.fetch(url, { method: 'POST', headers: { 'X-IOSBK-CSRF': csrf } }).then(function (response) {
       return response.json().catch(function () { return {}; }).then(function (data) {
@@ -128,6 +139,11 @@
     text('checkPair', state === 'failed' ? c.retryPair : c.checkPair);
   }
 
+  function backupFailureMessage(device) {
+    var code = device.last_backup_message_code;
+    if (code && IOSBKI18n.has(code)) return IOSBKI18n.message({message_code: code, params: device.last_backup_message_params}, 'guide.failedBackup');
+    return IOSBKI18n.message({code: 'api.' + (device.last_backup_error_code || '')}, 'guide.failedBackup');
+  }
   function backupMessage(device) {
     var c = t();
     var state = device ? device.backup_state : 'idle';
@@ -137,8 +153,8 @@
     if (state === 'stopping') { title = tr('control.stopping'); detail = tr('control.stoppingHint'); }
     if (state === 'stopped') { title = tr('control.stopped'); detail = tr('control.stoppedHint'); }
     if (state === 'succeeded' && device && device.last_backup) { title = c.succeeded; detail = IOSBKI18n.formatDate(device.last_backup_at||device.last_backup); }
-    if (state === 'failed') { title = c.failedBackup; detail = IOSBKI18n.message({code:'api.'+(device.last_backup_error_code||'')},'guide.failedBackup'); }
-    if (state === 'interrupted') { title = c.interrupted; detail = IOSBKI18n.message({code:'api.'+(device.last_backup_error_code||'')},'guide.failedBackup'); }
+    if (state === 'failed') { title = c.failedBackup; detail = backupFailureMessage(device); }
+    if (state === 'interrupted') { title = c.interrupted; detail = backupFailureMessage(device); }
     text('backupTitle', title); text('backupDetail', detail);
     document.getElementById('backupMotion').hidden = state !== 'starting' && state !== 'running';
     document.getElementById('backupAuth').hidden = state !== 'starting' && state !== 'running';
@@ -203,7 +219,7 @@
       badge.className = 'connection-badge online'; renderConnectionCopy();
     };
     eventSource.onmessage = function (event) {
-      try { snapshot = JSON.parse(event.data); IOSBKI18n.setTimezone(snapshot.timezone); render(); } catch (_) { showToast(tr('guide.invalidStatus')); }
+      try { snapshot = JSON.parse(event.data); IOSBKI18n.setTimezone(snapshot.timezone); render(); } catch (_) { showToast('guide.invalidStatus'); }
     };
     eventSource.onerror = function () {
       var badge = document.getElementById('connectionBadge');
@@ -213,20 +229,20 @@
   }
 
   document.querySelectorAll('[data-lang]').forEach(function(button){ button.addEventListener('click',function(){IOSBKI18n.setLocale(button.dataset.lang);}); });
-  window.addEventListener('iosbk:localechange',function(){document.getElementById('toast').hidden=true;applyLanguage();render();});
+  window.addEventListener('iosbk:localechange',function(){applyLanguage();render();renderToast();});
   document.querySelectorAll('[data-platform]').forEach(function (button) { button.addEventListener('click', function () { platform = button.dataset.platform; document.querySelectorAll('[data-platform]').forEach(function (item) { item.classList.toggle('active', item === button); }); renderInstructions(); }); });
   document.querySelectorAll('[data-back]').forEach(function (button) { button.addEventListener('click', function () { setActive(Number(button.dataset.back)); }); });
   document.querySelectorAll('.step-row').forEach(function (button) { button.addEventListener('click', function () { if (!button.disabled) setActive(Number(button.dataset.step)); }); });
   document.getElementById('deviceChoices').addEventListener('click', function (event) { var button = event.target.closest('[data-device]'); if (button) selectDevice(button.dataset.device); });
   document.getElementById('skipWifi').addEventListener('click', function () { wifiConfirmed = true; IOSBKI18n.writeStorage('iosbk_guide_wifi', 'done'); setActive(1); });
   document.getElementById('completeWifi').addEventListener('click', function () { wifiConfirmed = true; IOSBKI18n.writeStorage('iosbk_guide_wifi', 'done'); setActive(1); });
-  document.getElementById('refreshDevices').addEventListener('click', function () { text('refreshDevices', t().refreshing); post('/api/refresh').then(function () { showToast(t().refreshing); }).catch(function (error) { showToast(IOSBKI18n.message(error.payload,'common.operationFailed')); }).finally(function () { text('refreshDevices', t().refresh); }); });
-  document.getElementById('checkPair').addEventListener('click', function () { if (!selectedUDID) { showToast(t().selectFirst); return; } post('/api/pair/' + encodeURIComponent(selectedUDID)).catch(function (error) { showToast(IOSBKI18n.message(error.payload,'common.operationFailed')); }); });
+  document.getElementById('refreshDevices').addEventListener('click', function () { text('refreshDevices', t().refreshing); post('/api/refresh').then(function () { showToast('guide.refreshing'); }).catch(function (error) { showToast(error.payload); }).finally(function () { text('refreshDevices', t().refresh); }); });
+  document.getElementById('checkPair').addEventListener('click', function () { if (!selectedUDID) { showToast('guide.selectFirst'); return; } post('/api/pair/' + encodeURIComponent(selectedUDID)).catch(function (error) { showToast(error.payload); }); });
   document.getElementById('startBackup').addEventListener('click', function () {
     var device = selectedDevice();
     if (device && device.backup_state === 'succeeded' && device.last_backup) { document.getElementById('wifiAfter').scrollIntoView({ behavior: 'smooth' }); return; }
-    if (!selectedUDID) { showToast(t().selectFirst); return; }
-    post('/api/backup/' + encodeURIComponent(selectedUDID)).catch(function (error) { showToast(IOSBKI18n.message(error.payload,'common.operationFailed')); });
+    if (!selectedUDID) { showToast('guide.selectFirst'); return; }
+    post('/api/backup/' + encodeURIComponent(selectedUDID)).catch(function (error) { showToast(error.payload); });
   });
 
   applyLanguage();
