@@ -603,9 +603,6 @@ func (s *notificationConfigStore) applyWebhookUpdates(current, next *notificatio
 		if !ok && cfg.SecretConfigured && !cfg.ReplaceSecret && !cfg.ClearSecret {
 			return i18n.NewError(i18n.NotificationRenamedSecretRequired, map[string]any{"channel": "Webhook", "name": cfg.Name})
 		}
-		if cfg.ReplaceSecret && cfg.URL == "" {
-			return i18n.WithNotificationChannel(i18n.NewError(i18n.NotificationReplacementURLRequired, map[string]any{"name": cfg.Name}), "Webhook", cfg.Name)
-		}
 		configured, err := s.applySecretUpdate(notificationSecretKey("webhook", cfg.Name, "url"), cfg.URL, cfg.ReplaceSecret, cfg.ClearSecret, ok && old.SecretConfigured, deletes)
 		if err != nil {
 			return i18n.WithNotificationChannel(err, "Webhook", cfg.Name)

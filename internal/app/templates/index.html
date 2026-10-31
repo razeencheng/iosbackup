@@ -1185,18 +1185,26 @@ function testDeviceIP(udid){
 function pairingStatusText(d){
   var request=manualPairingRequests[d.udid];
   if(request && request.payload) return apiMessage(request.payload,'guide.pairingFailed');
-  if(request && (request.phase==='requesting'||request.phase==='tracking')) return tr('action.pairingStatusText.checkingDevicePairing');
+  if(request && request.phase==='requesting') return tr('action.pairingStatusText.checkingDevicePairing');
+  if(d.pairing_state==='waiting_for_trust') return tr('action.pairingStatusText.tapTrustThisComputerAnd');
+  if(request && request.phase==='tracking') return tr('action.pairingStatusText.checkingDevicePairing');
   if(d.pairing_state==='checking') return tr('action.pairingStatusText.checkingDevicePairing');
   if(d.pairing_state==='paired') return tr('action.pairingStatusText.devicePairingIsValid');
-  if(d.pairing_state==='waiting_for_trust') return tr('action.pairingStatusText.tapTrustThisComputerAnd');
   if(d.pairing_state!=='failed') return '';
   return apiMessage({code:'api.'+(d.pairing_error_code||'')},'guide.pairingFailed');
 }
 const manualPairingRequests=Object.create(null);
 let manualPairingSequence=0;
+function pairingStatusSignature(d){ return JSON.stringify([d.pairing_state||'',d.pairing_error_code||'']); }
 function renderPairingResult(d){
   latestPairingStatuses[d.udid]=d;
-  var request=manualPairingRequests[d.udid], pending=request && (request.phase==='requesting'||request.phase==='tracking');
+  var request=manualPairingRequests[d.udid];
+  // 仅新的配对进展替换本次请求错误；重复快照和切换语言仍保留错误提示。
+  if(request && request.phase==='failed' && request.failureStatus!==pairingStatusSignature(d)){
+    delete manualPairingRequests[d.udid];
+    request=null;
+  }
+  var pending=request && (request.phase==='requesting'||request.phase==='tracking');
   var box=document.getElementById('pairingResult-'+d.udid);
   if(box){
     var text=pairingStatusText(d);
@@ -1242,8 +1250,9 @@ function pairDevice(udid){
   renderPairingResult(latestPairingStatuses[udid]||{udid:udid});
   function failed(payload){
     if(!pairingRequestCurrent(udid,requestId)) return;
-    manualPairingRequests[udid]={requestId:requestId,phase:'failed',payload:payload};
-    renderPairingResult(latestPairingStatuses[udid]||{udid:udid});
+    var device=latestPairingStatuses[udid]||{udid:udid};
+    manualPairingRequests[udid]={requestId:requestId,phase:'failed',payload:payload,failureStatus:pairingStatusSignature(device)};
+    renderPairingResult(device);
     toast(payload,true,'guide.pairingFailed');
   }
   return csrfFetch('/api/pair/'+udid,{method:'POST'}).then(function(r){return r.json();}).then(function(data){

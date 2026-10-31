@@ -123,6 +123,49 @@ test('pair tracking failures keep an actionable relocalizable message',async()=>
   assert.equal(app.get('pairingResult-PHONE').textContent,catalogs['zh-CN']['action.trackPairingResult.cannotReadThePairingResult']);
   assert.ok(!app.get('toastMsg').textContent.includes('private'));
 });
+for(const locale of ['en','zh-CN']){
+  test('pair tracking shows the trust instruction before completion '+locale,async()=>{
+    const app=page(locale),states=['checking','waiting_for_trust','paired'];
+    app.window.fetch=url=>Promise.resolve(response(url.startsWith('/api/pair/')?{}:{devices:[{udid:'PHONE',pairing_state:states.shift()}]}));
+    const pending=app.run("pairDevice('PHONE')");await tick();
+    assert.equal(app.get('pairingResult-PHONE').textContent,catalogs[locale]['action.pairingStatusText.checkingDevicePairing']);
+    app.advance(1000);await tick();
+    assert.equal(app.get('pairingResult-PHONE').textContent,catalogs[locale]['action.pairingStatusText.tapTrustThisComputerAnd']);
+    assert.equal(app.get('pairBtn-PHONE').disabled,true);
+    app.advance(1000);await pending;
+    assert.equal(app.get('pairingResult-PHONE').textContent,catalogs[locale]['action.pairingStatusText.devicePairingIsValid']);
+    assert.equal(app.get('pairBtn-PHONE').disabled,false);
+  });
+  test('pair tracking error survives unchanged status but clears on progress '+locale,async()=>{
+    const app=page(locale);app.run("patchDevice({udid:'PHONE',pairing_state:'checking'})");
+    app.window.fetch=url=>url.startsWith('/api/pair/')?Promise.resolve(response({})):Promise.reject(Error('offline'));
+    await app.run("pairDevice('PHONE')");
+    const other=locale==='en'?'zh-CN':'en';app.api.setLocale(other);
+    app.run("patchDevice({udid:'PHONE',pairing_state:'checking',pairing_error_code:''})");
+    assert.equal(app.get('pairingResult-PHONE').textContent,catalogs[other]['action.trackPairingResult.cannotReadThePairingResult']);
+    assert.equal(app.get('pairingResult-PHONE').style.color,'#9A6B66');
+    app.run("patchDevice({udid:'PHONE',pairing_state:'waiting_for_trust'})");
+    assert.equal(app.get('pairingResult-PHONE').textContent,catalogs[other]['action.pairingStatusText.tapTrustThisComputerAnd']);
+    assert.equal(app.get('pairingResult-PHONE').style.color,'#718090');
+    app.run("patchDevice({udid:'PHONE',pairing_state:'paired'})");app.api.setLocale(locale);
+    assert.equal(app.get('pairingResult-PHONE').textContent,catalogs[locale]['action.pairingStatusText.devicePairingIsValid']);
+    assert.equal(app.get('pairingResult-PHONE').style.color,'#0B7565');
+  });
+  test('new external pairing progress replaces a rejected request '+locale,async()=>{
+    const app=page(locale);app.run("patchDevice({udid:'PHONE',pairing_state:'paired'})");
+    app.window.fetch=()=>Promise.resolve(response({error:'busy',message_code:'api.busy'},false));
+    await app.run("pairDevice('PHONE')");
+    app.run("patchDevice({udid:'PHONE',pairing_state:'paired'})");
+    assert.equal(app.get('pairingResult-PHONE').textContent,apiCatalog[locale]['api.busy']);
+    app.run("patchDevice({udid:'PHONE',pairing_state:'checking'})");
+    assert.equal(app.get('pairingResult-PHONE').textContent,catalogs[locale]['action.pairingStatusText.checkingDevicePairing']);
+    app.run("patchDevice({udid:'PHONE',pairing_state:'waiting_for_trust'})");
+    assert.equal(app.get('pairingResult-PHONE').textContent,catalogs[locale]['action.pairingStatusText.tapTrustThisComputerAnd']);
+    app.run("patchDevice({udid:'PHONE',pairing_state:'paired'})");
+    assert.equal(app.get('pairingResult-PHONE').textContent,catalogs[locale]['action.pairingStatusText.devicePairingIsValid']);
+    assert.equal(app.get('pairBtn-PHONE').disabled,false);
+  });
+}
 test('backup terminal metadata relocalizes and unknown codes retain legacy fallback',()=>{
   const app=page();
   app.run("patchDevice({udid:'PHONE',backup_state:'failed',last_backup_error_code:'backup_failed',last_backup_error:'raw private text',last_backup_message_code:'api.low_battery',last_backup_message_params:{battery:9,min_battery:20},backup_progress:{state:'failed'}})");

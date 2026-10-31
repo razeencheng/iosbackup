@@ -178,7 +178,8 @@ func (app *application) runBackupJob(job *backupJob) (retErr error) {
 		backupLog(fmt.Sprintf("event=backup.failed error=%v", retErr))
 		if manager := app.notificationManagerSnapshot(); manager != nil {
 			_, code := backupFailureState(retErr)
-			manager.SendBackupFailure(device.Name, udid, code, retErr.Error())
+			messageCode, params := backupFailureMessage(retErr, code)
+			manager.SendBackupFailureWithReason(device.Name, udid, code, retErr.Error(), messageCode, params)
 		}
 	}()
 	app.broadcastStatus()

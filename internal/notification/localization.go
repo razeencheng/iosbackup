@@ -49,7 +49,7 @@ func defaultTemplatesFor(language string) map[string]string {
 
 func localizeMessage(message Message, language string) Message {
 	message.Locale = language
-	codedEvent := message.EventCode != "" || message.ReasonCode != ""
+	codedEvent := message.EventCode != "" || message.ReasonCode != "" || message.ReasonMessageCode != ""
 	coded := codedEvent || message.Title == "" || message.Test
 	event := message.EventCode
 	if event == "" {
@@ -81,11 +81,7 @@ func localizeMessage(message Message, language string) Message {
 		if reason != "" {
 			message.ExtraFields["diagnostics"] = reason
 		}
-		code := strings.TrimPrefix(message.ReasonCode, "api.")
-		if code == "" {
-			code = reason
-		}
-		translated := copyFor(language, "reason."+code)
+		translated := backupFailureReasonText(message, language, reason)
 		if translated != "" {
 			message.ExtraFields["reason"] = translated
 		} else if codedEvent {
@@ -106,6 +102,24 @@ func localizeMessage(message Message, language string) Message {
 	message.Title = expandMessageTemplate(message.Title, message)
 	message.Content = expandMessageTemplate(message.Content, message)
 	return message
+}
+
+// backupFailureReasonText 优先渲染具体原因；未知描述仍回退到既有分类和保守提示。
+func backupFailureReasonText(message Message, language, legacyReason string) string {
+	if code := message.ReasonMessageCode; code != "" {
+		if translated := copyFor(language, "reason."+strings.TrimPrefix(code, "api.")); translated != "" {
+			return translated
+		}
+		// 沿用通用失败的历史通知文案；具体 typed 原因共用 API 词条和单遍参数插值。
+		if code != i18n.BackupFailed && i18n.HasCode(code) {
+			return i18n.Text(language, code, message.ReasonMessageParams)
+		}
+	}
+	code := strings.TrimPrefix(message.ReasonCode, "api.")
+	if code == "" {
+		code = legacyReason
+	}
+	return copyFor(language, "reason."+code)
 }
 
 func expandMessageTemplate(template string, message Message) string {
@@ -129,7 +143,17 @@ func (manager *Manager) NewTestMessage(event Type) *Message {
 }
 
 func (manager *Manager) SendBackupFailure(deviceName, deviceUDID, code, diagnostics string) {
-	manager.Send(&Message{Type: BackupFailed, Level: LevelError, EventCode: string(BackupFailed), ReasonCode: code, DeviceName: deviceName, DeviceUDID: deviceUDID, ExtraFields: map[string]string{"reason": diagnostics, "diagnostics": diagnostics}})
+	manager.SendBackupFailureWithReason(deviceName, deviceUDID, code, diagnostics, "", nil)
+}
+
+// SendBackupFailureWithReason 将具体原因与兼容分类分开，发送时捕获参数和语言快照。
+func (manager *Manager) SendBackupFailureWithReason(deviceName, deviceUDID, code, diagnostics, messageCode string, params map[string]any) {
+	manager.Send(&Message{
+		Type: BackupFailed, Level: LevelError, EventCode: string(BackupFailed), ReasonCode: code,
+		ReasonMessageCode: messageCode, ReasonMessageParams: params,
+		DeviceName: deviceName, DeviceUDID: deviceUDID,
+		ExtraFields: map[string]string{"reason": diagnostics, "diagnostics": diagnostics},
+	})
 }
 
 func (manager *Manager) SendSystemEvent(code string, params map[string]string) {

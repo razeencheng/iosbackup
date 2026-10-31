@@ -33,9 +33,6 @@ func TestNotificationSecretValidationIdentifiesChannel(t *testing.T) {
 					err = store.Save(&tc.config)
 				}
 				code := "api.notification_replacement_secret_required"
-				if tc.channel == "Webhook" && method == "save" {
-					code = "api.notification_replacement_url_required"
-				}
 				assertNotificationErrorContext(t, err, code, tc.channel, name)
 			})
 		}
@@ -86,7 +83,7 @@ func assertNotificationErrorContext(t *testing.T, err error, code, channel, name
 			t.Fatalf("machine code changed: %s", data)
 		}
 		message, _ := decoded["error"].(string)
-		if !strings.Contains(message, name) || !strings.Contains(message, channel) || strings.Contains(string(data), "never-disclose-secret") {
+		if strings.Count(message, name) != 1 || !strings.Contains(message, channel) || strings.Contains(string(data), "never-disclose-secret") {
 			t.Fatalf("context missing or secret leaked: %s", data)
 		}
 		if locale == "en" && !strings.Contains(message, "Notification channel") {

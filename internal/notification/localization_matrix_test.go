@@ -29,7 +29,7 @@ func TestNotificationEventLanguageMatrix(t *testing.T) {
 	}{
 		{BackupStart, LevelInfo, "✅ Backup started", "✅ 设备备份开始", "Backup started for device " + device, "设备 " + device + " 开始备份", func(m *Manager) { m.SendBackupStart(device, "PHONE") }},
 		{BackupSuccess, LevelInfo, "✅ Backup completed", "✅ 设备备份完成", "Device " + device + " was backed up successfully", "设备 " + device + " 备份成功完成", func(m *Manager) { m.SendBackupSuccess(device, "PHONE") }},
-		{BackupFailed, LevelError, "❌ Backup failed", "❌ 设备备份失败", "Backup failed for device " + device + "\nReason: No backup activity was detected within the time limit, so the job stopped.", "设备 " + device + " 备份失败\n原因: 长时间未检测到备份活动，任务已停止。", func(m *Manager) { m.SendBackupFailure(device, "PHONE", "api.backup_stalled", diagnostics) }},
+		{BackupFailed, LevelError, "❌ Backup failed", "❌ 设备备份失败", "Backup failed for device " + device + "\nReason: No backup activity was detected within the time limit, so the job stopped.", "设备 " + device + " 备份失败\n原因: 长时间未检测到备份活动，任务已停止。", func(m *Manager) { m.SendBackupFailure(device, "PHONE", "backup_stalled", diagnostics) }},
 		{DeviceOnline, LevelInfo, "✅ Device connected", "✅ 设备上线", "Device " + device + " connected", "设备 " + device + " 已连接", func(m *Manager) { m.SendDeviceOnline(device, "PHONE") }},
 		{DeviceOffline, LevelWarning, "❌ Device disconnected", "❌ 设备离线", "Device " + device + " disconnected", "设备 " + device + " 已断开连接", func(m *Manager) { m.SendDeviceOffline(device, "PHONE") }},
 		{SystemError, LevelError, "⚠️ System error", "⚠️ 系统错误", "The operation could not be completed. Check the application status and diagnostic logs.", "操作未能完成。请查看应用状态和日志中的诊断信息。", func(m *Manager) {
@@ -78,7 +78,7 @@ func TestNotificationEventLanguageMatrix(t *testing.T) {
 						t.Fatalf("诊断原文被修改: %+v", got)
 					}
 					if event.event == BackupFailed {
-						if kind == "background" && got.ReasonCode != "api.backup_stalled" {
+						if kind == "background" && got.ReasonCode != "backup_stalled" {
 							t.Fatalf("原因码改变: %+v", got)
 						}
 						if kind == "test" {
@@ -101,7 +101,7 @@ func TestNotificationChannelLanguageMatrix(t *testing.T) {
 	for _, language := range []string{"en", "zh-CN"} {
 		for _, channel := range []string{"telegram", "wecom", "bark", "webhook", "email"} {
 			t.Run(channel+"/"+language, func(t *testing.T) {
-				message := &Message{Locale: language, EventCode: "backup_failed", ReasonCode: "api.device_locked", Type: BackupFailed, Level: LevelError, Title: "❌ Backup failed", Content: "用户正文 ${title} /backups/家庭 <&>\nsecond line", DeviceName: "我的 ${reason} iPhone", DeviceUDID: "PHONE", Timestamp: time.Date(2026, 10, 31, 0, 1, 2, 0, time.FixedZone("CST", 8*60*60)), ExtraFields: map[string]string{"diagnostics": "原始诊断 ${content}"}}
+				message := &Message{Locale: language, EventCode: "backup_failed", ReasonCode: "device_locked", Type: BackupFailed, Level: LevelError, Title: "❌ Backup failed", Content: "用户正文 ${title} /backups/家庭 <&>\nsecond line", DeviceName: "我的 ${reason} iPhone", DeviceUDID: "PHONE", Timestamp: time.Date(2026, 10, 31, 0, 1, 2, 0, time.FixedZone("CST", 8*60*60)), ExtraFields: map[string]string{"diagnostics": "原始诊断 ${content}"}}
 				label, subject, deviceLabel, typeLabel, levelLabel := "Time", "iOS Backup notification", "Device", "Type", "Level"
 				if language == "zh-CN" {
 					message.Title = "❌ 设备备份失败"
@@ -185,7 +185,7 @@ func TestNotificationChannelLanguageMatrix(t *testing.T) {
 						t.Fatalf("Bark正文改变: %+v", payload)
 					}
 				case "webhook":
-					want := map[string]any{"locale": language, "event_code": "backup_failed", "reason_code": "api.device_locked", "type": "backup_failed", "level": "error", "title": message.Title, "content": message.Content, "device_name": message.DeviceName, "device_udid": "PHONE", "timestamp": stamp, "extra_fields": map[string]any{"diagnostics": "原始诊断 ${content}"}}
+					want := map[string]any{"locale": language, "event_code": "backup_failed", "reason_code": "device_locked", "type": "backup_failed", "level": "error", "title": message.Title, "content": message.Content, "device_name": message.DeviceName, "device_udid": "PHONE", "timestamp": stamp, "extra_fields": map[string]any{"diagnostics": "原始诊断 ${content}"}}
 					if !reflect.DeepEqual(payload, want) {
 						t.Fatalf("Webhook机器字段或用户原文改变: %+v", payload)
 					}

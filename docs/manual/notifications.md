@@ -75,6 +75,8 @@ With automatic backups enabled, due checks must explicitly report invalid pairin
 
 Choose **Notification language** in notification settings, then save. This setting controls generated titles, default bodies, channel labels and test messages even while the browser is closed. The interface language switch only changes the page. Supported values are English (`en`) and Simplified Chinese (`zh-CN`); existing configurations without `language` continue to use Simplified Chinese.
 
+**After upgrading:** to receive English notifications, open notification settings, select **English** for **Notification language**, save, then send a test for the relevant event. If its body still contains Chinese from an old custom template, clear that event's template, save and test again to use the English default.
+
 To use the selected language's default body, leave that event's template blank. Existing nonempty templates, including Chinese text copied from an older example, are kept as custom content. Changing language never overwrites them; clear the relevant template and save to return to the built-in default. Device names and original diagnostic details are not automatically translated. Interface language, notification language and scheduling are independent: changing either language does not change backup times. Scheduling, notification timestamps and UI date display currently use `Asia/Shanghai` (Beijing time); notification timestamps include the `+08:00` offset.
 
 ## Body templates
