@@ -21,7 +21,7 @@
   function filterJobs(jobs, type, result) {
     return jobs.filter(function (job) {
       return (type === 'all' || (job.operation || 'backup') === type) &&
-        (result === 'all' || (result === 'attention' ? needsAttention(job) : job.state === result));
+        (result === 'all' || (result === 'attention' ? needsAttention(job) : (result === 'running' ? ['starting','running','stopping'].indexOf(job.state) >= 0 : job.state === result)));
     });
   }
   function isCurrentPoint(data, point) {

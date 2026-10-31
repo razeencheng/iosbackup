@@ -20,6 +20,7 @@ const jobs = [
 assert.equal(api.filterJobs(jobs, 'check', 'attention')[0].id, 'b', 'successful execution is not the same as a completed check');
 assert.equal(api.filterJobs(jobs, 'backup', 'attention').length, 2, 'history failure must remain visible');
 assert.equal(api.filterJobs(jobs, 'all', 'succeeded').length, 3, 'execution filter does not silently redefine tool success');
+assert.equal(api.filterJobs([{state:'starting'},{state:'running'},{state:'stopping'},{state:'stopped'}], 'all', 'running').length,3,'active task filter includes preparation and stopping');
 assert.equal(api.isCurrentPoint({ current_source: { kind: 'point', point_id: 'new', available: true } }, { id: 'old', baseline: true }), false, 'an old-generation baseline is not the current source');
 assert.equal(api.isCurrentPoint({ current_source: { kind: 'current', available: true } }, { id: 'new', baseline: true }), false);
 assert.equal(api.isCurrentPoint({ current_source: { kind: 'point', point_id: 'new', available: true } }, { id: 'new' }), true);
