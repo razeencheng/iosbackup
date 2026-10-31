@@ -75,7 +75,8 @@ func PlanRetention(c Catalog, r RetentionRequest, leases map[string]int) (Retent
 				return plan, ErrInvalid
 			}
 			today := r.Now.In(loc)
-			cutoff := time.Date(today.Year(), today.Month(), today.Day(), 0, 0, 0, 0, loc).AddDate(0, 0, 1-policy.Days).Format("2006-01-02")
+			// 自然日运算不经过当地午夜；部分时区切换夏令时会跳过午夜。
+			cutoff := time.Date(today.Year(), today.Month(), today.Day(), 0, 0, 0, 0, time.UTC).AddDate(0, 0, 1-policy.Days).Format("2006-01-02")
 			if p.Day >= cutoff && latest[p.Timezone+"/"+p.Day].ID == id {
 				reason = "daily"
 			}

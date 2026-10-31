@@ -195,3 +195,70 @@ func TestCopyIsolationMetadataDigestIgnoresCoarseTimestamp(t *testing.T) {
 		t.Fatal("metadata mutation not detected")
 	}
 }
+
+func simulatedClone(dst, src *os.File) error {
+	_, err := io.Copy(dst, io.NewSectionReader(src, 0, 1<<30))
+	return err
+}
+
+func TestCloneProbeClosesBeforeRemoval(t *testing.T) {
+	root, err := os.OpenRoot(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer root.Close()
+	var cloned *os.File
+	ok, err := probeCloneWith(root, func(dst, src *os.File) error { cloned = dst; return simulatedClone(dst, src) }, func(path string) error {
+		if strings.HasPrefix(path, ".clone-copy-") && cloned != nil {
+			if _, e := cloned.Stat(); !errors.Is(e, os.ErrClosed) {
+				return errors.New("target still open during removal")
+			}
+		}
+		return root.Remove(path)
+	})
+	if err != nil || !ok {
+		t.Fatal("probe rejected a close-before-delete filesystem", err)
+	}
+}
+
+func TestCloneProbePermissionFallbackOnlyAppliesToClone(t *testing.T) {
+	for _, denied := range []error{syscall.EPERM, syscall.EACCES} {
+		root, err := os.OpenRoot(t.TempDir())
+		if err != nil {
+			t.Fatal(err)
+		}
+		ok, err := probeCloneWith(root, func(*os.File, *os.File) error { return denied }, root.Remove)
+		root.Close()
+		if ok || err != nil {
+			t.Fatal("clone-only permission restriction blocked ordinary copy", err)
+		}
+	}
+}
+
+func TestCopyCloneCapacityBudgetAndFallback(t *testing.T) {
+	for _, mode := range []string{"clone", "unsupported", "file-fallback"} {
+		t.Run(mode, func(t *testing.T) {
+			src, dst := copyFixture(t)
+			if err := os.WriteFile(filepath.Join(src, "large"), make([]byte, 2<<20), 0600); err != nil {
+				t.Fatal(err)
+			}
+			capacity := func(string) (Capacity, error) {
+				return Capacity{BytesKnown: true, Bytes: 1 << 20, InodesKnown: true, Inodes: 1024}, nil
+			}
+			clone := func(out, in *os.File) error {
+				if mode == "unsupported" || mode == "file-fallback" && filepath.Base(in.Name()) == "large" {
+					return syscall.ENOTSUP
+				}
+				return simulatedClone(out, in)
+			}
+			report, err := copyTreeWith(context.Background(), src, dst, CopyOptions{PreferClone: true, ReserveBytes: 64 << 10}, capacity, clone)
+			if mode == "clone" {
+				if err != nil || report.Mode != "clone" {
+					t.Fatal("clone was charged the full logical size", report, err)
+				}
+			} else if !errors.Is(err, ErrCapacity) {
+				t.Fatal("full-copy fallback ignored space budget", err)
+			}
+		})
+	}
+}

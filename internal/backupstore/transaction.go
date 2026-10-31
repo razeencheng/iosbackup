@@ -7,6 +7,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"iosbackup/internal/persistence"
@@ -135,14 +136,14 @@ func (s *Store) Commit(ctx context.Context, workID string, point Point) (Point, 
 	if err = s.stage("descriptor", func() error { return s.writeJSON(filepath.Join("descriptors", point.ID+".json"), point) }); err != nil {
 		return Point{}, s.uncertainError(err)
 	}
-	stamp, stampErr := s.objectStamp(ctx, filepath.Join("work", workID))
+	stamp, stampErr := s.objectStamps(ctx, filepath.Join("work", workID))
 	if stampErr != nil {
 		return Point{}, s.uncertainError(stampErr)
 	}
-	if stamp != hex.EncodeToString(stats.Digest[:]) {
+	if stamp.Digest != stats.Digest {
 		return Point{}, s.uncertainError(ErrChanged)
 	}
-	tx.SourceStamp = stamp
+	tx.SourceStamp = "v2:" + hex.EncodeToString(stamp.PersistentDigest[:])
 	tx.Phase = "ready"
 	if err = s.stage("ready", func() error { return s.saveTransaction(tx) }); err != nil {
 		return Point{}, s.uncertainError(err)
@@ -200,9 +201,13 @@ func (s *Store) publish(tx transaction) error {
 	} else if err != nil {
 		return err
 	}
-	stamp, err := s.objectStamp(context.Background(), path)
+	stamps, err := s.objectStamps(context.Background(), path)
 	if err != nil {
 		return err
+	}
+	stamp := hex.EncodeToString(stamps.Digest[:])
+	if strings.HasPrefix(tx.SourceStamp, "v2:") {
+		stamp = "v2:" + hex.EncodeToString(stamps.PersistentDigest[:])
 	}
 	if tx.SourceStamp == "" || stamp != tx.SourceStamp {
 		return ErrChanged
@@ -311,22 +316,23 @@ func (s *Store) AbortWork(ctx context.Context, id string) error {
 }
 
 func (s *Store) objectStamp(ctx context.Context, path string) (string, error) {
+	stamp, err := s.objectStamps(ctx, path)
+	return hex.EncodeToString(stamp.Digest[:]), err
+}
+
+func (s *Store) objectStamps(ctx context.Context, path string) (treeStamp, error) {
 	directory := filepath.Join(path, s.identity.UDID)
 	info, err := s.root.Lstat(directory)
 	if err != nil {
-		return "", err
+		return treeStamp{}, err
 	}
 	if !info.IsDir() {
-		return "", ErrUnsafe
+		return treeStamp{}, ErrUnsafe
 	}
 	root, err := s.root.OpenRoot(directory)
 	if err != nil {
-		return "", err
+		return treeStamp{}, err
 	}
 	defer root.Close()
-	stamp, err := stampTree(ctx, root)
-	if err != nil {
-		return "", err
-	}
-	return hex.EncodeToString(stamp.Digest[:]), nil
+	return stampTree(ctx, root)
 }

@@ -151,6 +151,10 @@ func TestBackupGenerationsNewGenerationRequiresFull(t *testing.T) {
 	if err = s.finish("PHONE", id); err != nil {
 		t.Fatal(err)
 	}
+	// 手机改密成功本身没有提供可用备份；成功备份另记录来源证据。
+	if _, err = s.historyBackupGeneration("PHONE", "encrypted", strings.Repeat("a", 64)); err != nil {
+		t.Fatal(err)
+	}
 	old, err := s.load("PHONE")
 	if err != nil {
 		t.Fatal(err)
@@ -263,13 +267,16 @@ func TestBackupGenerationsRenameThenSyncFailure(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if err = s.finish("PHONE", id); err != nil {
+		t.Fatal(err)
+	}
 	s.write = func(path string, data []byte, mode os.FileMode) error {
 		if err := persistence.WriteFileAtomic(path, data, mode); err != nil {
 			return err
 		}
 		return errors.New("directory sync failed")
 	}
-	if err = s.finish("PHONE", id); err == nil {
+	if _, err = s.historyBackupGeneration("PHONE", "encrypted", strings.Repeat("a", 64)); err == nil {
 		t.Fatal("uncertain write accepted")
 	}
 	state, err := s.load("PHONE")

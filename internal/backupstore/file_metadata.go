@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"strings"
 	"syscall"
 	"time"
 )
@@ -16,6 +17,16 @@ func saturatedProduct(a, b uint64) uint64 {
 }
 func identityText(dev, ino uint64, sec, nsec int64) string {
 	return fmt.Sprintf("%d:%d:%d:%d", dev, ino, sec, nsec)
+}
+
+// 设备号由挂载分配，不能跨重启持久化；保留 inode 和变更时间识别实体替换。
+func persistentFileIdentity(info os.FileInfo) string {
+	identity := fileIdentity(info)
+	_, rest, ok := strings.Cut(identity, ":")
+	if !ok {
+		return identity
+	}
+	return rest
 }
 func allocatedBytes(info os.FileInfo) int64 {
 	if s, ok := info.Sys().(*syscall.Stat_t); ok {

@@ -43,6 +43,26 @@ func TestRetentionNaturalDays(t *testing.T) {
 		})
 	}
 }
+
+func TestRetentionMidnightDSTUsesCalendarDates(t *testing.T) {
+	loc, err := time.LoadLocation("America/Sao_Paulo")
+	if err != nil {
+		t.Fatal(err)
+	}
+	c, r := retentionFixture()
+	r.Now = time.Date(2018, 11, 6, 12, 0, 0, 0, loc)
+	r.Policy.Days = 3
+	for i := 0; i < 5; i++ {
+		retentionPoint(&c, r, i, i, loc.String())
+	}
+	plan, err := PlanRetention(c, r, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(plan.Retain) != 3 || len(plan.Delete) != 2 {
+		t.Fatalf("midnight DST changed natural-day retention: %+v", plan)
+	}
+}
 func TestRetentionProtectionAndPending(t *testing.T) {
 	c, r := retentionFixture()
 	keep := map[string]string{}

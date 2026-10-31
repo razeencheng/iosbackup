@@ -3,6 +3,7 @@
 package backupstore
 
 import (
+	"math"
 	"os"
 	"syscall"
 )
@@ -21,11 +22,19 @@ func StorageCapacity(path string) (Capacity, error) {
 	if err := syscall.Statfs(path, &stat); err != nil {
 		return Capacity{}, err
 	}
-	c := Capacity{BytesKnown: stat.Bsize > 0, InodesKnown: stat.Files > 0, Inodes: stat.Ffree}
-	if c.BytesKnown {
-		c.Bytes = saturatedProduct(stat.Bavail, uint64(stat.Bsize))
+	return capacityFromStatfs(stat), nil
+}
+func capacityFromStatfs(stat syscall.Statfs_t) Capacity {
+	unit := stat.Frsize
+	if unit <= 0 {
+		unit = stat.Bsize
 	}
-	return c, nil
+	// -1 等未知计数以无符号形式返回，不能解释成无限可用空间。
+	c := Capacity{BytesKnown: unit > 0 && stat.Bavail <= math.MaxInt64, InodesKnown: stat.Files > 0 && stat.Files <= math.MaxInt64 && stat.Ffree <= math.MaxInt64, Inodes: stat.Ffree}
+	if c.BytesKnown {
+		c.Bytes = saturatedProduct(stat.Bavail, uint64(unit))
+	}
+	return c
 }
 func fileIdentity(info os.FileInfo) string {
 	s, ok := info.Sys().(*syscall.Stat_t)

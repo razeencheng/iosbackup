@@ -44,6 +44,8 @@ func NewID() (string, error) {
 func ValidID(id string) bool { return idPattern.MatchString(id) }
 
 type Generation struct {
+	// 仅在本应用成功备份后记录来源密钥包摘要，不代表密码已经验证。
+	KeybagDigest       string    `json:"keybag_digest,omitempty"`
 	ID                 string    `json:"id"`
 	Kind               string    `json:"kind"` // unknown | encrypted | unencrypted
 	CredentialRef      string    `json:"credential_ref,omitempty"`
@@ -111,12 +113,20 @@ func (g Generation) Validate() error {
 	}
 	switch g.Kind {
 	case "unknown", "unencrypted":
-		if g.CredentialRef != "" || g.CredentialVerified {
+		if g.CredentialRef != "" || g.CredentialVerified || g.KeybagDigest != "" {
 			return ErrInvalid
 		}
 	case "encrypted":
 		if (g.CredentialRef != "" && !ValidID(g.CredentialRef)) || (g.CredentialVerified && g.CredentialRef == "") {
 			return ErrInvalid
+		}
+		if g.KeybagDigest != "" {
+			if len(g.KeybagDigest) != 64 {
+				return ErrInvalid
+			}
+			if _, err := hex.DecodeString(g.KeybagDigest); err != nil {
+				return ErrInvalid
+			}
 		}
 	default:
 		return ErrInvalid

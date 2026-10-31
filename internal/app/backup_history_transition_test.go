@@ -77,6 +77,9 @@ func TestHistoryOldInterruptedEnableDoesNotSwitchToEmptyCurrent(t *testing.T) {
 	if err != nil || string(data) != "original" {
 		t.Fatal("interrupted enable replaced the current source with an empty copy", err)
 	}
+	if run.state.WritableGeneration.Kind != "unencrypted" {
+		t.Fatal("legacy source encryption metadata lost during recovery")
+	}
 }
 
 func TestHistoryMigrationDoesNotBlockOtherSettings(t *testing.T) {

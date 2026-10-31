@@ -235,10 +235,48 @@ func (s *generationStore) finish(udid, id string) error {
 	return s.save(state)
 }
 
-// compatibleBaseline 只允许明确的同代、同凭据正常点。未知元数据需新建全量。
+// compatibleBaseline 选择同代正常候选；本地密码是否验证不决定手机能否增量。
+// 加密导入和旧记录没有成功备份的密钥包证据，首次仍请求全量。
 func (s backupGenerations) compatibleBaseline(p backupstore.Point, metadataKnown bool) bool {
 	g, ok := s.Generations[s.Current]
-	return s.Recovered && metadataKnown && ok && s.Pending == nil && g.Kind != "unknown" && p.State == "normal" && p.Generation == g && (g.Kind != "encrypted" || g.CredentialRef != "" && g.CredentialVerified)
+	return s.Recovered && metadataKnown && ok && s.Pending == nil && g.Kind != "unknown" && p.State == "normal" && p.Generation == g && (g.Kind != "encrypted" || g.KeybagDigest != "")
+}
+
+// 只由成功备份且轻量检查通过的结果调用。摘要识别备份中的加密材料，
+// 不证明它与当前手机或保存的密码相同；实际增量协商仍由手机协议完成。
+func (s *generationStore) historyBackupGeneration(udid, kind, keybag string) (backupstore.Generation, error) {
+	if kind != "encrypted" {
+		return s.historyGeneration(udid, kind)
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	state, err := s.loadLocked(udid)
+	if err != nil {
+		return backupstore.Generation{}, err
+	}
+	current := state.Generations[state.Current]
+	if state.Pending == nil && state.Recovered && current.Kind == "encrypted" && keybag != "" && current.KeybagDigest == keybag {
+		return current, nil
+	}
+	pw := ""
+	if state.Pending != nil {
+		if current.Kind == "unknown" && current.ID != "" {
+			return current, nil
+		}
+		kind, keybag = "unknown", ""
+	} else if s.secrets != nil && s.secrets.Available() {
+		pw, err = s.secrets.GetBackupPassword(udid)
+		if err != nil && !errors.Is(err, errPasswordNotFound) {
+			return backupstore.Generation{}, err
+		}
+	}
+	gen, err := s.generation(udid, kind, pw)
+	if err != nil {
+		return gen, err
+	}
+	gen.KeybagDigest = keybag
+	state.Generations[gen.ID], state.Current = gen, gen.ID
+	return gen, s.save(state)
 }
 func (app *application) generationRegistry() *generationStore {
 	app.mu.Lock()

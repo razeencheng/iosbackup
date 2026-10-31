@@ -34,10 +34,11 @@ type Capacity struct {
 	QuotaKnown  bool
 }
 type treeStamp struct {
-	Digest      [32]byte
-	Files       int64
-	Directories int64
-	Bytes       int64
+	Digest           [32]byte
+	PersistentDigest [32]byte
+	Files            int64
+	Directories      int64
+	Bytes            int64
 }
 
 func openSafeRoot(path string) (*os.Root, error) {
@@ -151,8 +152,10 @@ func stampTree(ctx context.Context, root *os.Root) (treeStamp, error) {
 			metadata = fmt.Sprintf("%x", digest.Sum(nil))
 		}
 		sum := sha256.Sum256([]byte(fmt.Sprintf("%s\x00%d\x00%d\x00%d\x00%s\x00%s", path, info.Size(), info.Mode(), info.ModTime().UnixNano(), fileIdentity(info), metadata)))
+		stable := sha256.Sum256([]byte(fmt.Sprintf("%s\x00%d\x00%d\x00%d\x00%s\x00%s", path, info.Size(), info.Mode(), info.ModTime().UnixNano(), persistentFileIdentity(info), metadata)))
 		for i := range stamp.Digest {
 			stamp.Digest[i] ^= sum[i]
+			stamp.PersistentDigest[i] ^= stable[i]
 		}
 		if info.IsDir() {
 			stamp.Directories++
@@ -175,6 +178,10 @@ func below(path, parent string) bool {
 // CopyTree 只创建新的目标。错误时留下未发布副本，由持有工作事务的调用方清理。
 // 不使用硬链接；普通复制和克隆失败均不会改写来源。
 func CopyTree(ctx context.Context, source, destination string, options CopyOptions) (CopyReport, error) {
+	return copyTreeWith(ctx, source, destination, options, StorageCapacity, cloneFile)
+}
+
+func copyTreeWith(ctx context.Context, source, destination string, options CopyOptions, capacity func(string) (Capacity, error), cloneFile func(*os.File, *os.File) error) (CopyReport, error) {
 	report := CopyReport{Mode: "copy"}
 	if err := ctx.Err(); err != nil {
 		return report, err
@@ -212,11 +219,13 @@ func CopyTree(ctx context.Context, source, destination string, options CopyOptio
 	if reserve == 0 {
 		reserve = 16 << 20
 	}
-	cap, err := StorageCapacity(parent)
+	cap, err := capacity(parent)
 	if err != nil {
 		return report, err
 	}
-	if err = checkCapacity(cap, uint64(before.Bytes), uint64(before.Files+before.Directories), reserve); err != nil {
+	entries := uint64(before.Files + before.Directories)
+	// 先仅检查探测与目录所需余量；克隆能力确认前不按整份逻辑大小拒绝。
+	if err = checkCapacity(cap, 0, entries, reserve); err != nil {
 		return report, err
 	}
 	if err = os.Mkdir(dstPath, 0700); err != nil {
@@ -229,10 +238,22 @@ func CopyTree(ctx context.Context, source, destination string, options CopyOptio
 	defer dst.Close()
 	clone := false
 	if options.PreferClone {
-		clone, err = probeClone(dst)
+		clone, err = probeCloneWith(dst, cloneFile, dst.Remove)
 		if err != nil {
 			return report, err
 		}
+	}
+	needed := uint64(before.Bytes)
+	if clone {
+		// 为新目录项、共享块引用和后续写入留余量；实际配额仍由写入错误确认。
+		needed = saturatedProduct(entries, 4096)
+	}
+	cap, err = capacity(parent)
+	if err != nil {
+		return report, err
+	}
+	if err = checkCapacity(cap, needed, entries, reserve); err != nil {
+		return report, err
 	}
 	buffer := make([]byte, 128<<10)
 	err = walkTree(ctx, src, func(path string, info os.FileInfo) error {
@@ -270,6 +291,16 @@ func CopyTree(ctx context.Context, source, destination string, options CopyOptio
 			}
 		}
 		if !cloned {
+			if clone {
+				// 单文件可能跨存储或不支持克隆；回退复制前重新按实际文件大小检查。
+				available, err := capacity(parent)
+				if err != nil {
+					return err
+				}
+				if err = checkCapacity(available, uint64(info.Size()), 0, reserve); err != nil {
+					return err
+				}
+			}
 			if err = copyBytes(ctx, out, in, buffer); err != nil {
 				return err
 			}
@@ -398,8 +429,11 @@ func probeCloneWith(root *os.Root, clone func(*os.File, *os.File) error, remove 
 	if err != nil {
 		return false, err
 	}
+	targetClosed := false
 	defer func() {
-		retErr = errors.Join(retErr, target.Close())
+		if !targetClosed {
+			retErr = errors.Join(retErr, target.Close())
+		}
 		if e := remove(b); e != nil && !errors.Is(e, os.ErrNotExist) {
 			retErr = errors.Join(retErr, e)
 		}
@@ -409,7 +443,7 @@ func probeCloneWith(root *os.Root, clone func(*os.File, *os.File) error, remove 
 		return false, err
 	}
 	if err = clone(target, source); err != nil {
-		if errors.Is(err, syscall.ENOTSUP) || errors.Is(err, syscall.ENOTTY) || errors.Is(err, syscall.EINVAL) || errors.Is(err, syscall.EXDEV) || errors.Is(err, syscall.ENOSYS) {
+		if errors.Is(err, syscall.ENOTSUP) || errors.Is(err, syscall.ENOTTY) || errors.Is(err, syscall.EINVAL) || errors.Is(err, syscall.EXDEV) || errors.Is(err, syscall.ENOSYS) || errors.Is(err, syscall.EPERM) || errors.Is(err, syscall.EACCES) {
 			return false, nil
 		}
 		return false, err
@@ -418,6 +452,10 @@ func probeCloneWith(root *os.Root, clone func(*os.File, *os.File) error, remove 
 		return false, err
 	}
 	if err = target.Truncate(8); err != nil {
+		return false, err
+	}
+	targetClosed = true
+	if err = target.Close(); err != nil {
 		return false, err
 	}
 	if err = remove(b); err != nil {
@@ -435,18 +473,19 @@ func probeCloneWith(root *os.Root, clone func(*os.File, *os.File) error, remove 
 
 // syncTree 对提交数据刷盘，不忽略应用产物，也不接受链接或特殊文件。
 func syncTree(ctx context.Context, root *os.Root) error {
-	base, err := root.Stat(".")
+	base, err := root.Open(".")
 	if err != nil {
 		return err
 	}
-	baseStat, ok := base.Sys().(*syscall.Stat_t)
-	if !ok {
-		return ErrUnsafe
+	baseMount, err := mountIdentity(base)
+	base.Close()
+	if err != nil {
+		return err
 	}
 	// 此处根目录是对象容器，UDID 目录才对应复制和摘要扫描的深度零。
 	return walkTreeDepth(ctx, root, -1, func(path string, info fs.FileInfo) error {
 		stat, ok := info.Sys().(*syscall.Stat_t)
-		if !ok || stat.Dev != baseStat.Dev || (!info.IsDir() && stat.Nlink != 1) {
+		if !ok || (!info.IsDir() && stat.Nlink != 1) {
 			return ErrUnsafe
 		}
 		f, err := root.OpenFile(path, os.O_RDONLY|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0)
@@ -457,6 +496,13 @@ func syncTree(ctx context.Context, root *os.Root) error {
 		actual, err := f.Stat()
 		if err != nil || !os.SameFile(info, actual) {
 			return ErrChanged
+		}
+		mount, err := mountIdentity(f)
+		if err != nil {
+			return err
+		}
+		if mount != baseMount {
+			return ErrUnsafe
 		}
 		return f.Sync()
 	})

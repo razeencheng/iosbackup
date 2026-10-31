@@ -2,6 +2,8 @@ package app
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"iosbackup/internal/backupstore"
@@ -352,8 +354,7 @@ func (app *application) historyBaselineMetadata(ctx context.Context, store *back
 		return false
 	}
 	if encrypted {
-		pw, err := app.generationRegistry().password(p.UDID, g.CredentialRef)
-		return err == nil && pw != ""
+		return g.KeybagDigest != "" && historyKeybagDigest(metadata) == g.KeybagDigest
 	}
 	return true
 }
@@ -478,7 +479,13 @@ func (app *application) disableBackupHistory(ctx context.Context, job *backupJob
 	st.TransitionSource = ""
 	st.WritableStore, st.WritableID = id, work.ID
 	st.CurrentReset = st.CurrentDeleted
-	if previous.TransitionSource != "current" && st.LatestPoint != "" {
+	if previous.TransitionSource == "legacy" {
+		st.WritableGeneration, err = app.importHistoryGeneration(ctx, job.udid, work.Directory, previous)
+		if err != nil {
+			return st, err
+		}
+		st.WritableCompletedAt = app.historyImportCompletion(ctx, work.Directory, previous)
+	} else if previous.TransitionSource != "current" && st.LatestPoint != "" {
 		source, e := m.store(st.LatestStore)
 		if e != nil {
 			return st, e
@@ -594,7 +601,16 @@ func (app *application) generationForHistoryResult(ctx context.Context, udid, di
 	if encrypted {
 		kind = "encrypted"
 	}
-	return app.generationRegistry().historyGeneration(udid, kind)
+	return app.generationRegistry().historyBackupGeneration(udid, kind, historyKeybagDigest(manifest))
+}
+
+func historyKeybagDigest(manifest map[string]any) string {
+	keybag, ok := manifest["BackupKeyBag"].([]byte)
+	if !ok || len(keybag) == 0 {
+		return ""
+	}
+	digest := sha256.Sum256(keybag)
+	return hex.EncodeToString(digest[:])
 }
 func (app *application) finishBackupHistory(job *backupJob, run *backupHistoryRun, check *backupCheckResult, at time.Time) {
 	if run == nil {
@@ -1018,11 +1034,13 @@ func (app *application) historyImportCompletion(ctx context.Context, dir string,
 }
 func (app *application) importHistoryGeneration(ctx context.Context, udid, dir string, st historyDeviceState) (backupstore.Generation, error) {
 	kind := "unknown"
+	keybag := ""
 	root, err := os.OpenRoot(dir)
 	if err == nil {
 		values, e := readBackupCheckPlist(ctx, root, "Manifest.plist", nil)
 		root.Close()
 		if e == nil {
+			keybag = historyKeybagDigest(values)
 			if encrypted, ok := values["IsEncrypted"].(bool); ok {
 				kind = "unencrypted"
 				if encrypted {
@@ -1031,7 +1049,7 @@ func (app *application) importHistoryGeneration(ctx context.Context, udid, dir s
 			}
 		}
 	}
-	if st.WritableID != "" && st.WritableGeneration.Validate() == nil && st.WritableGeneration.Kind == kind {
+	if st.WritableID != "" && st.WritableGeneration.Validate() == nil && st.WritableGeneration.Kind == kind && (kind != "encrypted" || keybag != "" && keybag == st.WritableGeneration.KeybagDigest) {
 		return st.WritableGeneration, nil
 	}
 	return app.generationRegistry().historyImportGeneration(udid, kind)
