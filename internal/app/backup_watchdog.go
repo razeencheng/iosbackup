@@ -145,6 +145,11 @@ func (a *backupActivity) timeout(cfg runtimeConfig, at time.Time) error {
 }
 
 func (app *application) runBackupCommand(ctx context.Context, cancel context.CancelCauseFunc, udid, sessionID, directory string, network bool, requests ...backupRequest) error {
+	ctx, releaseWriter, err := app.historyWorkWriterContext(ctx, udid, directory)
+	if err != nil {
+		return err
+	}
+	defer releaseWriter()
 	request := backupRequest{Mode: "auto"}
 	if len(requests) > 0 {
 		var err error
@@ -166,6 +171,10 @@ func (app *application) runBackupCommand(ctx context.Context, cancel context.Can
 		factory = newExecCmd
 	}
 	cmd := factory(ctx, cmdIdevicebackup2, args...)
+	// 注入的命令工厂也沿用同一写入锁。
+	if writer := historyWorkWriter(ctx); writer != nil {
+		cmd.cmd.ExtraFiles = []*os.File{writer}
+	}
 	cmd.SetGracefulCancel(3 * time.Second)
 	cmd.cmd.Dir = app.paths.BackupBase
 	env := append(os.Environ(), "IOSBK_BACKUP_ACTIVITY=1")

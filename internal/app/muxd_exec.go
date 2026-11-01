@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"io"
+	"os"
 	"os/exec"
 	"sync"
 	"syscall"
@@ -20,6 +21,9 @@ type execCmd struct {
 // newExecCmd 创建新的 execCmd（带 context）。
 func newExecCmd(ctx context.Context, name string, args ...string) *execCmd {
 	cmd := exec.CommandContext(ctx, name, args...)
+	if writer := historyWorkWriter(ctx); writer != nil {
+		cmd.ExtraFiles = []*os.File{writer}
+	}
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	return &execCmd{cmd: cmd, done: make(chan struct{})}
 }

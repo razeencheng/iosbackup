@@ -15,6 +15,8 @@ import (
 const historyIOTimeout = 6 * time.Hour
 
 type historyDeviceState struct {
+	RetiredStore        string                 `json:"retired_store,omitempty"`
+	RetiredWork         string                 `json:"retired_work,omitempty"`
 	WritableCompletedAt time.Time              `json:"writable_completed_at,omitempty"`
 	CurrentReset        bool                   `json:"current_reset,omitempty"`
 	DeletedAt           time.Time              `json:"deleted_at,omitempty"`
@@ -196,6 +198,13 @@ func (app *application) prepareBackupHistory(job *backupJob, root string) (*back
 		return nil, err
 	}
 	st, err := m.reconcileHistoryLatest(job.udid)
+	if err != nil {
+		return nil, err
+	}
+	if err = m.reclaimHistoryWork(job.ctx, job.udid); err != nil {
+		return nil, err
+	}
+	st, err = m.deviceState(job.udid)
 	if err != nil {
 		return nil, err
 	}
@@ -478,6 +487,9 @@ func (app *application) disableBackupHistory(ctx context.Context, job *backupJob
 	st.Phase, st.Root, st.StoreID = "disabled", root, id
 	st.TransitionSource = ""
 	st.WritableStore, st.WritableID = id, work.ID
+	if previous.WritableID != "" && previous.WritableID != work.ID {
+		st.RetiredStore, st.RetiredWork = previous.WritableStore, previous.WritableID
+	}
 	st.CurrentReset = st.CurrentDeleted
 	if previous.TransitionSource == "legacy" {
 		st.WritableGeneration, err = app.importHistoryGeneration(ctx, job.udid, work.Directory, previous)
@@ -500,7 +512,10 @@ func (app *application) disableBackupHistory(ctx context.Context, job *backupJob
 	if err = m.saveDevice(job.udid, st); err != nil {
 		return st, err
 	}
-	return st, nil
+	if err = m.reclaimHistoryWork(ctx, job.udid); err != nil {
+		return st, err
+	}
+	return m.deviceState(job.udid)
 }
 func (app *application) migrateHistorySource(ctx context.Context, job *backupJob, st historyDeviceState, gen backupstore.Generation) (historyDeviceState, error) {
 	m := app.backupStorage
@@ -574,7 +589,13 @@ func (app *application) migrateHistorySource(ctx context.Context, job *backupJob
 	if saved.State == "normal" {
 		st.LatestStore, st.LatestPoint = saved.StoreID, saved.ID
 	}
-	return st, m.saveDevice(job.udid, st)
+	if err = m.saveDevice(job.udid, st); err != nil {
+		return st, err
+	}
+	if err = m.reclaimHistoryWork(ctx, job.udid); err != nil {
+		return st, err
+	}
+	return m.deviceState(job.udid)
 }
 func (app *application) historyPoint(st historyDeviceState, gen backupstore.Generation, at time.Time, check backupCheckResult) backupstore.Point {
 	state := "pending"

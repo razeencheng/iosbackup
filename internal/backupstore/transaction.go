@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"time"
 
 	"iosbackup/internal/persistence"
@@ -106,6 +107,11 @@ func (s *Store) Commit(ctx context.Context, workID string, point Point) (Point, 
 	if tx.Phase != "work" {
 		return Point{}, ErrConflict
 	}
+	writer, err := s.lockWork(workID, syscall.LOCK_EX)
+	if err != nil {
+		return Point{}, err
+	}
+	defer writer.Close()
 	point.ID, point.StoreID, point.UDID, point.JobID = workID, s.identity.ID, s.identity.UDID, tx.JobID
 	point.CompletedAt = point.CompletedAt.UTC()
 	point.Generation.CreatedAt = point.Generation.CreatedAt.UTC()
@@ -288,6 +294,15 @@ func (s *Store) AbortWork(ctx context.Context, id string) error {
 		return err
 	}
 	tx, err := s.readTransaction(id)
+	if errors.Is(err, os.ErrNotExist) {
+		// 回收结束后登记簿保存可能失败；只接受所有入口均不存在的幂等重试。
+		for _, path := range []string{filepath.Join("work", id), filepath.Join("objects", id), filepath.Join("descriptors", id+".json")} {
+			if _, e := s.root.Lstat(path); !errors.Is(e, os.ErrNotExist) {
+				return ErrUncertain
+			}
+		}
+		return nil
+	}
 	if err != nil {
 		return err
 	}
@@ -299,6 +314,13 @@ func (s *Store) AbortWork(ctx context.Context, id string) error {
 	}
 	if _, err = s.root.Lstat(filepath.Join("objects", id)); !errors.Is(err, os.ErrNotExist) {
 		return ErrUncertain
+	}
+	writer, err := s.lockWork(id, syscall.LOCK_EX)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	if writer != nil {
+		defer writer.Close()
 	}
 	// 已确认工作副本归属后完成清理，原 work/sealing 事务保护中途崩溃。
 	if err = removeTree(context.WithoutCancel(ctx), s.root, filepath.Join("work", id)); err != nil {

@@ -156,6 +156,11 @@ func (app *application) Restore(ctx context.Context, udid, password string, opts
 		return err
 	}
 	defer cleanupSource()
+	restoreCtx, releaseWriter, err := app.historyWorkWriterContext(restoreCtx, udid, dir)
+	if err != nil {
+		return err
+	}
+	defer releaseWriter()
 	args := []string{"restore", dir}
 	if opts.System {
 		args = append(args, "--system")
@@ -183,7 +188,7 @@ func (app *application) Restore(ctx context.Context, udid, password string, opts
 
 	app.addWarnLog(udid, fmt.Sprintf("event=restore.started Destructive restore directory=%s system=%v settings=%v reboot=%v",
 		dir, opts.System, opts.Settings, opts.Reboot))
-	out, err := app.runIdeviceCmdBoundedEnv(ctx, cmdKindLong, device, env, cmdIdevicebackup2, args...)
+	out, err := app.runIdeviceCmdBoundedEnv(restoreCtx, cmdKindLong, device, env, cmdIdevicebackup2, args...)
 	if err != nil {
 		return operationError(i18n.RestoreFailed, err, cleanBackupOutput(out))
 	}

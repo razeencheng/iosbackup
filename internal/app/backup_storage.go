@@ -88,7 +88,7 @@ func (m *backupStorage) load(ctx context.Context) error {
 				return backupstore.ErrInvalid
 			}
 		}
-		for _, ref := range [][2]string{{st.LatestStore, st.LatestPoint}, {st.WritableStore, st.WritableID}} {
+		for _, ref := range [][2]string{{st.LatestStore, st.LatestPoint}, {st.WritableStore, st.WritableID}, {st.RetiredStore, st.RetiredWork}} {
 			if ref[0] == "" && ref[1] == "" {
 				continue
 			}
@@ -345,6 +345,10 @@ func (app *application) recoverBackupStorage(ctx context.Context) error {
 				return err
 			}
 			app.addErrorLog(udid, fmt.Sprintf("event=backup.history_reconcile_unavailable error=%v", err))
+			continue
+		}
+		if err := storage.reclaimHistoryWork(ctx, udid); err != nil {
+			app.addErrorLog(udid, fmt.Sprintf("event=backup.history_cleanup_unavailable error=%v", err))
 		}
 	}
 	app.mu.Lock()
