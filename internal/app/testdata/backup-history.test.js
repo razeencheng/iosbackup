@@ -3,6 +3,12 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('n
 const window={document:{addEventListener(){}},addEventListener(){}};
 vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../static/backup-history.js'),'utf8'),{window,AbortController,console});
 const api=window.IOSBKHistory;
+assert.equal(typeof api.pointChecks,'function','history checks need separate completed and attempted results');
+const passed={scope:'manifest',state:'passed',checked_at:'2026-10-30T01:00:00Z'},cancelled={scope:'manifest',state:'unavailable',reason:'cancelled',checked_at:'2026-10-31T01:00:00Z'};
+assert.equal(api.pointChecks({review:passed,review_attempt:cancelled}).primary,passed);
+assert.equal(api.pointChecks({review:passed,review_attempt:cancelled}).attempt,cancelled);
+const issues={...cancelled,state:'issues',reason:'missing_objects'};
+assert.equal(api.pointChecks({review:passed,review_attempt:issues}).primary,issues,'new completed issues must override an older pass');
 (async()=>{
  for(const [canDownload,leave] of [[true,false],[false,false],[true,true]]){
   const listeners={},frame={src:''},point='a'.repeat(32),requests=[];let finishExport;

@@ -49,37 +49,62 @@ func (app *application) historyService() *historyService {
 }
 
 type historyPointView struct {
-	JobID             string            `json:"job_id"`
-	ID                string            `json:"id"`
-	StoreID           string            `json:"store_id"`
-	UDID              string            `json:"udid"`
-	Revision          uint64            `json:"revision"`
-	CompletedAt       time.Time         `json:"completed_at"`
-	CommittedAt       time.Time         `json:"committed_at"`
-	CompletionUnknown bool              `json:"completion_unknown"`
-	Day               string            `json:"day"`
-	Timezone          string            `json:"timezone"`
-	State             string            `json:"state"`
-	Encryption        string            `json:"encryption"`
-	GenerationID      string            `json:"generation_id"`
-	Check             backupstore.Check `json:"check"`
-	Review            backupstore.Check `json:"review"`
-	ReviewAttempt     backupstore.Check `json:"review_attempt"`
-	Pinned            bool              `json:"pinned"`
-	Manual            bool              `json:"manual"`
-	Baseline          bool              `json:"baseline"`
-	Reason            string            `json:"reason"`
-	InUse             bool              `json:"in_use"`
-	Bytes             int64             `json:"bytes"`
-	BytesKnown        bool              `json:"bytes_known"`
-	CanDelete         bool              `json:"can_delete"`
-	CanPin            bool              `json:"can_pin"`
-	CanCheck          bool              `json:"can_check"`
-	CanExport         bool              `json:"can_export"`
+	JobID                  string            `json:"job_id"`
+	ID                     string            `json:"id"`
+	StoreID                string            `json:"store_id"`
+	UDID                   string            `json:"udid"`
+	Revision               uint64            `json:"revision"`
+	CompletedAt            time.Time         `json:"completed_at"`
+	CommittedAt            time.Time         `json:"committed_at"`
+	CompletionUnknown      bool              `json:"completion_unknown"`
+	Day                    string            `json:"day"`
+	Timezone               string            `json:"timezone"`
+	State                  string            `json:"state"`
+	Encryption             string            `json:"encryption"`
+	GenerationID           string            `json:"generation_id"`
+	Check                  backupstore.Check `json:"check"`
+	Review                 backupstore.Check `json:"review"`
+	ReviewAttempt          backupstore.Check `json:"review_attempt"`
+	Pinned                 bool              `json:"pinned"`
+	Manual                 bool              `json:"manual"`
+	Baseline               bool              `json:"baseline"`
+	Reason                 string            `json:"reason"`
+	InUse                  bool              `json:"in_use"`
+	Bytes                  int64             `json:"bytes"`
+	BytesKnown             bool              `json:"bytes_known"`
+	CanDelete              bool              `json:"can_delete"`
+	CanPin                 bool              `json:"can_pin"`
+	CanCheck               bool              `json:"can_check"`
+	CheckScope             string            `json:"check_scope"`
+	CheckUnavailableReason string            `json:"check_unavailable_reason,omitempty"`
+	ReviewSaveFailed       bool              `json:"review_save_failed,omitempty"`
+	CanExport              bool              `json:"can_export"`
 }
 
 func pointView(p backupstore.Point, c backupstore.Catalog, busy bool, reason string) historyPointView {
-	return historyPointView{JobID: p.JobID, ID: p.ID, StoreID: p.StoreID, UDID: p.UDID, Revision: c.Revision, CompletedAt: p.CompletedAt, CommittedAt: p.CommittedAt, CompletionUnknown: p.CompletionUnknown, Day: p.Day, Timezone: p.Timezone, State: p.State, Encryption: p.Generation.Kind, GenerationID: p.Generation.ID, Check: p.Check, Review: p.Review, ReviewAttempt: p.ReviewAttempt, Pinned: p.Pinned, Manual: p.Manual, Baseline: c.Baselines[p.Generation.ID] == p.ID, Reason: reason, InUse: busy, Bytes: p.Bytes, BytesKnown: p.BytesKnown, CanDelete: !busy, CanPin: true, CanCheck: !busy, CanExport: true}
+	v := historyPointView{JobID: p.JobID, ID: p.ID, StoreID: p.StoreID, UDID: p.UDID, Revision: c.Revision, CompletedAt: p.CompletedAt, CommittedAt: p.CommittedAt, CompletionUnknown: p.CompletionUnknown, Day: p.Day, Timezone: p.Timezone, State: p.State, Encryption: p.Generation.Kind, GenerationID: p.Generation.ID, Check: p.Check, Review: p.Review, ReviewAttempt: p.ReviewAttempt, Pinned: p.Pinned, Manual: p.Manual, Baseline: c.Baselines[p.Generation.ID] == p.ID, Reason: reason, InUse: busy, Bytes: p.Bytes, BytesKnown: p.BytesKnown, CanDelete: !busy, CanPin: true, CanCheck: !busy, CanExport: true, CheckScope: "manifest"}
+	if p.Generation.Kind != "unencrypted" {
+		v.CanCheck = false
+		v.CheckUnavailableReason = "encryption_unknown"
+		if p.Generation.Kind == "encrypted" {
+			v.CheckUnavailableReason = "encrypted_manifest"
+		}
+	}
+	if busy && v.CheckUnavailableReason == "" {
+		v.CheckUnavailableReason = "busy"
+	}
+	return v
+}
+
+// 仅覆盖本进程有界会话中尚未写回的结果，既有已完成结果仍保留。
+func (app *application) overlayHistoryReview(v *historyPointView) {
+	service := app.historyService()
+	service.mu.Lock()
+	defer service.mu.Unlock()
+	if run := service.reviews[v.ID]; run != nil && run.Result.State != "running" && !run.Saved {
+		v.ReviewAttempt = historyCheckEvidence(run.Result)
+		v.ReviewSaveFailed = true
+	}
 }
 func (app *application) historyLocations(udid string) []historyLocation {
 	if app.backupStorage == nil {
@@ -224,6 +249,10 @@ func (app *application) handleBackupHistory(w http.ResponseWriter, r *http.Reque
 			v.CanDelete = v.CanDelete && !busy
 			v.CanPin = !busy
 			v.CanCheck = v.CanCheck && !busy
+			if busy && v.CheckUnavailableReason == "" {
+				v.CheckUnavailableReason = "busy"
+			}
+			app.overlayHistoryReview(&v)
 			points = append(points, v)
 			bytes += p.Bytes
 			allKnown = allKnown && p.BytesKnown
@@ -434,6 +463,10 @@ func (app *application) handleBackupPoint(w http.ResponseWriter, r *http.Request
 		v.CanPin = !busy
 		v.CanDelete = v.CanDelete && !busy
 		v.CanCheck = v.CanCheck && !busy
+		if busy && v.CheckUnavailableReason == "" {
+			v.CheckUnavailableReason = "busy"
+		}
+		app.overlayHistoryReview(&v)
 		writeJSON(w, 200, v)
 		return
 	}
@@ -488,6 +521,14 @@ func (app *application) handleBackupPoint(w http.ResponseWriter, r *http.Request
 	case "check":
 		if request.Action != "" && request.Action != "start" {
 			writeError(w, 400, i18n.InvalidJSON)
+			return
+		}
+		if p.Generation.Kind != "unencrypted" {
+			code := i18n.HistoryCheckUnknown
+			if p.Generation.Kind == "encrypted" {
+				code = i18n.HistoryCheckEncrypted
+			}
+			writeError(w, http.StatusUnprocessableEntity, code)
 			return
 		}
 		var id string

@@ -16,7 +16,7 @@
     return result;
   }
   function needsAttention(job) {
-    return ['failed','interrupted'].indexOf(job.state) >= 0 || ['failed','uncertain','pending'].indexOf(job.history_state) >= 0 || (job.check && ['issues','unavailable','cancelled'].indexOf(job.check.state) >= 0);
+    return ['failed','interrupted'].indexOf(job.state) >= 0 || ['failed','uncertain','pending'].indexOf(job.history_state) >= 0 || !!(job.check && job.check.reason!=='cancelled' && ['issues','unavailable'].indexOf(job.check.state) >= 0);
   }
   function filterJobs(jobs, type, result) {
     return jobs.filter(function (job) {
@@ -28,6 +28,7 @@
     var source = data && data.current_source;
     return !!(source && source.kind === 'point' && source.available && source.point_id === point.id);
   }
+  function canDeleteCurrent(data){var s=data&&data.current_source;return !!(s&&s.kind==='current'&&s.available&&(!data.phase||data.phase==='disabled'));}
   function tr(key, params) { return global.IOSBKI18n.t(key, params); }
   function el(tag, text, cls) { var n = doc.createElement(tag); if (text !== undefined) n.textContent = text; if (cls) n.className = cls; return n; }
   function button(text, fn, cls) { var b = el('button', text, cls || 'history-button'); b.type = 'button'; b.onclick = fn; return b; }
@@ -178,6 +179,7 @@
   function updateHistory(view) {
     var u = view.udid, data = view.data; if (!data) return;
     history[u] = data;
+    var deleteButton=get('delBtn-'+u);if(deleteButton)deleteButton.classList.toggle('hidden',!canDeleteCurrent(data));
     recentJob(u);
     var source = data.current_source || {}, currentPoint = view.points.find(function (p) { return isCurrentPoint(data,p); });
     text('consoleLatest-' + u, currentPoint ? (currentPoint.completion_unknown ? tr('history.timeUnknown') : formatDate(currentPoint.completed_at)) : tr(source.kind === 'current' ? 'console.currentSet' : 'history.unknown'));
@@ -262,5 +264,5 @@
     var dirty=Object.keys(saved).some(function(u){return Object.keys(groups).some(function(group){var content=get('setting-'+group+'-'+u);return content&&content.closest('dialog[open]')&&JSON.stringify(configPayload(group,readConfig(u)))!==JSON.stringify(configPayload(group,saved[u]));});});
     if(dirty){event.preventDefault();event.returnValue='';}
   });
-  global.IOSBKConsole={isBackupRunning:isBackupRunning,busyLabel:busyLabel,configPayload:configPayload,filterJobs:filterJobs,needsAttention:needsAttention,isCurrentPoint:isCurrentPoint,init:init,settings:settings,backup:backup,pointDrawer:pointDrawer,closePoint:closePoint,taskDrawer:taskDrawer,openJob:openJob,openPoint:openPoint,current:current,updateHistory:updateHistory,closeLayers:closeLayers,layer:layer};
+  global.IOSBKConsole={canDeleteCurrent:canDeleteCurrent,isBackupRunning:isBackupRunning,busyLabel:busyLabel,configPayload:configPayload,filterJobs:filterJobs,needsAttention:needsAttention,isCurrentPoint:isCurrentPoint,init:init,settings:settings,backup:backup,pointDrawer:pointDrawer,closePoint:closePoint,taskDrawer:taskDrawer,openJob:openJob,openPoint:openPoint,current:current,updateHistory:updateHistory,closeLayers:closeLayers,layer:layer};
 })(window);

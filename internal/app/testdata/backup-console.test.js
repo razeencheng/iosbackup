@@ -27,8 +27,14 @@ assert.equal(api.isCurrentPoint({ current_source: { kind: 'point', point_id: 'ne
 assert.equal(api.isBackupRunning({backing_up:true,active_operation:'check'}),false,'a read-only check must not display phone backup progress');
 assert.equal(api.isBackupRunning({backing_up:true,active_operation:'local'}),false);
 assert.equal(api.isBackupRunning({backing_up:true,active_operation:'backup'}),true);
+assert.equal(!!api.needsAttention({operation:'check',state:'stopped',check:{state:'unavailable',reason:'cancelled'}}),false,'a user-cancelled check is neutral');
+assert.equal(!!api.needsAttention({operation:'check',state:'failed',error_code:'storage_unavailable',check:{state:'unavailable',reason:'cancelled'}}),true,'save failures remain attention-worthy after cancellation');
 assert.equal(api.busyLabel({active_operation:'check'}),'console.checkingBackup');
 assert.equal(api.busyLabel({active_operation:'local'}),'console.deviceBusy');
+assert.equal(api.canDeleteCurrent({phase:'active',current_source:{kind:'point',available:true}}),false);
+assert.equal(api.canDeleteCurrent({phase:'enabling',current_source:{kind:'current',available:true}}),false);
+assert.equal(api.canDeleteCurrent({phase:'disabled',current_source:{kind:'current',available:true}}),true,'an isolated ordinary current copy retains its delete action');
+assert.equal(api.canDeleteCurrent({current_source:{kind:'current',available:true}}),true,'legacy current backups retain their delete action');
 console.log('console group saves, task filtering and current-source identity passed');
 
 {

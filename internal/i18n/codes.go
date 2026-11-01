@@ -83,6 +83,8 @@ const (
 	EncryptionSubmitted                   = "api.encryption_submitted"
 	ExperimentalDisabled                  = "api.experimental_disabled"
 	HistoryCapacity                       = "api.history_capacity"
+	HistoryCheckEncrypted                 = "api.history_check_encrypted"
+	HistoryCheckUnknown                   = "api.history_check_unknown"
 	HistoryConflict                       = "api.history_conflict"
 	HistorySessionExpired                 = "api.history_session_expired"
 	HistoryUnavailable                    = "api.history_unavailable"
