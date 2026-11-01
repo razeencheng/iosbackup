@@ -312,6 +312,16 @@ func (app *application) prepareBackupHistory(job *backupJob, root string) (*back
 		return nil, err
 	}
 	if job.historyPolicyOnly {
+		job.historyCleanup = "running"
+		deferred, err := app.collectBackupHistoryResult(ctx, job.udid, st, gen)
+		if err != nil {
+			job.historyCleanup = "failed"
+			return nil, err
+		}
+		job.historyCleanup = "completed"
+		if deferred {
+			job.historyCleanup = "deferred"
+		}
 		return &backupHistoryRun{state: st, store: store, generation: gen, active: true}, nil
 	}
 	// Only already-eligible points may be collected before allocating a work copy.
@@ -368,23 +378,37 @@ func (app *application) historyBaselineMetadata(ctx context.Context, store *back
 	return true
 }
 func (app *application) collectBackupHistory(ctx context.Context, udid string, st historyDeviceState, gen backupstore.Generation) error {
+	_, err := app.collectBackupHistoryResult(ctx, udid, st, gen)
+	return err
+}
+
+func (app *application) collectBackupHistoryResult(ctx context.Context, udid string, st historyDeviceState, gen backupstore.Generation) (bool, error) {
+	deferred := false
 	stores, err := app.backupStorage.deviceStores(udid)
 	if err != nil {
-		return err
+		return false, err
 	}
 	for _, store := range stores {
+		if err = ctx.Err(); err != nil {
+			return deferred, err
+		}
 		req := backupstore.RetentionRequest{Policy: backupstore.Policy{Enabled: st.Phase == "active", Days: st.Days}, EpochID: st.EpochID, GenerationID: gen.ID, Now: app.nowTime()}
 		plan, err := store.PlanGC(req)
 		if err != nil {
-			return err
+			return deferred, err
+		}
+		for _, reason := range plan.Retain {
+			deferred = deferred || reason == "in_use"
 		}
 		if len(plan.Delete) > 0 {
-			if _, err = store.GC(ctx, req, plan.Revision); err != nil {
-				return err
+			removed, err := store.GC(ctx, req, plan.Revision)
+			if err != nil {
+				return deferred, err
 			}
+			deferred = deferred || len(removed) < len(plan.Delete)
 		}
 	}
-	return nil
+	return deferred, nil
 }
 func (app *application) disableBackupHistory(ctx context.Context, job *backupJob, root string, st historyDeviceState) (historyDeviceState, error) {
 	m := app.backupStorage

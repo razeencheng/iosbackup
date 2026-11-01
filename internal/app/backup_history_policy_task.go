@@ -8,11 +8,13 @@ import (
 )
 
 type historyPolicyRun struct {
-	ID        string `json:"id,omitempty"`
-	State     string `json:"state"`
-	ErrorCode string `json:"error_code,omitempty"`
-	cancel    context.CancelFunc
-	done      chan struct{}
+	ID            string `json:"id,omitempty"`
+	State         string `json:"state"`
+	ErrorCode     string `json:"error_code,omitempty"`
+	SettingsSaved bool   `json:"settings_saved"`
+	CleanupState  string `json:"cleanup_state,omitempty"`
+	cancel        context.CancelFunc
+	done          chan struct{}
 }
 
 // 状态只暴露任务结果；目标策略与 pending 标记在配置中持久化，重启后可重试。
@@ -20,12 +22,14 @@ func (app *application) historyPolicyStatus(udid string, cfg *backupConfig) hist
 	view := historyPolicyRun{State: "idle"}
 	if cfg != nil && cfg.HistoryPolicyPending {
 		view.State = "interrupted"
+		view.SettingsSaved, view.CleanupState = true, "pending"
 	}
 	service := app.historyService()
 	service.mu.Lock()
 	defer service.mu.Unlock()
 	if run := service.policies[udid]; run != nil {
 		view.ID, view.State, view.ErrorCode = run.ID, run.State, run.ErrorCode
+		view.SettingsSaved, view.CleanupState = run.SettingsSaved, run.CleanupState
 	}
 	return view
 }
@@ -52,10 +56,17 @@ func (app *application) startHistoryPolicy(requestCtx context.Context, udid stri
 		return historyPolicyRun{}, err
 	}
 	work.job.ctx = ctx
+	service.mu.Lock()
+	run.SettingsSaved, run.CleanupState = true, "pending"
+	service.mu.Unlock()
 	go func() {
 		defer cancel()
 		err := app.runHistoryPolicy(work)
 		service.mu.Lock()
+		run.CleanupState = work.job.historyCleanup
+		if run.CleanupState == "" {
+			run.CleanupState = "not_needed"
+		}
 		run.State = "succeeded"
 		if err != nil {
 			run.State, run.ErrorCode = "failed", i18n.HistoryUnavailable
@@ -70,5 +81,5 @@ func (app *application) startHistoryPolicy(requestCtx context.Context, udid stri
 		service.mu.Unlock()
 		app.broadcastStatus()
 	}()
-	return historyPolicyRun{ID: run.ID, State: "running"}, nil
+	return historyPolicyRun{ID: run.ID, State: "running", SettingsSaved: true, CleanupState: "pending"}, nil
 }
