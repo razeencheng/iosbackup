@@ -7,6 +7,15 @@ const window={document:{addEventListener(){}},addEventListener(){}};
 const context=vm.createContext({window,console,AbortController,setTimeout,clearTimeout});
 vm.runInContext(fs.readFileSync(path.join(__dirname,'../static/backup-jobs.js'),'utf8'),context);
 const api=window.IOSBKJobs;
+assert.equal(typeof api.durationText,'function');
+window.IOSBKI18n={t:(key,p={})=>key+':'+JSON.stringify(p)};
+for(const [seconds,key] of [[0,'seconds'],[59,'seconds'],[60,'minutes'],[3599,'minutes'],[3600,'hours']]){
+ const start='2026-10-30T00:00:00Z',end=new Date(Date.parse(start)+seconds*1000).toISOString();
+ assert.ok(api.durationText(start,end).startsWith('console.duration.'+key+':'));
+}
+assert.ok(api.durationText('2026-10-30T00:00:00Z','').startsWith('console.inProgress'));
+assert.ok(api.durationText('bad','bad').startsWith('jobs.unknown'));
+assert.ok(api.durationText('2026-10-31T00:00:00Z','2026-10-30T00:00:00Z').startsWith('jobs.unknown'));
 const events=api.mergeEvents([{cursor:1},{cursor:2}],[{cursor:2},{cursor:3}],2);
 assert.deepEqual(Array.from(events,e=>e.cursor),[2,3],'repeated pulls must not duplicate events, and the view must stay bounded');
 console.log('backup task timeline is bounded and deduplicated');

@@ -48,6 +48,15 @@
   function date(value){return value&&!String(value).startsWith('0001-')?global.IOSBKI18n.formatDate(value):tr('jobs.noActivity');}
   function label(kind,value){var key='jobs.'+kind+'.'+value;return global.IOSBKI18n.has(key)?tr(key):tr('jobs.unknown');}
   function historyLabel(job){var key='console.historyResult.'+(job.history_state||'unknown');return tr(global.IOSBKI18n.has(key)?key:'console.historyResult.unknown');}
+  function durationText(start,end){
+    if(!end||String(end).startsWith('0001-'))return tr('console.inProgress');
+    var first=Date.parse(start),last=Date.parse(end);
+    if(!Number.isFinite(first)||!Number.isFinite(last)||last<first||String(start).startsWith('0001-'))return tr('jobs.unknown');
+    var seconds=Math.round((last-first)/1000);
+    if(seconds<60)return tr('console.duration.seconds',{seconds:seconds});
+    if(seconds<3600)return tr('console.duration.minutes',{minutes:Math.floor(seconds/60),seconds:seconds%60});
+    return tr('console.duration.hours',{hours:Math.floor(seconds/3600),minutes:Math.floor(seconds%3600/60)});
+  }
   function formatEvent(event){
     var line=date(event.at)+'  '+label('event',event.code);
     if(event.phase)line+=' · '+label('phase',event.phase);
@@ -75,9 +84,9 @@
       jobs.forEach(function(job){
         var row=document.createElement('button');row.type='button';row.className='console-task-row';row.dataset.jobAction='select';row.dataset.udid=u;row.dataset.job=job.id;
         var when=document.createElement('span'),strong=document.createElement('strong'),small=document.createElement('small');strong.textContent=date(job.started_at);small.textContent=job.operation==='check'?tr('check.title'):label('source',job.source)+' · '+label('mode',job.requested_mode);when.append(strong,small);row.append(when);
-        var outcome=document.createElement('span');strong=document.createElement('strong');strong.textContent=label('state',job.state);strong.className=global.IOSBKConsole.needsAttention(job)?'console-amber':'console-good';outcome.append(strong);
+        var outcome=document.createElement('span');strong=document.createElement('strong');strong.textContent=label('state',job.state);strong.className=global.IOSBKConsole.needsAttention(job)?'console-amber':job.state==='stopped'?'console-subtle':'console-good';outcome.append(strong);
         small=document.createElement('small');small.textContent=job.operation==='check'?(job.check?tr('check.state.'+job.check.state):tr('check.none')):tr('jobs.outcomes',{execution:label('state',job.execution_state||job.state),history:historyLabel(job)});outcome.append(small);row.append(outcome);
-        var duration=document.createElement('span'),start=Date.parse(job.started_at),end=Date.parse(job.completed_at);duration.textContent=Number.isFinite(start)&&Number.isFinite(end)&&end>=start?tr('console.duration',{seconds:Math.round((end-start)/1000)}):tr('console.inProgress');duration.className='console-duration';row.append(duration);
+        var duration=document.createElement('span');duration.textContent=durationText(job.started_at,job.completed_at);duration.className='console-duration';row.append(duration);
         var details=document.createElement('span');details.textContent=tr('console.details')+' →';details.className='console-task-link';row.append(details);list.append(row);
       });
     }
@@ -134,5 +143,5 @@
   document.addEventListener('change',function(event){var f=event.target.dataset.jobFilter,u=event.target.dataset.udid;if(!f)return;filters[u]=filters[u]||{type:'all',result:'all'};filters[u][f]=event.target.value;controller.repaint();});
   global.addEventListener('iosbk:localechange',function(){controller.repaint();});
   var lastRevision;
-  global.IOSBKJobs={select:function(id){return controller.select(id);},mergeEvents:mergeEvents,createController:createController,formatEvent:formatEvent,open:open,close:close,hide:function(){if(visible)close(visible,false);},onStatus:function(snapshot){if(snapshot.backup_jobs_revision!==lastRevision){lastRevision=snapshot.backup_jobs_revision;controller.invalidate();}}};
+  global.IOSBKJobs={durationText:durationText,select:function(id){return controller.select(id);},mergeEvents:mergeEvents,createController:createController,formatEvent:formatEvent,open:open,close:close,hide:function(){if(visible)close(visible,false);},onStatus:function(snapshot){if(snapshot.backup_jobs_revision!==lastRevision){lastRevision=snapshot.backup_jobs_revision;controller.invalidate();}}};
 })(window);

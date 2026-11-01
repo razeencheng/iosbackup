@@ -95,11 +95,12 @@
   }
   function settings(u, group) {
     var content = get('setting-' + group + '-' + u); if (!content) return;
-    var entry = layer(content, tr('console.setting.' + group), {canClose: function () { return group !== 'history' || !global.IOSBKHistory.isPending(); },close: function () {
+    var entry = layer(content, tr('console.setting.' + group), {canClose: function () { return group !== 'history' || entry.accepted || !global.IOSBKHistory.isPending(); },close: function () {
       if (groups[group]) restoreConfig(u, group);
       if (group === 'history') global.IOSBKHistory.discard(u);
       content.querySelectorAll('input[type="password"]').forEach(function (input) { input.value = ''; });
     }});
+    entry.settingsDevice=u;entry.settingsGroup=group;
     if (group === 'encryption') global.loadEncStatus(u);
     if (groups[group]) {
       var save = content.querySelector('[data-group-save]'), cancel = content.querySelector('[data-group-cancel]');
@@ -123,6 +124,7 @@
       };
     }
   }
+  function policyAccepted(u){layers.slice().forEach(function(entry){if(entry.settingsDevice===u&&entry.settingsGroup==='history'){entry.accepted=true;entry.close();}});}
   function pointDrawer(u) {
     var content = get('historyDetail-' + u); if (!content || content.closest('dialog.console-drawer')) return;
     layer(content, tr('console.pointDetails'), {drawer:true,close:function(){global.IOSBKHistory.back();}});
@@ -186,7 +188,7 @@
     text('consoleCount-' + u, String(data.total));
     text('consoleSize-' + u, bytes(data.logical_bytes) + (data.bytes_known ? '' : ' + ?'));
     text('consoleFree-' + u, tr('console.freeSpace',{size:bytes((data.storage || {}).available_bytes)}));
-    text('historyPolicySummary-' + u, tr(data.policy.enabled ? 'history.summary' : 'history.summaryOff',{days:data.policy.days,count:data.total}));
+    text('historyPolicySummary-' + u, tr(data.policy.enabled ? 'history.summary' : 'history.summaryOff',{days:data.policy.days,count:data.total})+(global.IOSBKHistory&&global.IOSBKHistory.policyNotice?' '+global.IOSBKHistory.policyNotice(data):''));
     var currentCard = get('currentBackup-' + u);
     if (currentCard) {
       currentCard.classList.toggle('hidden', source.kind === 'point' && source.available);
@@ -264,5 +266,5 @@
     var dirty=Object.keys(saved).some(function(u){return Object.keys(groups).some(function(group){var content=get('setting-'+group+'-'+u);return content&&content.closest('dialog[open]')&&JSON.stringify(configPayload(group,readConfig(u)))!==JSON.stringify(configPayload(group,saved[u]));});});
     if(dirty){event.preventDefault();event.returnValue='';}
   });
-  global.IOSBKConsole={canDeleteCurrent:canDeleteCurrent,isBackupRunning:isBackupRunning,busyLabel:busyLabel,configPayload:configPayload,filterJobs:filterJobs,needsAttention:needsAttention,isCurrentPoint:isCurrentPoint,init:init,settings:settings,backup:backup,pointDrawer:pointDrawer,closePoint:closePoint,taskDrawer:taskDrawer,openJob:openJob,openPoint:openPoint,current:current,updateHistory:updateHistory,closeLayers:closeLayers,layer:layer};
+  global.IOSBKConsole={policyAccepted:policyAccepted,canDeleteCurrent:canDeleteCurrent,isBackupRunning:isBackupRunning,busyLabel:busyLabel,configPayload:configPayload,filterJobs:filterJobs,needsAttention:needsAttention,isCurrentPoint:isCurrentPoint,init:init,settings:settings,backup:backup,pointDrawer:pointDrawer,closePoint:closePoint,taskDrawer:taskDrawer,openJob:openJob,openPoint:openPoint,current:current,updateHistory:updateHistory,closeLayers:closeLayers,layer:layer};
 })(window);

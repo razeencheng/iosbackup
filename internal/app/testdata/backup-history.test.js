@@ -3,6 +3,29 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('n
 const window={document:{addEventListener(){}},addEventListener(){}};
 vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../static/backup-history.js'),'utf8'),{window,AbortController,console});
 const api=window.IOSBKHistory;
+assert.equal(typeof api.policyNeedsConfirmation,'function');
+assert.equal(api.policyNeedsConfirmation({preview:{previous:{enabled:true},policy:{enabled:true}},affected_count:0}),false);
+assert.equal(api.policyNeedsConfirmation({preview:{previous:{enabled:false},policy:{enabled:true}},affected_count:0}),true);
+assert.equal(api.policyNeedsConfirmation({preview:{previous:{enabled:true},policy:{enabled:true}},affected_count:1}),true);
+assert.equal(api.policyNeedsConfirmation({}),true,'missing impact data must not skip confirmation');
+(async()=>{
+ for(const leave of [false,true]){
+  const listeners={},calls=[],closed=[];let resolveSave;
+  const host={document:{addEventListener:(name,fn)=>listeners[name]=fn,getElementById:()=>null,querySelector:()=>null},addEventListener(){},setTimeout(){return 1},clearTimeout(){},toast(){},IOSBKI18n:{t:key=>key,has:()=>true,message:()=>''},IOSBKConsole:{updateHistory(){},policyAccepted:u=>closed.push(u)},csrfFetch:async(url,options)=>{
+   calls.push([url,options]);if(options.method==='PUT')return new Promise(resolve=>{resolveSave=resolve});
+   return {ok:true,json:async()=>url.endsWith('/policy-preview')?{token:'confirmed-preview',affected_count:0,preview:{previous:{enabled:true},policy:{enabled:true},stores:{}}}:{policy:{enabled:true,days:3},points:[],unavailable_stores:[],total:0}};
+  }};
+  vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../static/backup-history.js'),'utf8'),{window:host,AbortController,console});
+  host.IOSBKHistory.section('A','settings');await host.IOSBKHistory.refresh();
+  listeners.click({target:{closest:()=>({dataset:{historyAction:'policy'}})}});
+  await new Promise(setImmediate);assert.equal(closed.length,0,'editing stays open until server acceptance');
+  const save=calls.find(([,options])=>options.method==='PUT');assert.equal(JSON.parse(save[1].body).token,'confirmed-preview','skipping a dialog must still send the server preview token');
+  if(leave)host.IOSBKHistory.section('B','settings');
+  resolveSave({ok:true,json:async()=>({operation:{id:'policy-A',state:'running'}})});
+  await new Promise(setImmediate);assert.deepEqual(closed,leave?[]:['A'],'acceptance may only close its originating settings window');host.IOSBKHistory.hide();
+ }
+ console.log('no-impact policy save preserves preview validation and origin-specific acceptance');
+})().catch(e=>{console.error(e);process.exitCode=1});
 assert.equal(typeof api.pointChecks,'function','history checks need separate completed and attempted results');
 const passed={scope:'manifest',state:'passed',checked_at:'2026-10-30T01:00:00Z'},cancelled={scope:'manifest',state:'unavailable',reason:'cancelled',checked_at:'2026-10-31T01:00:00Z'};
 assert.equal(api.pointChecks({review:passed,review_attempt:cancelled}).primary,passed);
