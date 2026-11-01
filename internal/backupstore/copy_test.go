@@ -115,8 +115,8 @@ func TestCopyIsolationCancellationAndSourceChange(t *testing.T) {
 		t.Fatal(err)
 	}
 	changed := false
-	_, err := CopyTree(context.Background(), src, dst, CopyOptions{Progress: func(CopyReport) {
-		if !changed {
+	_, err := CopyTree(context.Background(), src, dst, CopyOptions{Progress: func(report CopyReport) {
+		if !changed && report.Phase == "copying" {
 			changed = true
 			_ = os.WriteFile(filepath.Join(src, "Info.plist"), []byte(strings.Repeat("x", 100)), 0600)
 		}

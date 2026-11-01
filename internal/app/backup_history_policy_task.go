@@ -8,11 +8,12 @@ import (
 )
 
 type historyPolicyRun struct {
-	ID            string `json:"id,omitempty"`
-	State         string `json:"state"`
-	ErrorCode     string `json:"error_code,omitempty"`
-	SettingsSaved bool   `json:"settings_saved"`
-	CleanupState  string `json:"cleanup_state,omitempty"`
+	Progress      *backupLocalProgress `json:"progress,omitempty"`
+	ID            string               `json:"id,omitempty"`
+	State         string               `json:"state"`
+	ErrorCode     string               `json:"error_code,omitempty"`
+	SettingsSaved bool                 `json:"settings_saved"`
+	CleanupState  string               `json:"cleanup_state,omitempty"`
 	cancel        context.CancelFunc
 	done          chan struct{}
 }
@@ -30,6 +31,7 @@ func (app *application) historyPolicyStatus(udid string, cfg *backupConfig) hist
 	if run := service.policies[udid]; run != nil {
 		view.ID, view.State, view.ErrorCode = run.ID, run.State, run.ErrorCode
 		view.SettingsSaved, view.CleanupState = run.SettingsSaved, run.CleanupState
+		view.Progress = run.Progress
 	}
 	return view
 }
@@ -56,6 +58,7 @@ func (app *application) startHistoryPolicy(requestCtx context.Context, udid stri
 		return historyPolicyRun{}, err
 	}
 	work.job.ctx = ctx
+	work.job.id = run.ID
 	service.mu.Lock()
 	run.SettingsSaved, run.CleanupState = true, "pending"
 	service.mu.Unlock()

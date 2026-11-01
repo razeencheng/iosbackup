@@ -53,7 +53,7 @@
   set('historyPolicyOperation-'+v.udid,v.dirty?'':policyNotice(v.data));
   var retry=show('historyPolicyRetry-'+v.udid,!!(v.data&&v.data.can_retry_policy));if(retry)retry.disabled=pending;
  }
- function policyNotice(data){var op=data&&data.policy_operation,state=op&&op.state;if(['running','failed','interrupted','succeeded'].indexOf(state)<0)return '';return tr('history.policyOperation.'+state)+(op.error_code&&global.IOSBKI18n.has(op.error_code)?' '+tr(op.error_code):'');}
+ function policyNotice(data){var op=data&&data.policy_operation,state=op&&op.state;if(['running','failed','interrupted','succeeded'].indexOf(state)<0)return '';var key=op.cleanup_state==='failed'?'history.policyCleanup.failed':op.cleanup_state==='deferred'?'history.policyCleanup.deferred':'history.policyOperation.'+state;return tr(key)+(state==='running'&&op.progress&&global.localPreparationSummary?' '+global.localPreparationSummary(op.progress):'')+(op.error_code&&global.IOSBKI18n.has(op.error_code)?' '+tr(op.error_code):'');}
  function render(v){
   latest=v;var u=v.udid,op=v.data&&v.data.policy_operation;
   if(op&&op.state==='succeeded'&&policyTracking[u]===op.id){delete policyTracking[u];if(global.toast)global.toast('bset.saved');}

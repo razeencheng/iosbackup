@@ -256,6 +256,9 @@ func (m *backupStorage) prepare(ctx context.Context, id, job, baseline string, o
 func (m *backupStorage) prepareFrom(ctx context.Context, id, job, sourceID, baseline string, options backupstore.CopyOptions) (backupstore.Work, backupstore.CopyReport, error) {
 	var report backupstore.CopyReport
 	// 实例共用一个大 I/O 槽；队列等待期间仍可取消。
+	if options.Progress != nil {
+		options.Progress(backupstore.CopyReport{Phase: "waiting"})
+	}
 	select {
 	case <-ctx.Done():
 		return backupstore.Work{}, report, ctx.Err()

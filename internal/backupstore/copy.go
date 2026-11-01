@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 	"syscall"
+	"time"
 )
 
 type CopyOptions struct {
@@ -20,6 +21,11 @@ type CopyOptions struct {
 	Progress     func(CopyReport)
 }
 type CopyReport struct {
+	Phase          string
+	TotalsKnown    bool
+	TotalFiles     int64
+	TotalBytes     int64
+	ScannedFiles   int64
 	Files          int64
 	Bytes          int64
 	AllocatedBytes int64
@@ -122,6 +128,10 @@ func walkTreeDepth(ctx context.Context, root *os.Root, initialDepth int, visit f
 	return walk(".", initialDepth)
 }
 func stampTree(ctx context.Context, root *os.Root) (treeStamp, error) {
+	return stampTreeProgress(ctx, root, nil)
+}
+
+func stampTreeProgress(ctx context.Context, root *os.Root, progress func(treeStamp)) (treeStamp, error) {
 	var stamp treeStamp
 	err := walkTree(ctx, root, func(path string, info os.FileInfo) error {
 		// 目录枚举顺序不参与摘要；包含实体和变更时间，识别等长改写及替换。
@@ -166,6 +176,9 @@ func stampTree(ctx context.Context, root *os.Root) (treeStamp, error) {
 		}
 		stamp.Bytes += info.Size()
 		stamp.Files++
+		if progress != nil {
+			progress(stamp)
+		}
 		return nil
 	})
 	return stamp, err
@@ -181,8 +194,31 @@ func CopyTree(ctx context.Context, source, destination string, options CopyOptio
 	return copyTreeWith(ctx, source, destination, options, StorageCapacity, cloneFile)
 }
 
-func copyTreeWith(ctx context.Context, source, destination string, options CopyOptions, capacity func(string) (Capacity, error), cloneFile func(*os.File, *os.File) error) (CopyReport, error) {
-	report := CopyReport{Mode: "copy"}
+func copyTreeWith(ctx context.Context, source, destination string, options CopyOptions, capacity func(string) (Capacity, error), cloneFile func(*os.File, *os.File) error) (report CopyReport, retErr error) {
+	report = CopyReport{Mode: "copy", Phase: "scanning"}
+	lastAt, lastBytes := time.Time{}, int64(0)
+	emit := func(force bool) {
+		if options.Progress == nil {
+			return
+		}
+		now := time.Now()
+		if !force && now.Sub(lastAt) < 250*time.Millisecond && report.Bytes-lastBytes < 16<<20 {
+			return
+		}
+		lastAt, lastBytes = now, report.Bytes
+		options.Progress(report)
+	}
+	defer func() {
+		report.Phase = "completed"
+		if retErr != nil {
+			report.Phase = "failed"
+			if errors.Is(retErr, context.Canceled) || errors.Is(retErr, context.DeadlineExceeded) {
+				report.Phase = "cancelled"
+			}
+		}
+		emit(true)
+	}()
+	emit(true)
 	if err := ctx.Err(); err != nil {
 		return report, err
 	}
@@ -211,10 +247,11 @@ func copyTreeWith(ctx context.Context, source, destination string, options CopyO
 		return report, err
 	}
 	defer src.Close()
-	before, err := stampTree(ctx, src)
+	before, err := stampTreeProgress(ctx, src, func(st treeStamp) { report.ScannedFiles = st.Files; emit(false) })
 	if err != nil {
 		return report, err
 	}
+	report.TotalBytes, report.TotalFiles, report.TotalsKnown = before.Bytes, before.Files, true
 	reserve := options.ReserveBytes
 	if reserve == 0 {
 		reserve = 16 << 20
@@ -256,6 +293,8 @@ func copyTreeWith(ctx context.Context, source, destination string, options CopyO
 		return report, err
 	}
 	buffer := make([]byte, 128<<10)
+	report.Phase = "copying"
+	emit(true)
 	err = walkTree(ctx, src, func(path string, info os.FileInfo) error {
 		if info.IsDir() {
 			if path != "." {
@@ -301,7 +340,13 @@ func copyTreeWith(ctx context.Context, source, destination string, options CopyO
 					return err
 				}
 			}
-			if err = copyBytes(ctx, out, in, buffer); err != nil {
+			writer := copyProgressWriter{out: out, advance: func(n int) { report.Bytes += int64(n); emit(false) }}
+			if report.ClonedFiles > 0 {
+				report.Mode = "mixed"
+			} else {
+				report.Mode = "copy"
+			}
+			if err = copyBytes(ctx, writer, in, buffer); err != nil {
 				return err
 			}
 		}
@@ -326,20 +371,25 @@ func copyTreeWith(ctx context.Context, source, destination string, options CopyO
 			return err
 		}
 		report.Files++
-		report.Bytes += info.Size()
 		report.AllocatedBytes += allocatedBytes(output)
 		if cloned {
+			report.Bytes += info.Size()
 			report.ClonedFiles++
 		}
-		if options.Progress != nil {
-			options.Progress(report)
+		if report.ClonedFiles == report.Files {
+			report.Mode = "clone"
+		} else if report.ClonedFiles > 0 {
+			report.Mode = "mixed"
 		}
+		emit(false)
 		return nil
 	})
 	if err != nil {
 		return report, err
 	}
-	after, err := stampTree(ctx, src)
+	report.Phase, report.ScannedFiles = "verifying", 0
+	emit(true)
+	after, err := stampTreeProgress(ctx, src, func(st treeStamp) { report.ScannedFiles = st.Files; emit(false) })
 	if err != nil {
 		return report, err
 	}
@@ -367,6 +417,19 @@ func copyTreeWith(ctx context.Context, source, destination string, options CopyO
 		report.Mode = "mixed"
 	}
 	return report, err
+}
+
+type copyProgressWriter struct {
+	out     io.Writer
+	advance func(int)
+}
+
+func (w copyProgressWriter) Write(p []byte) (int, error) {
+	n, err := w.out.Write(p)
+	if n > 0 {
+		w.advance(n)
+	}
+	return n, err
 }
 func sameFileVersion(a, b os.FileInfo) bool {
 	return a != nil && b != nil && a.Mode().IsRegular() && b.Mode().IsRegular() && os.SameFile(a, b) && a.Size() == b.Size() && a.Mode() == b.Mode() && a.ModTime() == b.ModTime() && fileIdentity(a) == fileIdentity(b)

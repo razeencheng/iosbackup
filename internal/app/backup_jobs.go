@@ -59,7 +59,7 @@ func validJobEvent(e backupJobEvent) bool {
 		return false
 	}
 	switch e.Phase {
-	case "", "preparing", "waiting_authorization", "waiting_device", "sending", "receiving", "completed":
+	case "", "preparing", "waiting_authorization", "waiting_device", "sending", "receiving", "completed", "local_waiting", "local_scanning", "local_copying", "local_verifying", "local_completed", "local_cancelled", "local_failed":
 	default:
 		return false
 	}

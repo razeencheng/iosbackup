@@ -1,0 +1,20 @@
+'use strict';
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
+const template=fs.readFileSync(path.join(__dirname,'../templates/index.html'),'utf8');
+const nodes={};
+function node(id){return nodes[id]||(nodes[id]={textContent:'',style:{},attrs:{},classList:{toggle(){}},setAttribute(k,v){this.attrs[k]=v},removeAttribute(k){delete this.attrs[k]}})}
+const context={document:{getElementById:node},window:{IOSBKConsole:{isBackupRunning:()=>true}},tr:key=>key,IOSBKI18n:{getLocale:()=> 'en',formatDate:()=>'',has:()=>false}};
+context.IOSBKConsole=context.window.IOSBKConsole;
+vm.runInNewContext(template.slice(template.indexOf('function isBackupProgressNumber'),template.indexOf('function rerenderBackupProgress')),context);
+const progress={state:'preparing',phase:'local_copying',local:{phase:'copying',bytes:50,total_bytes:100,totals_known:true}};
+assert.equal(context.backupProgressMode(progress),'local-copying','local copy must not display phone authorization');
+context.renderBackupProgress({udid:'A',backup_state:'running',backup_progress:progress});
+assert.equal(nodes['bkprogress-value-A'].textContent,'50%');
+assert.equal(nodes['bkprogress-track-A'].attrs['aria-label'],'progress.localAria');
+assert.equal(nodes['bkprogress-status-hint-A'].textContent,'progress.localHint');
+assert.equal(context.backupProgressMode({state:'failed',phase:'local_copying',local:progress.local}),'failed','terminal status wins over previous local progress');
+context.renderBackupProgress({udid:'A',backup_state:'running',backup_progress:{state:'preparing',phase:'local_scanning',local:{phase:'scanning',totals_known:false}}});
+assert.equal(nodes['bkprogress-value-A'].textContent,'—','unknown scan total must not invent a percent');
+context.renderBackupProgress({udid:'A',backup_state:'running',backup_progress:{state:'preparing',phase:'preparing'}});
+assert.equal(nodes['bkprogress-status-hint-A'].textContent,'progress.preparingHint','phone connection restores authorization guidance');
+console.log('local copy progress is distinct from phone progress and authorization');

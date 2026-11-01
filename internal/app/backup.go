@@ -247,6 +247,7 @@ func (app *application) runBackupJob(job *backupJob) (retErr error) {
 		return err
 	}
 	backupLog(fmt.Sprintf("event=backup.started automatic=%t", job.automatic))
+	app.connectBackupProgress(job)
 	if manager := app.notificationManagerSnapshot(); manager != nil {
 		manager.SendBackupStart(device.Name, udid)
 	}

@@ -1085,13 +1085,15 @@ function batteryHTML(d){
 }
 function isBackupProgressNumber(value){ return typeof value==='number' && Number.isFinite(value) && value>=0; }
 function backupProgressMode(progress){
-  if(!progress || progress.state==='preparing') return 'preparing';
+  if(!progress) return 'preparing';
   if(progress.state==='reconnecting') return 'reconnecting';
   if(progress.state==='interrupted') return 'interrupted';
   if(progress.state==='completed') return 'completed';
   if(progress.state==='failed') return 'failed';
   if(progress.state==='stopping') return 'stopping';
   if(progress.state==='stopped') return 'stopped';
+  if(progress.local && ['waiting','scanning','copying','verifying','completed'].indexOf(progress.local.phase)>=0) return 'local-'+progress.local.phase;
+  if(progress.state==='preparing') return 'preparing';
   if(progress.state==='running'){
     if(progress.phase==='preparing') return 'preparing';
     if(progress.phase==='waiting_authorization') return 'waiting-authorization';
@@ -1113,6 +1115,7 @@ function formatBackupBytes(value){
   return size.toLocaleString(IOSBKI18n.getLocale(),{minimumFractionDigits:0,maximumFractionDigits:digits})+' '+units[unit];
 }
 function backupProgressCopy(mode,d){
+  if(mode.indexOf('local-')===0) return {title:'progress.local.'+mode.slice(6),subtitle:'progress.localSubtitle',hint:'progress.localHint',tone:'',icon:'info'};
   if(mode==='stopping') return {title:'control.stopping',subtitle:'progress.overallSubtitle',hint:'control.stoppingHint',tone:'warning',icon:'info'};
   if(mode==='stopped') return {title:'control.stopped',subtitle:'progress.overallSubtitle',hint:'control.stoppedHint',tone:'warning',icon:'info'};
   if(mode==='waiting-authorization') return {title:'progress.waitingAuthorizationTitle',subtitle:'progress.overallSubtitle',hint:'progress.waitingAuthorizationHint',tone:'warning',icon:'info'};
@@ -1129,6 +1132,14 @@ function backupProgressCopy(mode,d){
   else if(d.last_backup_error_code==='storage_unavailable') hint='progress.storageHint';
   else if(d.last_backup_error_code==='device_locked') hint='progress.lockedHint';
   return {title:'progress.failedTitle',subtitle:'progress.overallSubtitle',hint:hint,tone:'error',icon:'alert'};
+}
+function localPreparationSummary(local){
+  if(!local) return '';
+  var key='progress.local.'+local.phase, title=tr(key);
+  if(local.totals_known && local.phase==='copying') title+=' · '+formatBackupBytes(local.bytes)+' / '+formatBackupBytes(local.total_bytes);
+  if(local.totals_known && local.phase==='verifying') title+=' · '+tr('progress.localFiles',{files:local.scanned_files,total:local.total_files});
+  if(local.mode && local.phase==='copying'){var modeKey='progress.copyMode.'+local.mode;title+=' · '+tr(modeKey);}
+  return title;
 }
 function backupFailureMessage(d,fallbackKey){
   var code=d.last_backup_message_code;
@@ -1148,9 +1159,11 @@ function renderBackupProgress(d){
   var title=document.getElementById('bkprogress-title-'+u), subtitle=document.getElementById('bkprogress-subtitle-'+u), value=document.getElementById('bkprogress-value-'+u);
   var track=document.getElementById('bkprogress-track-'+u), fill=document.getElementById('bkprogress-fill-'+u);
   var overall=isBackupProgressNumber(progress.overall_percent) && progress.overall_percent<=100 ? progress.overall_percent : null;
-  var indeterminate=mode==='preparing' && overall===null;
+  var local=mode.indexOf('local-')===0?progress.local:null;
+  if(local){overall=null;if(local.totals_known && local.phase==='copying' && local.total_bytes>0)overall=Math.min(100,100*local.bytes/local.total_bytes);else if(local.totals_known&&local.phase==='verifying'&&local.total_files>0)overall=Math.min(100,100*local.scanned_files/local.total_files);}
+  var indeterminate=(mode==='preparing'||!!local) && overall===null;
   title.textContent=tr(copy.title); subtitle.textContent=tr(copy.subtitle); value.textContent=overall===null?'—':formatBackupPercent(overall);
-  track.setAttribute('aria-label',tr('progress.overallAria'));
+  track.setAttribute('aria-label',tr(local?'progress.localAria':'progress.overallAria'));
   track.classList.toggle('hidden',overall===null && !indeterminate);
   track.classList.toggle('indeterminate',indeterminate);
   if(overall===null){ track.removeAttribute('aria-valuenow'); fill.style.width=''; }
@@ -1167,6 +1180,7 @@ function renderBackupProgress(d){
   var activity=document.getElementById('bkprogress-activity-'+u);
   var lastActivity=progress.last_activity_at ? new Date(progress.last_activity_at) : null;
   activity.textContent=lastActivity && !isNaN(lastActivity.getTime()) ? tr('progress.lastActivity')+IOSBKI18n.formatDate(progress.last_activity_at) : tr('progress.noActivity');
+  if(local)activity.textContent=localPreparationSummary(local);
   statusIcon.setAttribute('href','/static/ui-icons.svg#icon-'+copy.icon);
 }
 function rerenderBackupProgress(){ Object.keys(latestDeviceStatuses).forEach(function(udid){ renderBackupProgress(latestDeviceStatuses[udid]); }); }

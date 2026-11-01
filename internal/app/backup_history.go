@@ -240,7 +240,7 @@ func (app *application) prepareBackupHistory(job *backupJob, root string) (*back
 			if err = store.AbortWork(ctx, st.WritableID); err != nil && !errors.Is(err, os.ErrNotExist) {
 				return nil, err
 			}
-			work, _, err := m.prepareFrom(ctx, st.StoreID, job.id, "", "", backupstore.CopyOptions{})
+			work, _, err := m.prepareFrom(ctx, st.StoreID, job.id, "", "", app.historyCopyOptions(job))
 			if err != nil {
 				return nil, err
 			}
@@ -353,7 +353,7 @@ func (app *application) prepareBackupHistory(job *backupJob, root string) (*back
 			}
 		}
 	}
-	work, _, err := m.prepareFrom(ctx, id, job.id, sourceStore, baseline, backupstore.CopyOptions{PreferClone: true})
+	work, _, err := m.prepareFrom(ctx, id, job.id, sourceStore, baseline, app.historyCopyOptions(job))
 	if err != nil {
 		return nil, err
 	}
@@ -466,13 +466,14 @@ func (app *application) disableBackupHistory(ctx context.Context, job *backupJob
 		if e != nil {
 			return st, e
 		}
+		options := app.historyCopyOptions(job)
 		select {
 		case m.slot <- struct{}{}:
 		case <-ctx.Done():
 			_ = target.AbortWork(context.Background(), work.ID)
 			return st, ctx.Err()
 		}
-		_, err = backupstore.CopyTree(ctx, oldWork.Directory, work.Directory, backupstore.CopyOptions{PreferClone: true})
+		_, err = backupstore.CopyTree(ctx, oldWork.Directory, work.Directory, options)
 		<-m.slot
 		if err != nil {
 			_ = target.AbortWork(context.Background(), work.ID)
@@ -488,20 +489,21 @@ func (app *application) disableBackupHistory(ctx context.Context, job *backupJob
 		if e != nil {
 			return st, e
 		}
+		options := app.historyCopyOptions(job)
 		select {
 		case m.slot <- struct{}{}:
 		case <-ctx.Done():
 			_ = target.AbortWork(context.Background(), work.ID)
 			return st, ctx.Err()
 		}
-		_, err = backupstore.CopyTree(ctx, filepath.Join(previous.Root, job.udid), work.Directory, backupstore.CopyOptions{PreferClone: true})
+		_, err = backupstore.CopyTree(ctx, filepath.Join(previous.Root, job.udid), work.Directory, options)
 		<-m.slot
 		if err != nil {
 			_ = target.AbortWork(context.Background(), work.ID)
 			return st, err
 		}
 	} else {
-		work, _, err = m.prepareFrom(ctx, id, job.id, sourceStore, baseline, backupstore.CopyOptions{PreferClone: true})
+		work, _, err = m.prepareFrom(ctx, id, job.id, sourceStore, baseline, app.historyCopyOptions(job))
 		if err != nil {
 			return st, err
 		}
@@ -582,13 +584,14 @@ func (app *application) migrateHistorySource(ctx context.Context, job *backupJob
 	if err != nil {
 		return st, err
 	}
+	options := app.historyCopyOptions(job)
 	select {
 	case m.slot <- struct{}{}:
 	case <-ctx.Done():
 		_ = store.AbortWork(context.Background(), work.ID)
 		return st, ctx.Err()
 	}
-	_, err = backupstore.CopyTree(ctx, source, work.Directory, backupstore.CopyOptions{PreferClone: true})
+	_, err = backupstore.CopyTree(ctx, source, work.Directory, options)
 	<-m.slot
 	if err != nil {
 		_ = store.AbortWork(context.Background(), work.ID)

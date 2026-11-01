@@ -22,6 +22,7 @@ const (
 )
 
 type backupProgress struct {
+	Local              *backupLocalProgress
 	State              backupProgressState
 	Phase              string
 	OverallPercent     *float64

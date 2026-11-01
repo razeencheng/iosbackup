@@ -113,14 +113,15 @@ type deviceStatusDTO struct {
 }
 
 type backupProgressDTO struct {
-	State              string   `json:"state"`
-	Phase              string   `json:"phase"`
-	OverallPercent     *float64 `json:"overall_percent,omitempty"`
-	CurrentFilePercent *float64 `json:"current_file_percent,omitempty"`
-	CurrentBytes       *int64   `json:"current_bytes,omitempty"`
-	CurrentTotalBytes  *int64   `json:"current_total_bytes,omitempty"`
-	UpdatedAt          string   `json:"updated_at"`
-	LastActivityAt     string   `json:"last_activity_at,omitempty"`
+	Local              *backupLocalProgress `json:"local,omitempty"`
+	State              string               `json:"state"`
+	Phase              string               `json:"phase"`
+	OverallPercent     *float64             `json:"overall_percent,omitempty"`
+	CurrentFilePercent *float64             `json:"current_file_percent,omitempty"`
+	CurrentBytes       *int64               `json:"current_bytes,omitempty"`
+	CurrentTotalBytes  *int64               `json:"current_total_bytes,omitempty"`
+	UpdatedAt          string               `json:"updated_at"`
+	LastActivityAt     string               `json:"last_activity_at,omitempty"`
 }
 
 type statusSnapshot struct {
@@ -204,6 +205,7 @@ func (app *application) buildStatusSnapshot() statusSnapshot {
 				lastActivityAt = app.inDeploymentTime(progress.LastActivityAt).Format(time.RFC3339)
 			}
 			progressDTO = &backupProgressDTO{
+				Local:              progress.Local,
 				LastActivityAt:     lastActivityAt,
 				State:              string(progress.State),
 				Phase:              progress.Phase,
