@@ -86,6 +86,7 @@ const (
 	HistoryCheckEncrypted                 = "api.history_check_encrypted"
 	HistoryCheckUnknown                   = "api.history_check_unknown"
 	HistoryConflict                       = "api.history_conflict"
+	HistoryExportNoResume                 = "api.history_export_no_resume"
 	HistorySessionExpired                 = "api.history_session_expired"
 	HistoryUnavailable                    = "api.history_unavailable"
 	InvalidBackupMode                     = "api.invalid_backup_mode"

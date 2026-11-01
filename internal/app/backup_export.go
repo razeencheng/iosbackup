@@ -5,11 +5,13 @@ import (
 	"errors"
 	"iosbackup/internal/backupstore"
 	"iosbackup/internal/i18n"
+	"mime"
 	"net/http"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
+	"unicode"
 )
 
 const backupExportReadyTTL = 5 * time.Minute
@@ -24,6 +26,9 @@ type backupExport struct {
 	Expires       time.Time `json:"expires_at"`
 	Finished      time.Time `json:"finished_at,omitempty"`
 	DownloadError string    `json:"download_error,omitempty"`
+	Filename      string    `json:"filename"`
+	LogicalBytes  int64     `json:"logical_bytes"`
+	BytesKnown    bool      `json:"bytes_known"`
 	bytes         atomic.Int64
 	lease         *backupstore.Lease
 	ctx           context.Context
@@ -44,6 +49,9 @@ func (e *backupExport) release() {
 	})
 }
 func (app *application) createBackupExport(w http.ResponseWriter, r *http.Request, store *backupstore.Store, p backupstore.Point) {
+	app.mu.RLock()
+	filename := backupExportFilename(app.backupTaskDeviceNameUnsafe(p.UDID), p)
+	app.mu.RUnlock()
 	service := app.historyService()
 	service.mu.Lock()
 	defer service.mu.Unlock()
@@ -93,7 +101,7 @@ func (app *application) createBackupExport(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	ctx, cancel := context.WithCancel(app.rootCtx)
-	e := &backupExport{done: make(chan struct{}), ID: id, PointID: p.ID, UDID: p.UDID, State: "ready", Expires: now.Add(backupExportReadyTTL), lease: lease, ctx: ctx, cancel: cancel}
+	e := &backupExport{done: make(chan struct{}), ID: id, PointID: p.ID, UDID: p.UDID, State: "ready", Expires: now.Add(backupExportReadyTTL), lease: lease, ctx: ctx, cancel: cancel, Filename: filename, LogicalBytes: p.Bytes, BytesKnown: p.BytesKnown}
 	service.exports[id] = e
 	expire := func() {
 		service.mu.Lock()
@@ -117,7 +125,43 @@ func exportReleased(e *backupExport) bool {
 	}
 }
 func exportView(e *backupExport, transferBusy bool) map[string]any {
-	return map[string]any{"id": e.ID, "point_id": e.PointID, "udid": e.UDID, "state": e.State, "expires_at": e.Expires, "finished_at": e.Finished, "bytes_sent": e.bytes.Load(), "download_error": e.DownloadError, "can_download": e.State == "ready" && e.Expires.After(time.Now()) && !transferBusy}
+	return map[string]any{"id": e.ID, "point_id": e.PointID, "udid": e.UDID, "state": e.State, "expires_at": e.Expires, "finished_at": e.Finished, "bytes_sent": e.bytes.Load(), "download_error": e.DownloadError, "can_download": e.State == "ready" && e.Expires.After(time.Now()) && !transferBusy, "filename": e.Filename, "logical_bytes": e.LogicalBytes, "bytes_known": e.BytesKnown, "supports_resume": false}
+}
+
+func backupExportFilename(name string, p backupstore.Point) string {
+	runes := []rune(name)
+	if len(runes) > 80 {
+		runes = runes[:80]
+	}
+	name = strings.Map(func(r rune) rune {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) || r == ' ' || r == '-' || r == '_' || r == '.' {
+			return r
+		}
+		return '-'
+	}, string(runes))
+	// 按 UTF-8 字节限制名称，为日期和后缀预留空间。
+	for len(name) > 160 {
+		runes = []rune(name)
+		name = string(runes[:len(runes)-1])
+	}
+	name = strings.Trim(name, " .-_")
+	if name == "" {
+		name = "device"
+	}
+	at := p.CompletedAt
+	prefix := ""
+	if p.CompletionUnknown {
+		at = p.CommittedAt
+		prefix = "saved-"
+	}
+	if loc, err := time.LoadLocation(p.Timezone); err == nil {
+		at = at.In(loc)
+	}
+	id := p.ID
+	if len(id) > 8 {
+		id = id[:8]
+	}
+	return "iosbackup-" + name + "-" + prefix + at.Format("20060102-150405-0700") + "-" + id + ".tar"
 }
 func (app *application) handleBackupExport(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
@@ -169,6 +213,12 @@ func (app *application) handleBackupExport(w http.ResponseWriter, r *http.Reques
 		writeError(w, 410, i18n.HistorySessionExpired)
 		return
 	}
+	w.Header().Set("Accept-Ranges", "none")
+	if r.Header.Get("Range") != "" {
+		service.mu.Unlock()
+		writeError(w, http.StatusRequestedRangeNotSatisfiable, i18n.HistoryExportNoResume)
+		return
+	}
 	select {
 	case service.exportSlot <- struct{}{}:
 	default:
@@ -216,7 +266,7 @@ func (app *application) handleBackupExport(w http.ResponseWriter, r *http.Reques
 		<-service.exportSlot
 	}()
 	w.Header().Set("Content-Type", "application/x-tar")
-	w.Header().Set("Content-Disposition", `attachment; filename="iosbackup-`+e.UDID+`-`+e.PointID+`.tar"`)
+	w.Header().Set("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": e.Filename}))
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	writer := &backupExportWriter{ctx: ctx, w: w, controller: controller, bytes: &e.bytes, deadlineMu: &deadlineMu}
 	if err := e.lease.Export(ctx, writer, e.UDID); err != nil {
