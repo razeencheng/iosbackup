@@ -235,6 +235,22 @@ func (s *generationStore) finish(udid, id string) error {
 	return s.save(state)
 }
 
+// cancelUnstarted 只用于可以确认工具进程未启动的失败，不猜测手机已收到请求的结果。
+// 候选凭据仍然保留，避免清理影响其他未完成意图。
+func (s *generationStore) cancelUnstarted(udid, id string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	state, err := s.loadLocked(udid)
+	if err != nil {
+		return err
+	}
+	if state.Pending == nil || state.Pending.ID != id {
+		return errGenerationUncertain
+	}
+	state.Pending = nil
+	return s.save(state)
+}
+
 // compatibleBaseline 选择同代正常候选；本地密码是否验证不决定手机能否增量。
 // 加密导入和旧记录没有成功备份的密钥包证据，首次仍请求全量。
 func (s backupGenerations) compatibleBaseline(p backupstore.Point, metadataKnown bool) bool {
@@ -245,7 +261,7 @@ func (s backupGenerations) compatibleBaseline(p backupstore.Point, metadataKnown
 // 只由成功备份且轻量检查通过的结果调用。摘要识别备份中的加密材料，
 // 不证明它与当前手机或保存的密码相同；实际增量协商仍由手机协议完成。
 func (s *generationStore) historyBackupGeneration(udid, kind, keybag string) (backupstore.Generation, error) {
-	if kind != "encrypted" {
+	if kind != "encrypted" && kind != "unencrypted" {
 		return s.historyGeneration(udid, kind)
 	}
 	s.mu.Lock()
@@ -255,16 +271,22 @@ func (s *generationStore) historyBackupGeneration(udid, kind, keybag string) (ba
 		return backupstore.Generation{}, err
 	}
 	current := state.Generations[state.Current]
-	if state.Pending == nil && state.Recovered && current.Kind == "encrypted" && keybag != "" && current.KeybagDigest == keybag {
+	if state.Pending == nil && state.Recovered && current.Kind == kind && (kind == "unencrypted" || (keybag != "" && current.KeybagDigest == keybag)) {
 		return current, nil
 	}
 	pw := ""
 	if state.Pending != nil {
-		if current.Kind == "unknown" && current.ID != "" {
-			return current, nil
+		if kind == "unencrypted" || keybag != "" {
+			// 成功备份只确认新来源，不证明哪次手机改密成功，更不能绑定候选密码。
+			state.Unresolved = append(state.Unresolved, *state.Pending)
+			state.Pending = nil
+		} else {
+			if current.Kind == "unknown" && current.ID != "" {
+				return current, nil
+			}
+			kind, keybag = "unknown", ""
 		}
-		kind, keybag = "unknown", ""
-	} else if s.secrets != nil && s.secrets.Available() {
+	} else if kind == "encrypted" && s.secrets != nil && s.secrets.Available() {
 		pw, err = s.secrets.GetBackupPassword(udid)
 		if err != nil && !errors.Is(err, errPasswordNotFound) {
 			return backupstore.Generation{}, err

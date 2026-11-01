@@ -2,7 +2,10 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"os"
+	"os/exec"
 
 	"iosbackup/internal/i18n"
 )
@@ -91,6 +94,7 @@ func (app *application) SetBackupEncryption(ctx context.Context, udid string, en
 	env := []string{"BACKUP_PASSWORD=" + password}
 	out, err := app.runIdeviceCmdBoundedEnv(ctx, cmdKindLong, device, env, cmdIdevicebackup2, "encryption", state)
 	if err != nil {
+		app.reconcileUnstartedEncryption(udid, changeID, err)
 		return operationError(i18n.EncryptionFailed, err, cleanBackupOutput(out))
 	}
 
@@ -128,6 +132,7 @@ func (app *application) ChangeBackupPassword(ctx context.Context, udid, oldPw, n
 	env := []string{"BACKUP_PASSWORD=" + oldPw, "BACKUP_PASSWORD_NEW=" + newPw}
 	out, err := app.runIdeviceCmdBoundedEnv(ctx, cmdKindLong, device, env, cmdIdevicebackup2, "changepw")
 	if err != nil {
+		app.reconcileUnstartedEncryption(udid, changeID, err)
 		return operationError(i18n.PasswordChangeFailed, err, cleanBackupOutput(out))
 	}
 
@@ -138,6 +143,17 @@ func (app *application) ChangeBackupPassword(ctx context.Context, udid, oldPw, n
 	}
 	app.addInfoLog(udid, "event=encryption.password_changed")
 	return nil
+}
+
+func (app *application) reconcileUnstartedEncryption(udid, changeID string, commandErr error) {
+	var executableErr *exec.Error
+	var pathErr *os.PathError
+	if !errors.As(commandErr, &executableErr) && !(errors.As(commandErr, &pathErr) && pathErr.Op == "fork/exec") {
+		return
+	}
+	if err := app.generationRegistry().cancelUnstarted(udid, changeID); err != nil {
+		app.addErrorLog(udid, fmt.Sprintf("event=encryption.unstarted_reconcile_failed error=%v", err))
+	}
 }
 
 // Restore 把备份恢复到设备（**破坏性**，长操作）。password 经 env（加密备份需要）。
