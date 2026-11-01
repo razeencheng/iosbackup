@@ -42,6 +42,7 @@ type backupJobEvent struct {
 	Cursor    uint64    `json:"cursor"`
 	At        time.Time `json:"at"`
 	Code      string    `json:"code"`
+	Mode      string    `json:"mode,omitempty"`
 	Phase     string    `json:"phase,omitempty"`
 	Percent   *float64  `json:"percent,omitempty"`
 	Bytes     *int64    `json:"bytes,omitempty"`
@@ -50,8 +51,11 @@ type backupJobEvent struct {
 
 func validJobEvent(e backupJobEvent) bool {
 	switch e.Code {
-	case "started", "progress", "phase_changed", "stop_requested", "succeeded", "failed", "stopped", "interrupted":
+	case "started", "progress", "phase_changed", "stop_requested", "succeeded", "failed", "stopped", "interrupted", "mode_observed", "full_required_no_baseline":
 	default:
+		return false
+	}
+	if e.Mode != "" && e.Mode != "full" && e.Mode != "incremental" {
 		return false
 	}
 	switch e.Phase {

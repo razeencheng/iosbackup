@@ -269,6 +269,9 @@ func (app *application) runBackupJob(job *backupJob) (retErr error) {
 		effectiveRequest := job.request
 		if history != nil && history.forceFull {
 			effectiveRequest.Mode = "full"
+			if job.request.Mode == "auto" && app.backupJobRecords != nil {
+				app.backupJobRecords.emit(job.id, backupJobEvent{At: app.nowTime(), Code: "full_required_no_baseline"})
+			}
 		}
 		err = app.startHistoryCurrentWrite(job, history)
 		if err == nil {

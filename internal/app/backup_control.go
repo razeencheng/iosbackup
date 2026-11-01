@@ -17,6 +17,7 @@ type backupJob struct {
 	historyState                      string
 	backupRoot                        string
 	request                           backupRequest
+	observedMode                      string
 	startedAt                         time.Time
 	id, udid                          string
 	automatic                         bool

@@ -202,6 +202,7 @@ func (app *application) runBackupCommand(ctx context.Context, cancel context.Can
 			defer readers.Done()
 			app.readBackupOutput(udid, sessionID, r, stream, func(line, kind string) bool {
 				at := time.Now()
+				app.observeBackupMode(udid, sessionID, line, kind)
 				update, internal := activity.observe(line, kind, at)
 				if update.Phase != "" || update.OverallPercent != nil || update.CurrentBytes != nil || !update.LastActivityAt.IsZero() {
 					app.applyBackupProgressUpdate(udid, update, at, sessionID)

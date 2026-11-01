@@ -51,6 +51,7 @@
   function formatEvent(event){
     var line=date(event.at)+'  '+label('event',event.code);
     if(event.phase)line+=' · '+label('phase',event.phase);
+    if(event.mode)line+=' · '+label('mode',event.mode);
     if(typeof event.percent==='number')line+=' · '+event.percent.toLocaleString(global.IOSBKI18n.getLocale(),{maximumFractionDigits:1})+'%';
     if(typeof event.bytes==='number')line+=' · '+event.bytes.toLocaleString(global.IOSBKI18n.getLocale())+' B';
     if(event.error_code){var key='api.'+event.error_code;line+=' · '+(global.IOSBKI18n.has(key)?tr(key):tr('jobs.unknown'));}

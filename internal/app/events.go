@@ -227,7 +227,10 @@ func (app *application) buildStatusSnapshot() statusSnapshot {
 		jobActive := false
 		hold := app.backupHoldUnsafe(udid)
 		if job := app.backupJobs[udid]; job != nil {
-			jobID, requestedMode, observedMode = job.id, job.request.Mode, "unknown"
+			jobID, requestedMode, observedMode = job.id, job.request.Mode, job.observedMode
+			if observedMode == "" {
+				observedMode = "unknown"
+			}
 			jobActive = !job.finished
 		}
 		devs = append(devs, deviceStatusDTO{
