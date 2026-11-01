@@ -498,6 +498,11 @@ func (app *application) handleBackupPoint(w http.ResponseWriter, r *http.Request
 			return
 		}
 	case "":
+		generations, err := app.generationRegistry().load(p.UDID)
+		if err != nil {
+			historyError(w, err)
+			return
+		}
 		e = s.DeleteWithIntent(r.Context(), p.ID, c.Revision, func() error {
 			st, err := app.backupStorage.deviceState(p.UDID)
 			if err != nil {
@@ -505,10 +510,15 @@ func (app *application) handleBackupPoint(w http.ResponseWriter, r *http.Request
 			}
 			if st.LatestPoint == p.ID && st.Phase == "active" {
 				st.CurrentDeleted, st.CurrentReset, st.DeletedAt = true, false, app.nowTime()
+				g := generations.Generations[generations.Current]
+				st.PointDeletion = &historyPointDeletion{StoreID: p.StoreID, PointID: p.ID, Revision: c.Revision, Generation: g, AllowFallback: generations.compatibleBaseline(backupstore.Point{State: "normal", Generation: g}, true)}
 				return app.backupStorage.saveDevice(p.UDID, st)
 			}
 			return nil
 		})
+		if e == nil {
+			_, e = app.backupStorage.reconcileHistoryLatest(p.UDID)
+		}
 	}
 	if e != nil {
 		historyError(w, e)

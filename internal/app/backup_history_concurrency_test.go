@@ -179,6 +179,14 @@ func TestHistoryDeleteExcludesNewReaders(t *testing.T) {
 	attempts := make(chan result, 1)
 	early := false
 	a.backupStorage.write = func(path string, data []byte, mode os.FileMode) error {
+		var state historyLocations
+		if err := json.Unmarshal(data, &state); err != nil {
+			return err
+		}
+		// 收尾登记发生在对象已删除之后；只在删除意图写入窗口断言读者互斥。
+		if state.Devices[p.UDID].PointDeletion == nil {
+			return persistence.WriteFileAtomic(path, data, mode)
+		}
 		go func() { lease, e := s.Acquire(p.ID); attempts <- result{lease, e} }()
 		select {
 		case r := <-attempts:

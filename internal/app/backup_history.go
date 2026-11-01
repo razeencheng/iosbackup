@@ -15,6 +15,7 @@ import (
 const historyIOTimeout = 6 * time.Hour
 
 type historyDeviceState struct {
+	PointDeletion       *historyPointDeletion  `json:"point_deletion,omitempty"`
 	RetiredStore        string                 `json:"retired_store,omitempty"`
 	RetiredWork         string                 `json:"retired_work,omitempty"`
 	WritableCompletedAt time.Time              `json:"writable_completed_at,omitempty"`
@@ -359,6 +360,10 @@ func (app *application) prepareBackupHistory(job *backupJob, root string) (*back
 	return &backupHistoryRun{state: st, store: store, work: work, generation: gen, active: true, forceFull: baseline == ""}, nil
 }
 func (app *application) historyBaselineMetadata(ctx context.Context, store *backupstore.Store, p backupstore.Point, g backupstore.Generation) bool {
+	return historyBaselineMetadata(ctx, store, p, g)
+}
+
+func historyBaselineMetadata(ctx context.Context, store *backupstore.Store, p backupstore.Point, g backupstore.Generation) bool {
 	lease, err := store.Acquire(p.ID)
 	if err != nil {
 		return false
@@ -771,6 +776,14 @@ func (m *backupStorage) reconcileHistoryLatest(udid string) (historyDeviceState,
 	if err != nil || st.EpochID == "" || st.Phase == "disabled" || st.Phase == "disabling" {
 		return st, err
 	}
+	if st.PointDeletion != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), historyIOTimeout)
+		defer cancel()
+		st, err = m.finishHistoryPointDeletion(ctx, udid, st)
+		if err != nil {
+			return st, err
+		}
+	}
 	stores, err := m.deviceStores(udid)
 	if err != nil {
 		return st, err
@@ -788,7 +801,7 @@ func (m *backupStorage) reconcileHistoryLatest(udid string) (historyDeviceState,
 			if st.Phase == "enabling" && p.EpochID == st.EpochID {
 				migrationCommitted = true
 			}
-			if p.State == "normal" && p.EpochID == st.EpochID && (!st.CurrentDeleted || p.CommittedAt.After(st.DeletedAt)) && (latest.ID == "" || p.CommittedAt.After(latest.CommittedAt) || p.CommittedAt.Equal(latest.CommittedAt) && p.ID > latest.ID) {
+			if p.State == "normal" && p.EpochID == st.EpochID && (st.DeletedAt.IsZero() || p.CommittedAt.After(st.DeletedAt)) && (latest.ID == "" || p.CommittedAt.After(latest.CommittedAt) || p.CommittedAt.Equal(latest.CommittedAt) && p.ID > latest.ID) {
 				latest = p
 			}
 		}

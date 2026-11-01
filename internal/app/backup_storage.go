@@ -88,7 +88,14 @@ func (m *backupStorage) load(ctx context.Context) error {
 				return backupstore.ErrInvalid
 			}
 		}
-		for _, ref := range [][2]string{{st.LatestStore, st.LatestPoint}, {st.WritableStore, st.WritableID}, {st.RetiredStore, st.RetiredWork}} {
+		refs := [][2]string{{st.LatestStore, st.LatestPoint}, {st.WritableStore, st.WritableID}, {st.RetiredStore, st.RetiredWork}}
+		if pending := st.PointDeletion; pending != nil {
+			if st.Phase != "active" || !st.CurrentDeleted || pending.Revision == 0 || pending.Generation.Validate() != nil {
+				return backupstore.ErrInvalid
+			}
+			refs = append(refs, [2]string{pending.StoreID, pending.PointID})
+		}
+		for _, ref := range refs {
 			if ref[0] == "" && ref[1] == "" {
 				continue
 			}
