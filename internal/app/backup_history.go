@@ -215,6 +215,7 @@ func (app *application) prepareBackupHistory(job *backupJob, root string) (*back
 	if !job.historyPolicyOnly {
 		app.setHistoryJobState(job, "preparing")
 	}
+	app.reportHistoryPreparation(job, backupstore.CopyReport{Phase: "waiting"})
 	ctx, cancel := context.WithTimeout(job.ctx, historyIOTimeout)
 	defer cancel()
 	root, err = filepath.Abs(root)
@@ -574,6 +575,7 @@ func (app *application) migrateHistorySource(ctx context.Context, job *backupJob
 	} else if err != nil {
 		return st, err
 	}
+	app.reportHistoryPreparation(job, backupstore.CopyReport{Phase: "scanning"})
 	result := app.checkBackupSourceAt(ctx, job.udid, filepath.Dir(source), "quick")
 	st.LegacyBytes, _ = originalBackupSize(ctx, source)
 	store, err := m.store(st.StoreID)

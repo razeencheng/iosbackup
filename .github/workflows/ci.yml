@@ -56,7 +56,9 @@ jobs:
       - name: Offline backup browser behavior checks
         run: node internal/app/testdata/backup-browser.test.js
       - name: Backup task timeline checks
-        run: node internal/app/testdata/backup-jobs.test.js
+        run: |
+          node internal/app/testdata/backup-jobs.test.js
+          node internal/app/testdata/backup-progress.test.js
       - name: Backup check UI behavior
         run: node internal/app/testdata/backup-checks.test.js
       - name: History and accessible term behavior

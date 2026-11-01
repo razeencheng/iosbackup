@@ -172,7 +172,8 @@ func (app *application) Restore(ctx context.Context, udid, password string, opts
 		return err
 	}
 	defer cleanupSource()
-	restoreCtx, releaseWriter, err := app.historyWorkWriterContext(restoreCtx, udid, dir)
+	// 六小时上限仅约束本地准备，设备恢复继续沿用调用方的取消与截止时间。
+	restoreCtx, releaseWriter, err := app.historyWorkWriterContext(ctx, udid, dir)
 	if err != nil {
 		return err
 	}
