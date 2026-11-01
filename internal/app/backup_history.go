@@ -731,21 +731,34 @@ func (m *backupStorage) reconcileHistoryLatest(udid string) (historyDeviceState,
 		return st, err
 	}
 	var latest backupstore.Point
+	migrationCommitted := false
 	for _, s := range stores {
 		c, err := s.Snapshot()
 		if err != nil {
 			return st, err
 		}
 		for _, p := range c.Points {
+			// 开启周期的首个结果只能由迁移提交；正常和待确认结果均证明
+			// 导入已落盘。登记失败后不能再次复制来源，旧周期不参与对账。
+			if st.Phase == "enabling" && p.EpochID == st.EpochID {
+				migrationCommitted = true
+			}
 			if p.State == "normal" && p.EpochID == st.EpochID && (!st.CurrentDeleted || p.CommittedAt.After(st.DeletedAt)) && (latest.ID == "" || p.CommittedAt.After(latest.CommittedAt) || p.CommittedAt.Equal(latest.CommittedAt) && p.ID > latest.ID) {
 				latest = p
 			}
 		}
 	}
+	changed := migrationCommitted && !st.MigrationDone
+	if changed {
+		st.MigrationDone = true
+	}
 	if latest.ID != "" && (st.LatestPoint != latest.ID || st.LatestStore != latest.StoreID) {
 		st.LatestPoint, st.LatestStore = latest.ID, latest.StoreID
 		st.CurrentDeleted = false
 		st.CurrentReset = false
+		changed = true
+	}
+	if changed {
 		err = m.saveDevice(udid, st)
 	}
 	return st, err
