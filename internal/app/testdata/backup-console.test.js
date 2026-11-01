@@ -110,3 +110,14 @@ console.log('console group saves, task filtering and current-source identity pas
   assert.equal(nodes['testIPBtn-A'].disabled,false);
   console.log('cancelled connection checks cannot publish stale results');
 })().catch(error=>{console.error(error);process.exitCode=1});
+
+// Closing details must restore focus even when selection and polling replace the row.
+{
+  let focused='';
+  function node(){return {children:[],classList:{add(){},remove(){},contains(){return false;}},setAttribute(){},addEventListener(){},append(...children){this.children.push(...children);},querySelector(){return this.children.at(-1);},showModal(){},close(){},remove(){},focus(){focused=this.name||'header';},getClientRects(){return [1];},isConnected:true};}
+  const source={...node(),name:'old',isConnected:false,dataset:{point:'point-a',historyAction:'select'}},replacement={...node(),name:'replacement',dataset:{point:'point-a',historyAction:'select'}},content={...node(),closest(){return null;}};
+  const page={document:{activeElement:source,addEventListener(){},createElement:node,body:node(),getElementById(id){if(id==='historyDetail-A')return content;if(id==='historyList-A')return {querySelectorAll(){return [replacement];}};return null;}},addEventListener(){},IOSBKI18n:{t:key=>key},IOSBKHistory:{back(){}}};
+  vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../static/backup-console.js'),'utf8'),{window:page});
+  page.IOSBKConsole.pointDrawer('A',source);page.IOSBKConsole.closeLayers();
+  assert.equal(focused,'replacement','details must return keyboard focus to the matching replacement row');
+}

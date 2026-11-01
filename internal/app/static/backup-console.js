@@ -51,7 +51,8 @@
       if (parent) { parent.insertBefore(content, next && next.parentNode === parent ? next : null); content.classList.add('hidden'); }
       dialog.remove(); layers = layers.filter(function (item) { return item !== entry; });
       if (options.close) options.close();
-      if (prior && prior.isConnected && prior.getClientRects().length) prior.focus();
+      var target = options.returnFocus ? options.returnFocus() : prior;
+      if (target && target.isConnected && target.getClientRects().length) target.focus();
     }
     entry.closeButton=button(tr('console.close'),finish,'console-close');
     header.append(heading,entry.closeButton);
@@ -125,9 +126,13 @@
     }
   }
   function policyAccepted(u){layers.slice().forEach(function(entry){if(entry.settingsDevice===u&&entry.settingsGroup==='history'){entry.accepted=true;entry.close();}});}
-  function pointDrawer(u) {
+  function pointDrawer(u, origin) {
     var content = get('historyDetail-' + u); if (!content || content.closest('dialog.console-drawer')) return;
-    layer(content, tr('console.pointDetails'), {drawer:true,close:function(){global.IOSBKHistory.back();}});
+    var point=origin&&origin.dataset.point,action=origin&&origin.dataset.historyAction,dateButton=origin&&origin.classList.contains('history-point-select');
+    layer(content, tr('console.pointDetails'), {drawer:true,close:function(){global.IOSBKHistory.back();},returnFocus:function(){
+      var list=get('historyList-'+u),buttons=list?Array.from(list.querySelectorAll('[data-history-action][data-point]')):[];
+      return buttons.find(function(b){return b.dataset.point===point&&b.dataset.historyAction===action&&b.classList.contains('history-point-select')===dateButton;})||buttons[0]||get('backupBtn-'+u);
+    }});
   }
   function closePoint(u) {
     var content=get('historyDetail-'+u);

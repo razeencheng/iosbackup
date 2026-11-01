@@ -129,7 +129,7 @@
  async function act(action,buttonNode){
   var autoDownload=action==='downloadPoint';
   if(action==='open'){open(buttonNode.dataset.udid);return;}if(action==='back'){close(true);return;}if(action==='settings'){var u=visible;global.switchSection(u,'settings');global.IOSBKConsole.settings(u,'history');return;}
-  if(action==='select'||action==='downloadPoint'){controller.select(buttonNode.dataset.point);global.IOSBKConsole.pointDrawer(visible);if(action==='select')return;action='export';}if(action==='list'){global.IOSBKConsole.closeLayers();controller.back();return;}if(action==='more'){controller.refresh(true);return;}if(action==='refresh'){controller.refresh();return;}
+  if(action==='select'||action==='downloadPoint'){controller.select(buttonNode.dataset.point);global.IOSBKConsole.pointDrawer(visible,buttonNode);if(action==='select')return;action='export';}if(action==='list'){global.IOSBKConsole.closeLayers();controller.back();return;}if(action==='more'){controller.refresh(true);return;}if(action==='refresh'){controller.refresh();return;}
   if(pending||!latest)return;var actionEpoch=pollEpoch,u=latest.udid,p=latest.points.find(function(p){return p.id===latest.selected;}),draft=Object.assign({},latest.draft),originalPoints=latest.points.slice();pending=true;controller.repaint();
   try{
    if(action==='policy'){
