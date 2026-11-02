@@ -73,6 +73,7 @@ func (s *Store) deleteLocked(ctx context.Context, id string, revision uint64, ex
 	}
 	return nil
 }
+
 // finishRecycle 要求调用者持有 opMu 和 mu，返回时仍持有这两把锁。
 func (s *Store) finishRecycle(ctx context.Context, tx transaction) error {
 	id := tx.ID
