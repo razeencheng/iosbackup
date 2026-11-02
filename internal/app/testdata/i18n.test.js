@@ -80,7 +80,7 @@ for(const operation of ['check','local','backup']) {
  vm.runInContext('patchDevice('+JSON.stringify({udid:'PHONE',conn:'usb',operations_available:true,backing_up:true,active_operation:operation})+')',consoleApp.context);
  assert.equal(passwordAction.disabled,true,'busy operation must retain device action protection');
  assert.equal(consoleDOM.get('bkbar-PHONE').classList.contains('hidden'),operation!=='backup','only phone backups show progress/authorization hints');
- assert.match(consoleDOM.get('backupBtn-PHONE').innerHTML,new RegExp(operation==='check'?'console.checkingBackup':operation==='local'?'console.deviceBusy':'device.backingUp'));
+ assert.equal(consoleDOM.get('backupBtn-PHONE').textContent,consoleApp.api.t(operation==='check'?'console.checkingBackup':operation==='local'?'console.deviceBusy':'device.backingUp'));
 }
 
 vm.runInContext(`latestEncryptionStatuses.PHONE={online:true,will_encrypt:true};backupEncryptionStates.PHONE=false;listState.PHONE={all:[],filtered:[],page:0,pageSize:200,total:0};showInlineResult(document.getElementById('ipResult-PHONE'),true,'bset.testOk');dirtyCards.add('PHONE');`,consoleApp.context);
@@ -218,7 +218,7 @@ async function verifyBackupControlBehavior(){
  assert.equal(vm.runInContext('latestDeviceStatuses.PHONE.backup_state',controls.context),'running');
  vm.runInContext(`patchDevice({udid:'PHONE',conn:'usb',online:true,backup_job_id:'job-2',backup_state:'stopping',backing_up:true,auto_backup_hold:true,auto_backup_hold_version:'hold-2',auto_backup_hold_persistence:'saved'});`,controls.context);
  assert.equal(nodes.get('resumeBackup-PHONE').disabled,true,'cannot resume while stopping');
- assert.equal(nodes.get('stopBackup-PHONE').disabled,true);
+ assert.equal(nodes.get('backupBtn-PHONE').disabled,true);
  assert.equal(nodes.get('bkprogress-status-title-PHONE').textContent,catalogs['zh-CN']['control.stopping']);
  vm.runInContext(`patchDevice({udid:'PHONE',conn:'usb',online:true,backup_job_id:'job-2',backup_state:'stopped',backing_up:false,auto_backup_hold:true,auto_backup_hold_version:'hold-2',auto_backup_hold_persistence:'error'});`,controls.context);
  assert.equal(nodes.get('retryHold-PHONE').classList.contains('hidden'),false,'save error needs a retry action');
@@ -230,7 +230,7 @@ async function verifyBackupControlBehavior(){
  controls.window.fetch=(url)=>url==='/api/status'?Promise.reject(Error('offline')):Promise.resolve({status:500,json:()=>Promise.resolve({error:'save',code:'api.backup_hold_save_failed',backup_job_id:'job-3',backup_state:'stopping',backing_up:true,auto_backup_hold:true,auto_backup_hold_version:'job-3',auto_backup_hold_persistence:'error'})});
  await vm.runInContext('submitStopBackup()',controls.context);
  assert.equal(nodes.get('backupHoldMessage-PHONE').textContent,catalogs.en['control.holdSaveFailed'],'partial result must remain visible even when the follow-up refresh fails');
- assert.equal(nodes.get('stopBackup-PHONE').disabled,true,'accepted stop must not revert to running after a save error');
+ assert.equal(nodes.get('backupBtn-PHONE').disabled,true,'accepted stop must not revert to running after a save error');
  console.log('backup controls preserve task identity, prevent duplicate requests and distinguish stopping, holding and save failures');
 }
 async function runAllBehaviorChecks(){

@@ -273,11 +273,10 @@
               {{else if eq $conn "wifi"}}<span class="connection-badge" style="gap:7px;padding:5px 11px;background:#E2F3EF;color:#0B7565;border:1px solid #B9E2DA;font-size:12.5px;font-weight:600;white-space:nowrap"><svg class="connection-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M3 7.6a10.7 10.7 0 0 1 14 0M5.7 10.5a6.7 6.7 0 0 1 8.6 0M8.4 13.3a2.7 2.7 0 0 1 3.2 0" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path><circle cx="10" cy="16" r="1.25" fill="currentColor"></circle></svg><span data-i18n="status.wifi">{{t $.Locale "status.wifi"}}</span></span>
               {{else}}<span class="connection-badge" style="gap:7px;padding:5px 11px;background:#F3F7FA;color:#718090;border:1px solid #D8E2EA;font-size:12.5px;font-weight:600;white-space:nowrap"><svg class="connection-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2.6v6.1M5.5 5.7a6.2 6.2 0 1 0 9 0" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path></svg><span data-i18n="status.offline">{{t $.Locale "status.offline"}}</span></span>{{end}}
             </div>
-            <div class="backup-split">
-            <button id="backupBtn-{{$d.UDID}}" class="backup-action" onclick="event.stopPropagation();startBackup('{{$d.UDID}}',this)" {{if or (eq $conn "offline") $backingUp}}disabled{{end}} style="gap:9px;padding:10px 17px;font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit;border:none;white-space:nowrap;min-width:132px;{{if or (eq $conn "offline") $backingUp}}background:#F3F7FA;color:#ADB9C2;cursor:not-allowed;{{else}}background:#2C62C6;color:#fff;{{end}}">{{if $backingUp}}<span data-i18n="{{$busyKey}}">{{t $.Locale $busyKey}}</span>{{else}}<span data-i18n="device.backupNow">{{t $.Locale "device.backupNow"}}</span>{{end}}</button>
+            <div id="backupSplit-{{$d.UDID}}" class="backup-split">
+            <button id="backupBtn-{{$d.UDID}}" class="backup-action" onclick="event.stopPropagation();backupAction('{{$d.UDID}}',this)" {{if or (eq $conn "offline") $backingUp}}disabled{{end}} style="gap:9px;padding:10px 17px;font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit;border:none;white-space:nowrap;min-width:132px;{{if or (eq $conn "offline") $backingUp}}background:#F3F7FA;color:#ADB9C2;cursor:not-allowed;{{else}}background:#2C62C6;color:#fff;{{end}}">{{if $backingUp}}<span data-i18n="{{$busyKey}}">{{t $.Locale $busyKey}}</span>{{else}}<span data-i18n="device.backupNow">{{t $.Locale "device.backupNow"}}</span>{{end}}</button>
             <button id="backupAdvanced-{{$d.UDID}}" type="button" class="backup-control-button backup-advanced" {{if or (eq $conn "offline") $backingUp}}disabled{{end}} onclick="event.stopPropagation();IOSBKConsole.backup('{{$d.UDID}}')" data-i18n-title="console.advancedBackup" data-i18n-aria="console.advancedBackup" title="{{t $.Locale "console.advancedBackup"}}" aria-label="{{t $.Locale "console.advancedBackup"}}" aria-haspopup="dialog">⌄</button>
             </div>
-            <button id="stopBackup-{{$d.UDID}}" type="button" class="backup-control-button stop hidden" disabled onclick="event.stopPropagation();openStopBackup('{{$d.UDID}}')" data-i18n="control.stop">{{t $.Locale "control.stop"}}</button>
             <svg id="chev-{{$d.UDID}}" class="ui-icon" style="color:#ADB9C2;width:15px;height:15px" aria-hidden="true"><use href="/static/ui-icons.svg#icon-chevron-down"></use></svg>
           </div>
         </div>
@@ -1232,17 +1231,7 @@ function patchDevice(d){
   var offlineHelp=document.getElementById('offlineHelp-'+u); if(offlineHelp) offlineHelp.classList.toggle('hidden',d.conn!=='offline');
   var lb=document.getElementById('lastbackup-'+u); if(lb){ if(d.last_backup_at||d.last_backup){ setLiveAttribute(lb,'data-time',d.last_backup_at||d.last_backup);setLiveText(lb,IOSBKI18n.formatDate(d.last_backup_at||d.last_backup)); } else { lb.removeAttribute('data-time'); setLiveText(lb,tr('device.never'));setLiveAttribute(lb,'data-i18n','device.never'); } }
   renderBackupProgress(d);
-  var btn=document.getElementById('backupBtn-'+u);
-  if(btn){
-    var dis = (d.conn==='offline') || d.presence_known===false || d.operations_available===false || d.backing_up;
-    btn.disabled = dis;
-    btn.setAttribute('style','gap:9px;padding:10px 17px;font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit;border:none;white-space:nowrap;min-width:132px;'+(dis?'background:#F3F7FA;color:#ADB9C2;cursor:not-allowed;':'background:#2C62C6;color:#fff;'));
-    var retry=d.backup_progress && (d.backup_progress.state==='interrupted'||d.backup_progress.state==='failed');
-    setTranslatedHTML(btn,d.backing_up ? '<span data-i18n="'+IOSBKConsole.busyLabel(d)+'"></span>' : (d.auto_backup_hold?'<span data-i18n="control.manualOnce"></span>':(retry?'<span data-i18n="progress.retry"></span>':'<span data-i18n="device.backupNow"></span>')));
-    btn.style.opacity='';
-  }
   renderBackupControl(d);
-  var advanced=document.getElementById('backupAdvanced-'+u);if(advanced)advanced.disabled=!!btn.disabled;
 }
 
 /* ============== header actions ============== */
@@ -1394,25 +1383,52 @@ function gateMsg(d){
   if(!key) return 'gate.cant';
   return {message_code:key,params:{b:d.battery,m:d.min_battery}};
 }
-function startBackup(udid, btn){ submitBackup(udid, btn, 'auto'); }
-function submitBackup(udid, btn, mode){
-  btn.disabled=true; btn.style.opacity='.6';
-  var advanced=document.getElementById('backupAdvanced-'+udid);if(advanced)advanced.disabled=true;
-  function fail(payload){ toast(payload,true,'gate.cant'); btn.disabled=false; btn.style.opacity=''; if(advanced)advanced.disabled=false; }
-  csrfFetch('/api/backup/'+udid,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode:mode||'auto'})}).then(function(r){return r.json();}).then(function(data){
-    if(data.error_code || (data.error && data.code)){ fail(gateMsg(data)); }          // 被限制（未充电/电量低/离线/正忙）→ 说明原因
-    else if(data.error){ fail(data); }
-    else toast('action.fail.backupStartedYourDeviceWill');
-  }).catch(function(e){ fail('common.operationFailed'); });
+const backupStartPending={};
+function backupAction(udid,btn){
+  var d=latestDeviceStatuses[udid];
+  if(d&&IOSBKConsole.isBackupRunning(d)&&d.backup_job_active!==false)return openStopBackup(udid);
+  return startBackup(udid,btn);
+}
+function startBackup(udid,btn){ return submitBackup(udid,btn,'auto'); }
+function submitBackup(udid,btn,mode){
+  var before=latestDeviceStatuses[udid];
+  if(backupStartPending[udid]||(before&&(before.backing_up||before.conn==='offline'||before.operations_available===false||before.presence_known===false)))return Promise.resolve();
+  var previousJob=before&&before.backup_job_id;
+  backupStartPending[udid]=true;
+  renderBackupControl(before||{udid:udid});
+  return csrfFetch('/api/backup/'+udid,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode:mode||'auto'})}).then(function(r){return r.json();}).then(function(data){
+    if(data.error_code||(data.error&&data.code)){toast(gateMsg(data),true,'gate.cant');return;}
+    if(data.error){toast(data,true,'gate.cant');return;}
+    // SSE 可能先到，甚至已报告任务结束；迟到的启动响应不能覆盖它。
+    var current=latestDeviceStatuses[udid];
+    if(data.backup_job_id&&(!current||current.backup_job_id===previousJob)){
+      patchDevice(Object.assign({},current||{udid:udid},{backup_job_id:data.backup_job_id,backup_state:data.backup_state||'starting',backup_job_active:true,backing_up:true,active_operation:'backup'}));
+    }
+    toast('action.fail.backupStartedYourDeviceWill');
+  }).catch(function(){toast('common.operationFailed',true);}).finally(function(){
+    delete backupStartPending[udid];renderBackupControl(latestDeviceStatuses[udid]||before||{udid:udid});
+  });
 }
 
 /* ============== backup stopping and automatic holds ============== */
 const backupControlPending={};
 let backupStopTarget=null, backupStopSubmitting=false, backupStopFocus=null;
 function renderBackupControl(d){
-  var u=d.udid, pending=!!backupControlPending[u], stopping=d.backup_state==='stopping';
-  var stop=document.getElementById('stopBackup-'+u);
-  if(stop){stop.classList.toggle('hidden',!d.backing_up||d.backup_job_active===false);stop.disabled=pending||stopping||!d.backup_job_id;stop.textContent=tr(stopping?'control.stopping':'control.stop');}
+  var u=d.udid, pending=!!backupControlPending[u], running=IOSBKConsole.isBackupRunning(d)&&d.backup_job_active!==false;
+  var stopping=d.backup_state==='stopping'||(running&&backupControlPending[u]==='stop');
+  var starting=!!backupStartPending[u], canStop=running&&!!d.backup_job_id;
+  var busy=!!d.backing_up, unavailable=d.conn==='offline'||d.presence_known===false||d.operations_available===false;
+  var retry=d.backup_progress&&(d.backup_progress.state==='interrupted'||d.backup_progress.state==='failed');
+  var key=canStop?(stopping?'control.stopping':'control.stop'):(starting?'control.starting':(busy?IOSBKConsole.busyLabel(d):(d.auto_backup_hold?'control.manualOnce':(retry?'progress.retry':'device.backupNow'))));
+  var disabled=canStop?(pending||stopping):(starting||busy||unavailable);
+  var button=document.getElementById('backupBtn-'+u);
+  if(button){
+    button.disabled=disabled;setLiveText(button,tr(key));
+    setLiveAttribute(button,'style','gap:9px;padding:10px 17px;font-size:13.5px;font-weight:600;font-family:inherit;border:none;white-space:nowrap;min-width:132px;'+(disabled?'background:#F3F7FA;color:#ADB9C2;cursor:not-allowed;':(canStop?'background:#FFF0ED;color:#B83A36;cursor:pointer;':'background:#2C62C6;color:#fff;cursor:pointer;')));
+  }
+  var advanced=document.getElementById('backupAdvanced-'+u),single=starting||busy;
+  if(advanced){advanced.classList.toggle('hidden',single);advanced.disabled=disabled;}
+  var split=document.getElementById('backupSplit-'+u);if(split)split.classList.toggle('single',single);
   var banner=document.getElementById('backupHold-'+u);
   if(banner)banner.classList.toggle('hidden',!d.auto_backup_hold);
   var message=document.getElementById('backupHoldMessage-'+u);
@@ -1431,7 +1447,7 @@ function renderStopBackupDialog(){
 }
 function openStopBackup(udid){
   var d=latestDeviceStatuses[udid];
-  if(!d||!d.backing_up||d.backup_job_active===false||!d.backup_job_id||d.backup_state==='stopping'||backupControlPending[udid])return;
+  if(!d||!IOSBKConsole.isBackupRunning(d)||d.backup_job_active===false||!d.backup_job_id||d.backup_state==='stopping'||backupControlPending[udid])return;
   backupStopTarget={udid:udid,jobID:d.backup_job_id};
   backupStopFocus=document.activeElement;
   backupStopSubmitting=false;
@@ -1448,18 +1464,18 @@ function closeStopBackup(force){
   maybeReload();
 }
 function refreshBackupControlStatus(){
-  return IOSBKI18n.fetch('/api/status').then(function(r){return r.json();}).then(function(snap){(snap.devices||[]).forEach(patchDevice);applyI18n();});
+  return IOSBKI18n.fetch('/api/status').then(function(r){return r.json();}).then(function(snap){(snap.devices||[]).forEach(patchDevice);});
 }
 function sendBackupControl(udid,action,body){
   if(backupControlPending[udid])return Promise.resolve();
-  backupControlPending[udid]=true;
+  backupControlPending[udid]=action;
   if(latestDeviceStatuses[udid])renderBackupControl(latestDeviceStatuses[udid]);
   return csrfFetch('/api/backup-'+action+'/'+udid,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(r){return r.json();}).then(function(data){
     var current=latestDeviceStatuses[udid];
     if(current && (data.backup_job_id||'')===(current.backup_job_id||'')){
       var next=Object.assign({},current);
       ['backup_state','backing_up','auto_backup_hold','auto_backup_hold_version','auto_backup_hold_persistence'].forEach(function(key){if(Object.prototype.hasOwnProperty.call(data,key))next[key]=data[key];});
-      patchDevice(next);applyI18n();
+      patchDevice(next);
     }
     if(data.error)toast(data,true);
     else if(action==='resume')toast('control.resumed');

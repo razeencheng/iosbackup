@@ -923,7 +923,8 @@
     "notif.loadFailed": "Could not load saved settings. Reload them before saving or testing.",
     "notif.confirmFailed": "Could not confirm the saved settings. Your draft is kept; save again before testing.",
     "progress.fileWaiting": "Waiting for data",
-    "progress.fileFinished": "Transfer ended"
+    "progress.fileFinished": "Transfer ended",
+    "control.starting": "Starting…"
   },
   "zh-CN": {
     "app.title": "iOS Backup",
@@ -1849,6 +1850,7 @@
     "notif.loadFailed": "无法加载已保存的设置。请重新加载后再保存或发送测试。",
     "notif.confirmFailed": "无法确认已保存的设置。草稿已保留，请重新保存后再测试。",
     "progress.fileWaiting": "等待数据",
-    "progress.fileFinished": "传输已结束"
+    "progress.fileFinished": "传输已结束",
+    "control.starting": "正在启动…"
   }
 }

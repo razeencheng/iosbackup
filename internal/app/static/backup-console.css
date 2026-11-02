@@ -1,6 +1,7 @@
 /* B 方案：设备卡保留上下文，操作围绕所选备份或任务展开。 */
 .backup-advanced{width:34px;min-height:42px;padding:0;flex:none}
 .backup-split{display:inline-flex;flex:none;align-items:stretch;gap:0}
+.backup-split.single .backup-action{border-radius:8px!important}
 .backup-split .backup-action{border-radius:8px 0 0 8px!important}
 .backup-split .backup-advanced{border-radius:0 8px 8px 0;border:0;border-left:1px solid #ffffff55;background:#2c62c6;color:#fff;font-size:16px}
 .backup-split .backup-advanced:disabled{background:#f3f7fa;color:#adb9c2;border-left-color:#d8e2ea}
