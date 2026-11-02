@@ -12,6 +12,8 @@ import (
 // HoldWorkWriter 的目录锁可经 ExtraFiles 传给写入工具；应用退出后仍由
 // 存活的子进程持有。只关闭文件，不显式解锁共享的 open file description。
 func (s *Store) HoldWorkWriter(id string) (*os.File, error) {
+	s.opMu.Lock()
+	defer s.opMu.Unlock()
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if err := s.checkReady(); err != nil {
@@ -46,6 +48,8 @@ func (s *Store) lockWork(id string, mode int) (*os.File, error) {
 
 // UncommittedWork 仅列出可识别的未发布事务。由应用层核对持久引用后回收。
 func (s *Store) UncommittedWork() ([]string, error) {
+	s.opMu.Lock()
+	defer s.opMu.Unlock()
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if err := s.checkReady(); err != nil {
@@ -77,6 +81,8 @@ func (s *Store) UncommittedWork() ([]string, error) {
 
 // WorkLocation only returns an existing, owned, unpublished writable transaction.
 func (s *Store) WorkLocation(id string) (Work, error) {
+	s.opMu.Lock()
+	defer s.opMu.Unlock()
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if err := s.checkReady(); err != nil {
@@ -99,6 +105,8 @@ func (s *Store) WorkLocation(id string) (Work, error) {
 	return Work{ID: id, Parent: parent, Directory: filepath.Join(parent, s.identity.UDID)}, nil
 }
 func (s *Store) SyncWork(ctx context.Context, id string) error {
+	s.opMu.Lock()
+	defer s.opMu.Unlock()
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if err := s.checkReady(); err != nil {

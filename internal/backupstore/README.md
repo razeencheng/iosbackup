@@ -20,6 +20,10 @@ The source fingerprint detects file identity, size and timestamp changes, with b
 
 Recycle first records intent and removes the catalog reference durably. Only then does it remove the owned object and descriptor. Recovery checks descriptor consistency and treats a missing descriptor as a completed cleanup only when the object and catalog entry are also gone. Unknown directories and conflicting evidence are preserved.
 
+## Concurrent reads during cleanup
+
+Store operations acquire `opMu` before the catalog mutex `mu`. Transactions, work-directory operations, recovery and closure remain serialized. Recycle durably removes the catalog reference before releasing `mu` for physical file deletion; `opMu` remains held until cleanup finishes. Readers can list the updated catalog and acquire leases on other points, but cannot acquire the deleting point. GC rechecks leases before each remaining candidate and defers a point acquired while an earlier deletion was in progress. Failed physical deletion leaves the existing recovery transaction and marks the store uncertain after reacquiring `mu`.
+
 ## Filesystem and toolchain boundaries
 
 The target must support file and directory sync, same-filesystem rename and process locks. Go 1.25.0 is the minimum declared version for root-relative filesystem operations; the build toolchain is selected separately. No additional Go dependencies or CGO are required. On Linux, sealing compares `/proc/self/fdinfo` mount IDs of opened files: this accepts overlayfs device-number differences while rejecting nested bind mounts, even on the same underlying filesystem. Missing mount identity evidence blocks sealing.

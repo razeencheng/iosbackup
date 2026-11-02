@@ -112,9 +112,16 @@ func TestReviewHistoryShutdownCancels(t *testing.T) {
 		t.Fatal(e)
 	}
 	started := make(chan struct{})
+	cancelled := make(chan struct{})
+	finish := make(chan struct{})
+	var finishOnce sync.Once
+	allowFinish := func() { finishOnce.Do(func() { close(finish) }) }
+	defer allowFinish()
 	a.manifestRows = func(ctx context.Context, _ string, _ func(backupManifestRow) error) error {
 		close(started)
 		<-ctx.Done()
+		close(cancelled)
+		<-finish
 		return ctx.Err()
 	}
 	_, e = a.startHistoryReview(s, p, release)
@@ -129,18 +136,31 @@ func TestReviewHistoryShutdownCancels(t *testing.T) {
 	}
 	done := make(chan struct{})
 	go func() { a.closeBackupIndex(); close(done) }()
+	// 直接验证取消信号，不把后续持久化 I/O 误判成没有取消。
 	select {
-	case <-done:
-	case <-time.After(100 * time.Millisecond):
+	case <-cancelled:
+	case <-time.After(time.Second):
 		service := a.historyService()
 		service.mu.Lock()
-		run := service.reviews[p.ID]
-		run.cancel()
+		service.reviews[p.ID].cancel()
 		service.mu.Unlock()
+		allowFinish()
 		<-done
-		t.Fatal("coordinator shutdown failed to cancel historical scan; would wait 15 minutes")
+		t.Fatal("coordinator shutdown did not cancel historical scan")
+	}
+	select {
+	case <-done:
+		t.Fatal("shutdown returned before worker finished")
+	default:
+	}
+	allowFinish()
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("shutdown did not join canceled worker")
 	}
 }
+
 func TestReviewArchivedHistoryReadable(t *testing.T) {
 	a, h, p := historyHTTPFixture(t)
 	now := time.Now()

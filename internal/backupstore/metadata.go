@@ -11,6 +11,8 @@ import (
 
 // SetPinned is a durable compare-and-swap; pinning does not change check state.
 func (s *Store) SetPinned(ctx context.Context, id string, pinned bool, revision uint64) error {
+	s.opMu.Lock()
+	defer s.opMu.Unlock()
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if err := s.checkReady(); err != nil {
@@ -31,6 +33,8 @@ func (s *Store) SetPinned(ctx context.Context, id string, pinned bool, revision 
 // Freeze is restartable. A caller must durably enter a disabling state before
 // calling it, and may enable a fresh epoch only after every store is frozen.
 func (s *Store) Freeze(ctx context.Context) error {
+	s.opMu.Lock()
+	defer s.opMu.Unlock()
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if err := s.checkReady(); err != nil {
@@ -116,6 +120,8 @@ func (s *Store) finishMetadata(tx transaction) error {
 // RecordReview records new read-only evidence without promoting a pending point
 // or changing the original quick check that qualified its saved result.
 func (s *Store) RecordReview(ctx context.Context, id string, check Check, revision uint64) error {
+	s.opMu.Lock()
+	defer s.opMu.Unlock()
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if err := s.checkReady(); err != nil {

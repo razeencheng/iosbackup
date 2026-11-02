@@ -10,6 +10,8 @@ import (
 
 // Recycle 是带版本和占用保护的底层回收原语。保留策略在上层生成候选。
 func (s *Store) Recycle(ctx context.Context, id string, revision uint64) error {
+	s.opMu.Lock()
+	defer s.opMu.Unlock()
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.recycleLocked(ctx, id, revision)
@@ -18,6 +20,8 @@ func (s *Store) Recycle(ctx context.Context, id string, revision uint64) error {
 // Delete requires explicit user confirmation in the application layer. Unlike
 // automatic retention it may remove a pin or the final baseline, but never a reader.
 func (s *Store) Delete(ctx context.Context, id string, revision uint64) error {
+	s.opMu.Lock()
+	defer s.opMu.Unlock()
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.deleteLocked(ctx, id, revision, true, nil)
@@ -69,6 +73,7 @@ func (s *Store) deleteLocked(ctx context.Context, id string, revision uint64, ex
 	}
 	return nil
 }
+// finishRecycle 要求调用者持有 opMu 和 mu，返回时仍持有这两把锁。
 func (s *Store) finishRecycle(ctx context.Context, tx transaction) error {
 	id := tx.ID
 	_, published := s.catalog.Points[id]
@@ -112,6 +117,10 @@ func (s *Store) finishRecycle(ctx context.Context, tx transaction) error {
 		}
 		s.catalog = next
 	}
+	// 删除意图和目录更新已经持久化；新读者无法再获取此点。
+	// 调用者一直持有 opMu，因此其他事务、恢复与 Close 不能介入。
+	s.mu.Unlock()
+	defer s.mu.Lock()
 	if err := s.stage("recycle-data", func() error { return removeTree(ctx, s.root, filepath.Join("objects", id)) }); err != nil {
 		return err
 	}
@@ -163,6 +172,8 @@ func (s *Store) verifyRecycleSource(id string, expected Point, published bool) e
 // DeleteWithIntent holds the same lock as reader admission while the application
 // durably records its current-source intent. The callback must not call Store.
 func (s *Store) DeleteWithIntent(ctx context.Context, id string, revision uint64, beforeIntent func() error) error {
+	s.opMu.Lock()
+	defer s.opMu.Unlock()
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.deleteLocked(ctx, id, revision, true, beforeIntent)

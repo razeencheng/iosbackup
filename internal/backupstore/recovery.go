@@ -11,6 +11,8 @@ import (
 )
 
 func (s *Store) Recover(ctx context.Context) (RecoveryReport, error) {
+	s.opMu.Lock()
+	defer s.opMu.Unlock()
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	var report RecoveryReport

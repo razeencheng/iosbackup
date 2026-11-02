@@ -18,6 +18,9 @@ import (
 const metadataLimit = 16 << 20
 
 type Store struct {
+	// opMu 串行化事务、工作目录操作与关闭；顺序始终是 opMu → mu。
+	// 物理回收可临时释放 mu，让目录读取和其他点的读租约继续工作。
+	opMu      sync.Mutex
 	mu        sync.Mutex
 	path      string
 	root      *os.Root
@@ -148,6 +151,8 @@ func (s *Store) lockStore() error {
 	return nil
 }
 func (s *Store) Close() error {
+	s.opMu.Lock()
+	defer s.opMu.Unlock()
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.closed {

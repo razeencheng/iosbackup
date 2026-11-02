@@ -66,6 +66,8 @@ func (s *Store) saveTransaction(tx transaction) error {
 	return s.writeJSON(filepath.Join("transactions", tx.ID+".json"), tx)
 }
 func (s *Store) NewWork(jobID string) (Work, error) {
+	s.opMu.Lock()
+	defer s.opMu.Unlock()
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if err := s.checkReady(); err != nil {
@@ -92,6 +94,8 @@ func (s *Store) NewWork(jobID string) (Work, error) {
 	return Work{ID: id, Parent: parent, Directory: filepath.Join(parent, s.identity.UDID)}, nil
 }
 func (s *Store) Commit(ctx context.Context, workID string, point Point) (Point, error) {
+	s.opMu.Lock()
+	defer s.opMu.Unlock()
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if err := s.checkReady(); err != nil {
@@ -285,6 +289,8 @@ func cloneBaselines(source map[string]string) map[string]string {
 	return target
 }
 func (s *Store) AbortWork(ctx context.Context, id string) error {
+	s.opMu.Lock()
+	defer s.opMu.Unlock()
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if err := ctx.Err(); err != nil {
