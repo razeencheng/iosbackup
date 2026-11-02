@@ -118,6 +118,9 @@ const (
 
 // App 应用结构
 type application struct {
+	// 状态发布和订阅首帧共用顺序；锁内不做客户端网络写入。
+	statusPublishMu sync.Mutex
+
 	historyHTTP         *historyService
 	backupIndex         *backupIndexCoordinator
 	backupIndexStatuses map[string]backupIndexBrief

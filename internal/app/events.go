@@ -56,14 +56,20 @@ func (h *eventHub) Unsubscribe(ch chan []byte) {
 	h.mu.Unlock()
 }
 
-// Broadcast 向所有客户端发送；缓冲满的（慢）客户端直接丢帧，绝不阻塞。
+// Broadcast 向所有客户端发送；慢客户端丢弃最旧帧，保留最新状态且不阻塞。
 func (h *eventHub) Broadcast(payload []byte) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	for ch := range h.clients {
 		select {
 		case ch <- payload:
-		default: // 慢客户端：丢帧
+		default:
+			// 发布者由 h.mu 串行化；接收者只会腾出空间。
+			select {
+			case <-ch:
+			default:
+			}
+			ch <- payload
 		}
 	}
 }
@@ -291,6 +297,8 @@ func (app *application) buildStatusSnapshot() statusSnapshot {
 
 // broadcastStatus 仅在快照相对上次发生变化时广播（事件化，不刷屏）。
 func (app *application) broadcastStatus() {
+	app.statusPublishMu.Lock()
+	defer app.statusPublishMu.Unlock()
 	if app.hub == nil {
 		return
 	}
@@ -635,11 +643,15 @@ func (app *application) handleEvents(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Connection", "keep-alive")
 	w.Header().Set("X-Accel-Buffering", "no") // 关反代缓冲
 
+	// 订阅和首帧取样不能与发布交错，否则旧帧可能排在新首帧之后。
+	app.statusPublishMu.Lock()
 	ch := app.hub.Subscribe()
+	payload, err := json.Marshal(app.buildStatusSnapshot())
+	app.statusPublishMu.Unlock()
 	defer app.hub.Unsubscribe(ch)
 
-	// 首帧：当前快照（首屏对齐）
-	if payload, err := json.Marshal(app.buildStatusSnapshot()); err == nil {
+	// 网络写入在锁外，慢连接不阻塞发布或其他连接。
+	if err == nil {
 		fmt.Fprintf(w, "data: %s\n\n", payload)
 		flusher.Flush()
 	}
