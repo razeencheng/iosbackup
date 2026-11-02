@@ -34,7 +34,7 @@
     "progress.waitingAuthorizationTitle": "Waiting for device authorization",
     "progress.waitingAuthorizationHint": "Check your iPhone and enter its passcode when prompted. This backup stops if the wait times out.",
     "progress.waitingDeviceTitle": "Waiting for the device",
-    "progress.waitingDeviceHint": "Waiting for the device response. Preparing a large encrypted backup can take several minutes without changing the overall percentage.",
+    "progress.waitingDeviceHint": "Waiting for the next response from the phone. Keep it connected; the reported progress may remain unchanged while it processes the backup.",
     "progress.sendingTitle": "Sending data to the device",
     "progress.sendingHint": "Sending data needed by the backup. Incremental backups first send the existing manifest.",
     "progress.stalledHint": "No backup activity was detected within the time limit, so this job stopped. Check device authorization and the network, then retry.",
@@ -74,7 +74,7 @@
     "progress.runningHint": "Receiving backup data. Keep the device connection stable.",
     "progress.overallOnlyHint": "Reliable per-file byte counts are unavailable, so only overall progress is shown.",
     "progress.currentFile": "Current file",
-    "progress.currentFileHint": "Progress of the file currently being transferred",
+    "progress.currentFileHint": "File transfer progress reported by the device",
     "progress.separator": ". ",
     "progress.reconnectingTitle": "Waiting for the device to reconnect",
     "progress.reconnectingHint": "Wi-Fi was interrupted. The last progress is preserved while waiting for the device.",
@@ -921,7 +921,9 @@
     "notif.saving": "Saving notification settings…",
     "notif.loading": "Loading saved notification settings…",
     "notif.loadFailed": "Could not load saved settings. Reload them before saving or testing.",
-    "notif.confirmFailed": "Could not confirm the saved settings. Your draft is kept; save again before testing."
+    "notif.confirmFailed": "Could not confirm the saved settings. Your draft is kept; save again before testing.",
+    "progress.fileWaiting": "Waiting for data",
+    "progress.fileFinished": "Transfer ended"
   },
   "zh-CN": {
     "app.title": "iOS Backup",
@@ -958,7 +960,7 @@
     "progress.waitingAuthorizationTitle": "等待手机授权",
     "progress.waitingAuthorizationHint": "请查看 iPhone，并按提示输入锁屏密码。超过等待期限后本次备份会停止。",
     "progress.waitingDeviceTitle": "等待手机处理",
-    "progress.waitingDeviceHint": "正在等待手机的下一步响应。较大的加密备份在准备阶段可能需要几分钟，总体进度暂时不变。",
+    "progress.waitingDeviceHint": "正在等待手机的下一步响应。请保持连接，手机处理备份时，上报的进度可能暂时不变。",
     "progress.sendingTitle": "正在向手机发送数据",
     "progress.sendingHint": "正在发送备份所需的数据；增量备份会先发送已有清单。",
     "progress.stalledHint": "长时间未检测到备份活动，本次任务已停止。请检查手机授权和网络后重新备份。",
@@ -998,7 +1000,7 @@
     "progress.runningHint": "正在接收备份数据，请保持设备连接稳定。",
     "progress.overallOnlyHint": "当前没有可靠的文件字节信息，页面只展示总体进度。",
     "progress.currentFile": "当前文件",
-    "progress.currentFileHint": "当前正在传输的文件进度",
+    "progress.currentFileHint": "设备上报的文件传输进度",
     "progress.separator": "。 ",
     "progress.reconnectingTitle": "等待设备重新连接",
     "progress.reconnectingHint": "Wi-Fi 连接暂时中断，正在保留最后进度并等待设备重新上线。",
@@ -1845,6 +1847,8 @@
     "notif.saving": "正在保存通知设置…",
     "notif.loading": "正在加载已保存的通知设置…",
     "notif.loadFailed": "无法加载已保存的设置。请重新加载后再保存或发送测试。",
-    "notif.confirmFailed": "无法确认已保存的设置。草稿已保留，请重新保存后再测试。"
+    "notif.confirmFailed": "无法确认已保存的设置。草稿已保留，请重新保存后再测试。",
+    "progress.fileWaiting": "等待数据",
+    "progress.fileFinished": "传输已结束"
   }
 }

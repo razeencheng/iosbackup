@@ -1,20 +1,59 @@
 'use strict';
-const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
-const template=fs.readFileSync(path.join(__dirname,'../templates/index.html'),'utf8');
-const nodes={};
-function node(id){return nodes[id]||(nodes[id]={textContent:'',style:{},attrs:{},classList:{toggle(){}},setAttribute(k,v){this.attrs[k]=v},removeAttribute(k){delete this.attrs[k]}})}
-const context={document:{getElementById:node},window:{IOSBKConsole:{isBackupRunning:()=>true}},tr:key=>key,IOSBKI18n:{getLocale:()=> 'en',formatDate:()=>'',has:()=>false}};
-context.IOSBKConsole=context.window.IOSBKConsole;
-vm.runInNewContext(template.slice(template.indexOf('function isBackupProgressNumber'),template.indexOf('function rerenderBackupProgress')),context);
-const progress={state:'preparing',phase:'local_copying',local:{phase:'copying',bytes:50,total_bytes:100,totals_known:true}};
-assert.equal(context.backupProgressMode(progress),'local-copying','local copy must not display phone authorization');
-context.renderBackupProgress({udid:'A',backup_state:'running',backup_progress:progress});
-assert.equal(nodes['bkprogress-value-A'].textContent,'50%');
-assert.equal(nodes['bkprogress-track-A'].attrs['aria-label'],'progress.localAria');
-assert.equal(nodes['bkprogress-status-hint-A'].textContent,'progress.localHint');
-assert.equal(context.backupProgressMode({state:'failed',phase:'local_copying',local:progress.local}),'failed','terminal status wins over previous local progress');
-context.renderBackupProgress({udid:'A',backup_state:'running',backup_progress:{state:'preparing',phase:'local_scanning',local:{phase:'scanning',totals_known:false}}});
-assert.equal(nodes['bkprogress-value-A'].textContent,'—','unknown scan total must not invent a percent');
-context.renderBackupProgress({udid:'A',backup_state:'running',backup_progress:{state:'preparing',phase:'preparing'}});
-assert.equal(nodes['bkprogress-status-hint-A'].textContent,'progress.preparingHint','phone connection restores authorization guidance');
-console.log('local copy progress is distinct from phone progress and authorization');
+const assert=require('node:assert/strict'),vm=require('node:vm');
+const {boot,dom,pageScript,catalogs}=require('./i18n-test-helpers');
+const app=boot(),ui=dom(app);
+vm.runInContext(pageScript('index.html'),app.context);
+ui.get('card-A').setAttribute('data-udid-card','A');
+const initialKeys={'title':'progress.preparingTitle','subtitle':'progress.preparingSubtitle','status-title':'progress.preparingTitle','status-hint':'progress.preparingHint'};
+Object.entries(initialKeys).forEach(([suffix,key])=>ui.get('bkprogress-'+suffix+'-A').setAttribute('data-i18n',key));
+const writes=[];
+for(const suffix of ['title','subtitle','status-title','status-hint','activity']) {
+ const node=ui.get('bkprogress-'+suffix+'-A');let text=node.textContent;
+ Object.defineProperty(node,'textContent',{get:()=>text,set:value=>{writes.push({suffix,value});text=value;}});
+}
+const status=ui.get('bkprogress-status-A');let statusClass='';
+Object.defineProperty(status,'className',{get:()=>statusClass,set:value=>{writes.push({suffix:'class',value});statusClass=value;}});
+const icon=ui.get('bkprogress-status-icon-A'),setAttribute=icon.setAttribute;
+icon.setAttribute=function(key,value){writes.push({suffix:'icon',value});setAttribute.call(this,key,value);};
+const base={udid:'A',name:'Phone',conn:'wifi',online:true,backing_up:true,active_operation:'backup',backup_job_active:true,backup_job_id:'job-a',backup_state:'running'};
+function render(progress,extra={}) {const device={...base,...extra,backup_progress:progress};vm.runInContext('applyStatus('+JSON.stringify({devices:[device],backup_in_progress:device.backing_up?1:0,timezone:'Asia/Shanghai'})+')',app.context);return device;}
+const receiving={state:'running',phase:'receiving',overall_percent:3,current_bytes:5,current_total_bytes:10,last_activity_at:'2026-11-02T12:00:01Z'};
+render(receiving);
+writes.length=0;
+render({...receiving});
+assert.deepEqual(writes,[],'identical snapshots must not rewrite progress copy, tone or icon');
+render({...receiving,current_bytes:7,last_activity_at:'2026-11-02T12:00:20Z'});
+assert.deepEqual(writes,[],'byte updates and activity within the displayed minute must not rewrite status');
+assert.match(ui.get('bkprogress-current-value-A').textContent,/7 B/);
+app.api.setLocale('zh-CN');
+assert.equal(ui.get('bkprogress-status-title-A').textContent,catalogs['zh-CN']['progress.runningTitle']);
+assert.ok(!writes.some(w=>w.value===catalogs['zh-CN']['progress.preparingTitle']),'language switch must not flash the initial preparing copy');
+render({...receiving,phase:'waiting_device'});
+assert.equal(ui.get('bkprogress-current-A').classList.contains('hidden'),false,'short protocol waits must keep the file row in the layout');
+assert.doesNotMatch(ui.get('bkprogress-current-value-A').textContent,/5 B/,'waiting must not present stale file bytes as active transfer');
+render({...receiving,phase:'receiving',current_bytes:null,current_total_bytes:null});
+assert.equal(ui.get('bkprogress-current-A').classList.contains('hidden'),false,'file boundaries retain the established slot');
+render({...receiving,phase:'sending'});
+assert.equal(ui.get('bkprogress-status-title-A').textContent,catalogs['zh-CN']['progress.sendingTitle']);
+for(const phase of ['preparing','waiting_authorization','waiting_device']) {
+ render({state:'running',phase},{backup_job_id:'job-'+phase});
+ assert.equal(ui.get('bkprogress-value-A').textContent,'','unknown progress must not show a dash or a made-up percent');
+ assert.equal(ui.get('bkprogress-track-A').getAttribute('aria-valuenow'),null);
+ if(phase==='waiting_authorization')assert.equal(ui.get('bkprogress-track-A').classList.contains('indeterminate'),false);
+}
+for(const percent of [0,3]) {
+ render({...receiving,overall_percent:percent});
+ assert.equal(ui.get('bkprogress-value-A').textContent,percent+'%');
+ assert.equal(ui.get('bkprogress-track-A').getAttribute('aria-valuenow'),String(percent));
+}
+const local={state:'preparing',phase:'local_copying',local:{phase:'copying',bytes:50,total_bytes:100,totals_known:true}};
+render(local,{backup_job_id:'job-local'});
+assert.equal(ui.get('bkprogress-value-A').textContent,'50%');
+assert.equal(ui.get('bkprogress-track-A').getAttribute('aria-label'),catalogs['zh-CN']['progress.localAria']);
+assert.equal(ui.get('bkprogress-status-hint-A').textContent,catalogs['zh-CN']['progress.localHint']);
+assert.equal(ui.get('bkprogress-current-A').classList.contains('hidden'),true,'new tasks must not inherit the previous file slot');
+for(const state of ['stopping','stopped','failed','interrupted','completed']) {
+ render({...receiving,state},{backup_state:state,backing_up:state==='stopping'});
+ assert.equal(ui.get('bkbar-A').getAttribute('data-progress-mode'),state,'terminal/stop state is immediate');
+}
+console.log('progress snapshots update only changed values; waits, locale changes and local/phone scopes remain distinct');

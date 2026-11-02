@@ -36,10 +36,15 @@
   .backup-progress-panel{padding:0 20px 18px;background:#FBFCFD;border-top:1px solid #E7EDF2}
   .backup-progress-heading{display:flex;align-items:flex-end;justify-content:space-between;gap:14px;padding-top:17px}
   .backup-progress-heading-copy{min-width:0}
-  .backup-progress-heading-copy strong{display:block;font-size:13.5px;line-height:1.4;color:#213041}
-  .backup-progress-heading-copy span{display:block;margin-top:3px;color:#718090;font-size:11.5px;line-height:1.5}
-  .backup-progress-value{flex:none;color:#2C62C6;font-size:20px;font-weight:750;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+  .backup-progress-heading-copy strong{display:block;min-height:2.8em;font-size:13.5px;line-height:1.4;color:#213041}
+  .backup-progress-heading-copy span{display:block;min-height:3em;margin-top:3px;color:#718090;font-size:11.5px;line-height:1.5}
+  .backup-progress-value{flex:none;min-width:5ch;text-align:right;color:#2C62C6;font-size:20px;font-weight:750;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
   .backup-overall-track{height:8px;margin-top:12px;border-radius:var(--iosbk-radius);background:#E4EBF2;overflow:hidden;position:relative}
+  .backup-overall-track.empty{visibility:hidden}
+  .backup-status-copy{display:grid}
+  .backup-status-copy>div{grid-area:1/1;min-width:0}
+  .backup-status-measure{visibility:hidden;pointer-events:none}
+  .backup-status-body{flex:1;min-width:0}
   .backup-overall-fill{height:100%;border-radius:inherit;background:#2C62C6;transition:width .26s ease}
   .backup-overall-track.indeterminate .backup-overall-fill{width:34%;background:linear-gradient(90deg,#A8BDE5,#2C62C6,#A8BDE5);animation:iosbkprogressscan 1.45s ease-in-out infinite}
   .backup-current-file{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-top:13px}
@@ -47,7 +52,7 @@
   .backup-current-icon{width:28px;height:28px;display:grid;place-items:center;flex:none;border:1px solid #D4E1F6;border-radius:var(--iosbk-radius);background:#EEF4FF;color:#2C62C6}
   .backup-current-icon .ui-icon{width:15px;height:15px}
   .backup-current-copy strong{color:#213041;font-weight:700}
-  .backup-current-value{color:#213041;font-size:11.5px;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .backup-current-value{line-height:1.5;color:#213041;font-size:11.5px;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
   .backup-status-message{display:flex;align-items:flex-start;gap:9px;margin-top:13px;padding:11px 12px;border:1px solid #D8E2EA;border-radius:var(--iosbk-radius);background:#fff;color:#607181;font-size:11.5px;line-height:1.55}
   .backup-status-message .ui-icon{width:16px;height:16px;margin-top:1px;color:#2C62C6}
   .backup-status-message strong{color:#213041}
@@ -285,7 +290,7 @@
         <div id="bkbar-{{$d.UDID}}" class="backup-progress-panel{{if or (not $backingUp) (eq $operation "check") (eq $operation "local")}} hidden{{end}}" data-progress-mode="preparing">
           <div class="backup-progress-heading">
             <div class="backup-progress-heading-copy"><strong id="bkprogress-title-{{$d.UDID}}" data-i18n="progress.preparingTitle">{{t $.Locale "progress.preparingTitle"}}</strong><span id="bkprogress-subtitle-{{$d.UDID}}" data-i18n="progress.preparingSubtitle">{{t $.Locale "progress.preparingSubtitle"}}</span></div>
-            <span id="bkprogress-value-{{$d.UDID}}" class="backup-progress-value">—</span>
+            <span id="bkprogress-value-{{$d.UDID}}" class="backup-progress-value"></span>
           </div>
           <div id="bkprogress-track-{{$d.UDID}}" class="backup-overall-track indeterminate" role="progressbar" aria-valuemin="0" aria-valuemax="100"><div id="bkprogress-fill-{{$d.UDID}}" class="backup-overall-fill"></div></div>
           <div id="bkprogress-current-{{$d.UDID}}" class="backup-current-file hidden">
@@ -294,7 +299,15 @@
           </div>
           <div id="bkprogress-status-{{$d.UDID}}" class="backup-status-message">
             <svg class="ui-icon" aria-hidden="true"><use id="bkprogress-status-icon-{{$d.UDID}}" href="/static/ui-icons.svg#icon-info"></use></svg>
-            <div><strong id="bkprogress-status-title-{{$d.UDID}}" data-i18n="progress.preparingTitle">{{t $.Locale "progress.preparingTitle"}}</strong><span data-i18n="progress.separator" aria-hidden="true">{{t $.Locale "progress.separator"}}</span><span id="bkprogress-status-hint-{{$d.UDID}}" data-i18n="progress.preparingHint">{{t $.Locale "progress.preparingHint"}}</span><div id="bkprogress-activity-{{$d.UDID}}" style="margin-top:6px;font-size:12px;opacity:.8"></div></div>
+            <div class="backup-status-body">
+              <div class="backup-status-copy">
+                <div><strong id="bkprogress-status-title-{{$d.UDID}}" data-i18n="progress.preparingTitle">{{t $.Locale "progress.preparingTitle"}}</strong><span data-i18n="progress.separator" aria-hidden="true">{{t $.Locale "progress.separator"}}</span><span id="bkprogress-status-hint-{{$d.UDID}}" data-i18n="progress.preparingHint">{{t $.Locale "progress.preparingHint"}}</span></div>
+                <div class="backup-status-measure" aria-hidden="true"><strong data-i18n="progress.runningTitle">{{t $.Locale "progress.runningTitle"}}</strong><span data-i18n="progress.separator">{{t $.Locale "progress.separator"}}</span><span data-i18n="progress.runningHint">{{t $.Locale "progress.runningHint"}}</span></div>
+                <div class="backup-status-measure" aria-hidden="true"><strong data-i18n="progress.sendingTitle">{{t $.Locale "progress.sendingTitle"}}</strong><span data-i18n="progress.separator">{{t $.Locale "progress.separator"}}</span><span data-i18n="progress.sendingHint">{{t $.Locale "progress.sendingHint"}}</span></div>
+                <div class="backup-status-measure" aria-hidden="true"><strong data-i18n="progress.waitingDeviceTitle">{{t $.Locale "progress.waitingDeviceTitle"}}</strong><span data-i18n="progress.separator">{{t $.Locale "progress.separator"}}</span><span data-i18n="progress.waitingDeviceHint">{{t $.Locale "progress.waitingDeviceHint"}}</span></div>
+                <div class="backup-status-measure" aria-hidden="true"><strong data-i18n="progress.runningTitle">{{t $.Locale "progress.runningTitle"}}</strong><span data-i18n="progress.separator">{{t $.Locale "progress.separator"}}</span><span data-i18n="progress.overallOnlyHint">{{t $.Locale "progress.overallOnlyHint"}}</span></div>
+              </div>
+              <div id="bkprogress-activity-{{$d.UDID}}" style="margin-top:6px;font-size:12px;opacity:.8"></div></div>
           </div>
         </div>
 
@@ -1057,7 +1070,6 @@ function applyStatus(snap){
   (snap.devices||[]).forEach(patchDevice);
   backingCount = snap.backup_in_progress||0;
   updateAutoText();
-  applyI18n(); // 填充 patch 进来的 data-i18n 文案
 }
 function itileStyle(conn){
   var base='';
@@ -1084,6 +1096,17 @@ function batteryHTML(d){
   if(!d.online || d.presence_known===false) return '';
   var col = d.charging?'#2E7D5B':(d.battery<=20?'#BD2C24':'#718090');
   return batteryIconHTML(col)+d.battery+'%'+(d.charging?'<span style="color:#2E7D5B;font-weight:600">· <span data-i18n="battery.charging"></span></span>':'');
+}
+// 动态节点自行翻译；只有内容变化时才更新，避免普通状态推送重画整页。
+function setLiveText(node,text){
+  if(!node)return;
+  if(node.getAttribute('data-i18n')!==null)node.removeAttribute('data-i18n');
+  if(node.textContent!==text)node.textContent=text;
+}
+function setLiveAttribute(node,key,value){if(node.getAttribute(key)!==value){if(value===null)node.removeAttribute(key);else node.setAttribute(key,value);}}
+function setTranslatedHTML(node,html){
+  if(!node||node.translatedMarkup===html)return;
+  node.innerHTML=html;node.translatedMarkup=html;IOSBKI18n.apply(node);
 }
 function isBackupProgressNumber(value){ return typeof value==='number' && Number.isFinite(value) && value>=0; }
 function backupProgressMode(progress){
@@ -1157,33 +1180,39 @@ function renderBackupProgress(d){
 
   var mode=d.backup_state==='stopping'?'stopping':(d.backup_state==='stopped'?'stopped':backupProgressMode(progress)), copy=backupProgressCopy(mode,d);
   var terminal=['completed','failed','stopped','interrupted'].indexOf(mode)>=0;
-  panel.classList.toggle('hidden',!running && (d.backing_up || !terminal)); panel.setAttribute('data-progress-mode',mode);
+  panel.classList.toggle('hidden',!running && (d.backing_up || !terminal)); setLiveAttribute(panel,'data-progress-mode',mode);
   var title=document.getElementById('bkprogress-title-'+u), subtitle=document.getElementById('bkprogress-subtitle-'+u), value=document.getElementById('bkprogress-value-'+u);
   var track=document.getElementById('bkprogress-track-'+u), fill=document.getElementById('bkprogress-fill-'+u);
   var overall=isBackupProgressNumber(progress.overall_percent) && progress.overall_percent<=100 ? progress.overall_percent : null;
   var local=mode.indexOf('local-')===0?progress.local:null;
   if(local){overall=null;if(local.totals_known && local.phase==='copying' && local.total_bytes>0)overall=Math.min(100,100*local.bytes/local.total_bytes);else if(local.totals_known&&local.phase==='verifying'&&local.total_files>0)overall=Math.min(100,100*local.scanned_files/local.total_files);}
   var indeterminate=(mode==='preparing'||!!local) && overall===null;
-  title.textContent=tr(copy.title); subtitle.textContent=tr(copy.subtitle); value.textContent=overall===null?'—':formatBackupPercent(overall);
-  track.setAttribute('aria-label',tr(local?'progress.localAria':'progress.overallAria'));
-  track.classList.toggle('hidden',overall===null && !indeterminate);
+  setLiveText(title,tr(copy.title)); setLiveText(subtitle,tr(copy.subtitle)); setLiveText(value,overall===null?'':formatBackupPercent(overall));
+  setLiveAttribute(track,'aria-label',tr(local?'progress.localAria':'progress.overallAria'));
+  track.classList.toggle('empty',overall===null && !indeterminate);
+  setLiveAttribute(track,'aria-hidden',overall===null && !indeterminate?'true':null);
   track.classList.toggle('indeterminate',indeterminate);
-  if(overall===null){ track.removeAttribute('aria-valuenow'); fill.style.width=''; }
-  else { track.setAttribute('aria-valuenow',String(overall)); fill.style.width=overall+'%'; }
+  setLiveAttribute(track,'aria-valuenow',overall===null?null:String(overall));
+  var width=overall===null?'':overall+'%';if(fill.style.width!==width)fill.style.width=width;
 
   var current=document.getElementById('bkprogress-current-'+u), currentValue=document.getElementById('bkprogress-current-value-'+u);
   var hasCurrentFile=(mode==='transferring'||mode==='reconnecting') && isBackupProgressNumber(progress.current_bytes) && isBackupProgressNumber(progress.current_total_bytes) && progress.current_total_bytes>0;
-  current.classList.toggle('hidden',!hasCurrentFile);
-  currentValue.textContent=hasCurrentFile?formatBackupBytes(progress.current_bytes)+' / '+formatBackupBytes(progress.current_total_bytes)+(isBackupProgressNumber(progress.current_file_percent)?' · '+formatBackupPercent(progress.current_file_percent):''):'';
+  // 当前任务一旦收到文件进度，就保留这一行；新任务和本地阶段不继承旧占位。
+  var task=d.backup_job_id||'';
+  if(panel.fileProgressTask!==task){panel.fileProgressTask=task;panel.hadFileProgress=false;}
+  if(hasCurrentFile)panel.hadFileProgress=true;
+  var showFile=hasCurrentFile||(!local&&panel.hadFileProgress);
+  current.classList.toggle('hidden',!showFile);
+  setLiveText(currentValue,hasCurrentFile?formatBackupBytes(progress.current_bytes)+' / '+formatBackupBytes(progress.current_total_bytes)+(isBackupProgressNumber(progress.current_file_percent)?' · '+formatBackupPercent(progress.current_file_percent):''):(showFile?tr(terminal?'progress.fileFinished':'progress.fileWaiting'):''));
 
   var status=document.getElementById('bkprogress-status-'+u), statusTitle=document.getElementById('bkprogress-status-title-'+u), statusHint=document.getElementById('bkprogress-status-hint-'+u), statusIcon=document.getElementById('bkprogress-status-icon-'+u);
-  status.className='backup-status-message'+(copy.tone?' '+copy.tone:'');
-  statusTitle.textContent=tr(copy.title); statusHint.textContent=(mode==='failed'||mode==='interrupted')?backupFailureMessage(d,copy.hint):tr(copy.hint);
+  var statusClass='backup-status-message'+(copy.tone?' '+copy.tone:'');if(status.className!==statusClass)status.className=statusClass;
+  setLiveText(statusTitle,tr(copy.title)); setLiveText(statusHint,(mode==='failed'||mode==='interrupted')?backupFailureMessage(d,copy.hint):tr(copy.hint));
   var activity=document.getElementById('bkprogress-activity-'+u);
   var lastActivity=progress.last_activity_at ? new Date(progress.last_activity_at) : null;
-  activity.textContent=lastActivity && !isNaN(lastActivity.getTime()) ? tr('progress.lastActivity')+IOSBKI18n.formatDate(progress.last_activity_at) : tr('progress.noActivity');
-  if(local)activity.textContent=localPreparationSummary(local);
-  statusIcon.setAttribute('href','/static/ui-icons.svg#icon-'+copy.icon);
+  var activityText=lastActivity && !isNaN(lastActivity.getTime()) ? tr('progress.lastActivity')+IOSBKI18n.formatDate(progress.last_activity_at) : tr('progress.noActivity');
+  setLiveText(activity,local?localPreparationSummary(local):activityText);
+  setLiveAttribute(statusIcon,'href','/static/ui-icons.svg#icon-'+copy.icon);
 }
 function rerenderBackupProgress(){ Object.keys(latestDeviceStatuses).forEach(function(udid){ renderBackupProgress(latestDeviceStatuses[udid]); }); }
 function patchDevice(d){
@@ -1198,10 +1227,10 @@ function patchDevice(d){
   document.querySelectorAll('[data-connection-action]').forEach(function(button){if(button.getAttribute('data-connection-action')===u) button.disabled=d.operations_available===false||d.backing_up;});
   var tile=document.getElementById('itile-'+u); if(tile) tile.setAttribute('style', itileStyle(d.conn));
   var name=document.getElementById('name-'+u); if(name) name.style.color = (d.conn==='offline')?'#96A3AE':'#213041';
-  var battery=document.getElementById('battery-'+u); if(battery) battery.innerHTML=batteryHTML(d);
-  var box=document.getElementById('connbox-'+u); if(box) box.innerHTML = badgeHTML(d.conn);
+  var battery=document.getElementById('battery-'+u); if(battery) setTranslatedHTML(battery,batteryHTML(d));
+  var box=document.getElementById('connbox-'+u); if(box) setTranslatedHTML(box,badgeHTML(d.conn));
   var offlineHelp=document.getElementById('offlineHelp-'+u); if(offlineHelp) offlineHelp.classList.toggle('hidden',d.conn!=='offline');
-  var lb=document.getElementById('lastbackup-'+u); if(lb){ if(d.last_backup_at||d.last_backup){ lb.setAttribute('data-time',d.last_backup_at||d.last_backup); lb.textContent=IOSBKI18n.formatDate(d.last_backup_at||d.last_backup); } else { lb.removeAttribute('data-time'); lb.innerHTML='<span data-i18n="device.never"></span>'; } }
+  var lb=document.getElementById('lastbackup-'+u); if(lb){ if(d.last_backup_at||d.last_backup){ setLiveAttribute(lb,'data-time',d.last_backup_at||d.last_backup);setLiveText(lb,IOSBKI18n.formatDate(d.last_backup_at||d.last_backup)); } else { lb.removeAttribute('data-time'); setLiveText(lb,tr('device.never'));setLiveAttribute(lb,'data-i18n','device.never'); } }
   renderBackupProgress(d);
   var btn=document.getElementById('backupBtn-'+u);
   if(btn){
@@ -1209,7 +1238,7 @@ function patchDevice(d){
     btn.disabled = dis;
     btn.setAttribute('style','gap:9px;padding:10px 17px;font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit;border:none;white-space:nowrap;min-width:132px;'+(dis?'background:#F3F7FA;color:#ADB9C2;cursor:not-allowed;':'background:#2C62C6;color:#fff;'));
     var retry=d.backup_progress && (d.backup_progress.state==='interrupted'||d.backup_progress.state==='failed');
-    btn.innerHTML = d.backing_up ? '<span data-i18n="'+IOSBKConsole.busyLabel(d)+'"></span>' : (d.auto_backup_hold?'<span data-i18n="control.manualOnce"></span>':(retry?'<span data-i18n="progress.retry"></span>':'<span data-i18n="device.backupNow"></span>'));
+    setTranslatedHTML(btn,d.backing_up ? '<span data-i18n="'+IOSBKConsole.busyLabel(d)+'"></span>' : (d.auto_backup_hold?'<span data-i18n="control.manualOnce"></span>':(retry?'<span data-i18n="progress.retry"></span>':'<span data-i18n="device.backupNow"></span>')));
     btn.style.opacity='';
   }
   renderBackupControl(d);

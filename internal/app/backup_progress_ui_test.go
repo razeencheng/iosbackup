@@ -47,9 +47,6 @@ func TestBackupProgressRendererCoversApprovedStateMatrix(t *testing.T) {
 	for _, behavior := range []string{
 		`function backupProgressMode(progress)`,
 		`function renderBackupProgress(d)`,
-		`track.removeAttribute('aria-valuenow')`,
-		`current.classList.toggle('hidden',!hasCurrentFile)`,
-		`currentValue.textContent=hasCurrentFile?`,
 		`formatBackupBytes(progress.current_bytes)`,
 	} {
 		if !strings.Contains(markup, behavior) {
