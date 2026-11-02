@@ -38,14 +38,15 @@ assert.equal(api.pointChecks({review:passed,review_attempt:issues}).primary,issu
   const host={document:{activeElement:{isConnected:true},addEventListener(type,fn){listeners[type]=fn;},getElementById:id=>id==='historyDownloadFrame'?frame:null,querySelector(){return null;}},addEventListener(){},setTimeout(){return 1;},clearTimeout(){},IOSBKI18n:{t:key=>key,has:()=>true,message:()=>''},IOSBKConsole:{updateHistory(){},pointDrawer(){}},csrfFetch:async(url,options)=>{requests.push(url);if(leave&&url.endsWith('/exports'))await new Promise(resolve=>{finishExport=resolve;});return {ok:true,json:async()=>url.endsWith('/exports')?{id:'export-1',point_id:point,state:'ready',can_download:canDownload}:{policy:{enabled:true,count:3},points:[{id:point,can_export:true}],unavailable_stores:[],total:1}};}};
   vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../static/backup-history.js'),'utf8'),{window:host,AbortController,console});
   host.IOSBKHistory.section('A','backups');await host.IOSBKHistory.refresh();
-  listeners.click({target:{closest(){return {dataset:{historyAction:'downloadPoint',point}};}}});
+  listeners.click({target:{closest(){return {dataset:{historyAction:'select',point}};}}});
+  listeners.click({target:{closest(){return {dataset:{historyAction:'export'}};}}});
   if(leave){host.IOSBKHistory.hide();finishExport();}
   await new Promise(setImmediate);
   assert.ok(requests.includes('/api/backup-point/'+point+'/exports'));
-  assert.equal(frame.src,canDownload&&!leave?'/api/backup-export/export-1/download':'','row download starts only when a transfer can start and the selected view is still active');
+  assert.equal(frame.src,'','preparing a detail export never starts an invisible row download');
   host.IOSBKHistory.hide();
  }
- console.log('row downloads start directly and respect the transfer limit');
+ console.log('detail exports prepare sessions without an invisible row download');
 })().catch(e=>{console.error(e);process.exitCode=1});
 (async()=>{
  const listeners={},notices=[];let state='interrupted';

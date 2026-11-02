@@ -2,7 +2,7 @@
 
 [简体中文](backup-history.zh-CN.md) · [Restore overview](restore.md)
 
-Each device card has three tabs: **Backups / Task records / Device settings**. Expanding a card shows saved backup dates directly. History retention is edited separately under Device settings and is disabled by default for each device.
+Each device card has three tabs: **Backup list / Task records / Device settings**. Expanding a card shows saved backup dates directly. History retention is edited separately under Device settings and is disabled by default for each device.
 
 ## Enable and retain versions
 
@@ -12,7 +12,7 @@ Storage preparation continues in the background after submission, so you can lea
 
 Each new backup uses an independent work copy. Storage that passes the fast-clone probe can share unchanged blocks; other storage makes complete copies. Three 100 GB copies can require about 300 GB plus work space. The UI shows logical saved-data size; shared blocks, older records with unknown size and filesystem overhead mean it is not an exclusive physical-usage measurement. Insufficient space stops the new backup and preserves protected history.
 
-**Pin** keeps an important point out of automatic cleanup. Unpinning makes it subject to its other retention rules; it is not an immediate deletion. Pins, the latest normal baseline, older encryption versions, manually retained points and active reads can keep more points than the configured day count. The `?` controls explain these terms with mouse, keyboard or touch.
+**Pin** keeps an important point out of automatic cleanup. Unpinning makes it subject to its other retention rules; it is not an immediate deletion. Pins, the latest normal baseline, older encryption versions, manually retained points and active reads can keep more points than the configured backup count. The `?` controls explain these terms with mouse, keyboard or touch.
 
 Turning history off stops new points and automatic cleanup. Existing points become manually retained, while later ordinary backups use a separate writable current set. The Backups tab displays that current set separately and retains its check and file-list actions. Turning history back on only manages new points automatically.
 

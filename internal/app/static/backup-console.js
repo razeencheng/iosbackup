@@ -33,7 +33,7 @@
   function el(tag, text, cls) { var n = doc.createElement(tag); if (text !== undefined) n.textContent = text; if (cls) n.className = cls; return n; }
   function button(text, fn, cls) { var b = el('button', text, cls || 'history-button'); b.type = 'button'; b.onclick = fn; return b; }
   function get(id) { return doc.getElementById(id); }
-  function text(id, value) { var n = get(id); if (n) n.textContent = value; }
+  function text(id, value) { var n=get(id);if(n){n.removeAttribute('data-i18n');if(n.textContent!==value)n.textContent=value;}return n; }
   function formatDate(value) { return value && !String(value).startsWith('0001-') ? global.IOSBKI18n.formatDate(value) : tr('history.unknown'); }
   function bytes(value) { return typeof value === 'number' ? global.formatBackupBytes(value) : tr('history.sizeUnknown'); }
   function closeLayers() { layers.slice().reverse().forEach(function (layer) { layer.close(); }); }
@@ -173,27 +173,18 @@
     layer(content, tr('console.currentDetails'), {drawer:true,close:function(){global.closeBackupFiles(u);}});
     global.openBackupFiles(u);
   }
-  function storage(u) {
-    var data = history[u], content = el('div', undefined, 'console-layer-body'); if (!data) return;
-    var s = data.storage || {};
-    content.append(el('p', tr('history.storage', {size:bytes(data.logical_bytes)})), el('p', tr('console.freeSpace', {size:bytes(s.available_bytes)})));
-    if (s.copy_strategy && s.copy_strategy !== 'unknown') content.append(el('p', tr('console.copy.' + s.copy_strategy)));
-    content.append(el('p', tr('console.storageHint'), 'history-warning'), el('p', tr('console.checkedAt',{time:formatDate(s.checked_at)}), 'history-note'));
-    if (!data.bytes_known || (data.unavailable_stores || []).length) content.append(el('p', tr('history.sizePartial'), 'history-warning'));
-    if (s.state !== 'available') content.append(el('p',tr('console.storageUnavailable'),'history-warning'));
-    layer(content, tr('console.storage'));
-  }
   function updateHistory(view) {
     var u = view.udid, data = view.data; if (!data) return;
     history[u] = data;
     var deleteButton=get('delBtn-'+u);if(deleteButton)deleteButton.classList.toggle('hidden',!canDeleteCurrent(data));
     recentJob(u);
-    var source = data.current_source || {}, currentPoint = view.points.find(function (p) { return isCurrentPoint(data,p); });
-    text('consoleLatest-' + u, currentPoint ? (currentPoint.completion_unknown ? tr('history.timeUnknown') : formatDate(currentPoint.completed_at)) : tr(source.kind === 'current' ? 'console.currentSet' : 'history.unknown'));
-    text('consoleCount-' + u, String(data.total));
-    text('consoleSize-' + u, bytes(data.logical_bytes) + (data.bytes_known ? '' : ' + ?'));
-    text('consoleFree-' + u, tr('console.freeSpace',{size:bytes((data.storage || {}).available_bytes)}));
-    text('historyPolicySummary-' + u, tr(data.policy.enabled ? 'history.summary' : 'history.summaryOff',{limit:data.policy.count,count:data.total})+(global.IOSBKHistory&&global.IOSBKHistory.policyNotice?' '+global.IOSBKHistory.policyNotice(data):''));
+    var source=data.current_source||{},storage=data.storage||{},available=storage.state==='available'&&typeof storage.available_bytes==='number';
+    text('consoleCount-'+u,tr('console.historyCount',{count:data.total}));
+    text('consoleSize-'+u,bytes(data.logical_bytes));
+    var free=text('consoleFree-'+u,tr('console.freeSpace',{size:available?bytes(storage.available_bytes):tr('history.unknown')}));
+    if(free){free.setAttribute('data-hint',tr('console.checkedAt',{time:formatDate(storage.checked_at)})+(available?'':' · '+tr('console.storageUnavailable')));}
+    var notice=text('consoleStorageNotice-'+u,data.bytes_known?'':tr('history.sizePartial'));if(notice)notice.classList.toggle('hidden',!!data.bytes_known);
+    text('historyPolicySummary-'+u,tr(data.policy.enabled?'history.policySummary':'history.policySummaryOff',{limit:data.policy.count})+(global.IOSBKHistory&&global.IOSBKHistory.policyNotice?' '+global.IOSBKHistory.policyNotice(data):''));
     var currentCard = get('currentBackup-' + u);
     if (currentCard) {
       currentCard.classList.toggle('hidden', source.kind === 'point' && source.available);
@@ -251,7 +242,6 @@
     var u=b.dataset.udid,action=b.dataset.consoleAction;
     if(action==='settings')settings(u,b.dataset.group);
     if(action==='current')current(u);
-    if(action==='storage')storage(u);
     if(action==='job')openJob(u,b.dataset.job);
     if(action==='point')openPoint(u,b.dataset.point);
     if(action==='deployment'){

@@ -19,8 +19,10 @@ const base={udid:'A',name:'Phone',conn:'wifi',online:true,backing_up:true,active
 function render(progress,extra={}) {const device={...base,...extra,backup_progress:progress};vm.runInContext('applyStatus('+JSON.stringify({devices:[device],backup_in_progress:device.backing_up?1:0,timezone:'Asia/Shanghai'})+')',app.context);return device;}
 const receiving={state:'running',phase:'receiving',overall_percent:3,current_bytes:5,current_total_bytes:10,last_activity_at:'2026-11-02T12:00:01Z'};
 render(receiving);
+vm.runInContext('var progressRenderCount=0,originalProgressRenderer=renderBackupProgress;renderBackupProgress=function(d){progressRenderCount++;return originalProgressRenderer(d);}',app.context);
 writes.length=0;
 render({...receiving});
+assert.equal(vm.runInContext('progressRenderCount',app.context),1,'each status snapshot renders progress once');
 assert.deepEqual(writes,[],'identical snapshots must not rewrite progress copy, tone or icon');
 render({...receiving,current_bytes:7,last_activity_at:'2026-11-02T12:00:20Z'});
 assert.deepEqual(writes,[],'byte updates and activity within the displayed minute must not rewrite status');
