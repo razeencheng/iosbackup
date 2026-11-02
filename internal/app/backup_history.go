@@ -25,7 +25,7 @@ type historyDeviceState struct {
 	CurrentDeleted      bool                   `json:"current_deleted,omitempty"`
 	EpochID             string                 `json:"epoch_id"`
 	Phase               string                 `json:"phase"` // enabling | active | disabling | disabled
-	Days                int                    `json:"days"`
+	Count               int                    `json:"count"`
 	Root                string                 `json:"root"`
 	StoreID             string                 `json:"store_id"`
 	LatestStore         string                 `json:"latest_store,omitempty"`
@@ -263,7 +263,7 @@ func (app *application) prepareBackupHistory(job *backupJob, root string) (*back
 		}
 		return &backupHistoryRun{state: st, store: store, work: work, forceFull: st.CurrentDeleted}, nil
 	}
-	if st.Phase != "disabled" && st.EpochID != "" && policy.Days < st.Days && !job.config.HistoryPolicyPending {
+	if st.Phase != "disabled" && st.EpochID != "" && policy.Count < st.Count && !job.config.HistoryPolicyPending {
 		return nil, backupstore.ErrConflict
 	}
 	if st.Phase == "disabling" {
@@ -287,7 +287,7 @@ func (app *application) prepareBackupHistory(job *backupJob, root string) (*back
 		}
 		st.MigrationDone = false
 	}
-	st.StoreID, st.Root, st.Days = id, root, policy.Days
+	st.StoreID, st.Root, st.Count = id, root, policy.Count
 	if err = m.saveDevice(job.udid, st); err != nil {
 		return nil, err
 	}
@@ -398,7 +398,7 @@ func (app *application) collectBackupHistoryResult(ctx context.Context, udid str
 		if err = ctx.Err(); err != nil {
 			return deferred, err
 		}
-		req := backupstore.RetentionRequest{Policy: backupstore.Policy{Enabled: st.Phase == "active", Days: st.Days}, EpochID: st.EpochID, GenerationID: gen.ID, Now: app.nowTime()}
+		req := backupstore.RetentionRequest{Policy: backupstore.Policy{Enabled: st.Phase == "active", Count: st.Count}, EpochID: st.EpochID, GenerationID: gen.ID, Now: app.nowTime()}
 		plan, err := store.PlanGC(req)
 		if err != nil {
 			return deferred, err

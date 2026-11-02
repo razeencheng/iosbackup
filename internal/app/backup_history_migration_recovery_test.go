@@ -17,7 +17,7 @@ func TestHistoryMigrationCommitGapIsIdempotent(t *testing.T) {
 		for _, afterRename := range []bool{false, true} {
 			t.Run(result+map[bool]string{false: "/before_registry", true: "/after_registry"}[afterRename], func(t *testing.T) {
 				a := historyTestApp(t)
-				a.configs["CONTROL"].History = backupstore.Policy{Days: 3}
+				a.configs["CONTROL"].History = backupstore.Policy{Count: 3}
 				dir := filepath.Join(a.paths.BackupsRoot, "CONTROL")
 				writeHistoryBackup(t, dir, "finished", "original source")
 				if result != "unknown_time" {
@@ -53,7 +53,7 @@ func TestHistoryMigrationCommitGapIsIdempotent(t *testing.T) {
 					}
 					return persistence.WriteFileAtomic(path, data, mode)
 				}
-				policy := backupstore.Policy{Enabled: true, Days: 3}
+				policy := backupstore.Policy{Enabled: true, Count: 3}
 				if err := a.applyHistoryPolicy(context.Background(), "CONTROL", policy, nil); err == nil || !injected {
 					t.Fatalf("failure was not injected: %v", err)
 				}

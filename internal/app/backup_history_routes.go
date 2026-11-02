@@ -29,20 +29,21 @@ type historyReviewRun struct {
 	done   chan struct{}
 }
 type historyService struct {
-	closed     bool
-	mu         sync.Mutex
-	previews   map[string]historyPreviewToken
-	exports    map[string]*backupExport
-	reviews    map[string]*historyReviewRun
-	policies   map[string]*historyPolicyRun
-	exportSlot chan struct{}
+	closed      bool
+	mu          sync.Mutex
+	previews    map[string]historyPreviewToken
+	pinPreviews map[string]historyPinPreview
+	exports     map[string]*backupExport
+	reviews     map[string]*historyReviewRun
+	policies    map[string]*historyPolicyRun
+	exportSlot  chan struct{}
 }
 
 func (app *application) historyService() *historyService {
 	app.mu.Lock()
 	defer app.mu.Unlock()
 	if app.historyHTTP == nil {
-		app.historyHTTP = &historyService{previews: map[string]historyPreviewToken{}, exports: map[string]*backupExport{}, reviews: map[string]*historyReviewRun{}, exportSlot: make(chan struct{}, 1)}
+		app.historyHTTP = &historyService{previews: map[string]historyPreviewToken{}, pinPreviews: map[string]historyPinPreview{}, exports: map[string]*backupExport{}, reviews: map[string]*historyReviewRun{}, exportSlot: make(chan struct{}, 1)}
 		app.historyHTTP.policies = make(map[string]*historyPolicyRun)
 	}
 	return app.historyHTTP
@@ -201,7 +202,7 @@ func (app *application) handleBackupHistory(w http.ResponseWriter, r *http.Reque
 		writeError(w, 404, i18n.NotFound)
 		return
 	}
-	policy := backupstore.Policy{Days: 3}
+	policy := backupstore.Policy{Count: 2}
 	if cfg != nil {
 		policy, _ = cfg.History.Normalize()
 	}
@@ -229,7 +230,7 @@ func (app *application) handleBackupHistory(w http.ResponseWriter, r *http.Reque
 			allKnown = false
 			continue
 		}
-		plan, e := s.PlanGC(backupstore.RetentionRequest{Policy: backupstore.Policy{Enabled: policy.Enabled && st.Phase == "active", Days: policy.Days}, EpochID: st.EpochID, GenerationID: generation, Now: app.nowTime()})
+		plan, e := s.PlanGC(backupstore.RetentionRequest{Policy: backupstore.Policy{Enabled: policy.Enabled && st.Phase == "active", Count: policy.Count}, EpochID: st.EpochID, GenerationID: generation, Now: app.nowTime()})
 		if e != nil {
 			unavailable = append(unavailable, loc.ID)
 			allKnown = false
@@ -334,8 +335,8 @@ func (app *application) handleHistoryPolicy(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	policy, e := request.Policy.Normalize()
-	if e != nil {
-		historyError(w, e)
+	if e != nil || request.Policy.Count < 1 {
+		historyError(w, backupstore.ErrInvalid)
 		return
 	}
 	service := app.historyService()
@@ -433,7 +434,7 @@ func (app *application) handleBackupPoint(w http.ResponseWriter, r *http.Request
 	if len(parts) == 2 {
 		action = parts[1]
 	}
-	if action != "" && action != "pin" && action != "check" && action != "exports" {
+	if action != "" && action != "pin" && action != "pin-preview" && action != "check" && action != "exports" {
 		writeError(w, 404, i18n.NotFound)
 		return
 	}
@@ -481,6 +482,7 @@ func (app *application) handleBackupPoint(w http.ResponseWriter, r *http.Request
 	var request struct {
 		Revision uint64 `json:"revision"`
 		Pinned   *bool  `json:"pinned"`
+		Token    string `json:"token"`
 		Confirm  string `json:"confirm"`
 		Action   string `json:"action"`
 		ID       string `json:"id"`
@@ -492,8 +494,54 @@ func (app *application) handleBackupPoint(w http.ResponseWriter, r *http.Request
 		app.cancelHistoryReview(w, p.ID, request.ID)
 		return
 	}
-	if action == "pin" && request.Pinned == nil || action == "" && request.Confirm != p.ID {
+	if (action == "pin" || action == "pin-preview") && request.Pinned == nil || action == "" && request.Confirm != p.ID {
 		writeError(w, 400, i18n.InvalidJSON)
+		return
+	}
+	if action == "pin-preview" {
+		if *request.Pinned {
+			historyError(w, backupstore.ErrInvalid)
+			return
+		}
+		app.mu.RLock()
+		busy := app.backupInProgress[p.UDID] || app.checkInProgress[p.UDID] || app.deviceRemovalPending[p.UDID]
+		app.mu.RUnlock()
+		if busy {
+			historyError(w, errDeviceBusy)
+			return
+		}
+		preview, err := app.previewHistoryUnpin(s, p, request.Revision)
+		if err != nil {
+			historyError(w, err)
+			return
+		}
+		token, err := backupstore.NewID()
+		if err != nil {
+			historyError(w, err)
+			return
+		}
+		service := app.historyService()
+		service.mu.Lock()
+		now := time.Now()
+		for k, v := range service.pinPreviews {
+			if !v.Expires.After(now) {
+				delete(service.pinPreviews, k)
+			}
+		}
+		if len(service.pinPreviews) >= 64 {
+			service.mu.Unlock()
+			historyError(w, backupstore.ErrBusy)
+			return
+		}
+		preview.Expires = now.Add(10 * time.Minute)
+		service.pinPreviews[token] = preview
+		service.mu.Unlock()
+		affected := []map[string]any{}
+		for _, id := range preview.Plan.Delete {
+			point := c.Points[id]
+			affected = append(affected, map[string]any{"id": id, "completed_at": point.CompletedAt})
+		}
+		writeJSON(w, 200, map[string]any{"token": token, "revision": preview.Plan.Revision, "affected_count": len(affected), "points": affected})
 		return
 	}
 	release, e := app.acquireHistoryMutation(p.UDID)
@@ -517,6 +565,22 @@ func (app *application) handleBackupPoint(w http.ResponseWriter, r *http.Request
 	}
 	switch action {
 	case "pin":
+		if !*request.Pinned {
+			service := app.historyService()
+			service.mu.Lock()
+			previous, ok := service.pinPreviews[request.Token]
+			delete(service.pinPreviews, request.Token)
+			service.mu.Unlock()
+			current, err := app.previewHistoryUnpin(s, p, c.Revision)
+			if err != nil {
+				historyError(w, err)
+				return
+			}
+			if !ok || !previous.Expires.After(time.Now()) || !sameHistoryPinPreview(previous, current) {
+				historyError(w, backupstore.ErrConflict)
+				return
+			}
+		}
 		e = s.SetPinned(r.Context(), p.ID, *request.Pinned, c.Revision)
 	case "check":
 		if request.Action != "" && request.Action != "start" {

@@ -216,7 +216,7 @@ func TestDeviceSummaryControlsStayAlignedAndUnambiguous(t *testing.T) {
 		`function batteryIconHTML(color)`,
 		`function connectionIconHTML(conn)`,
 		`var battery=document.getElementById('battery-'+u)`,
-		`box.innerHTML = badgeHTML(d.conn);`,
+		`setTranslatedHTML(box,badgeHTML(d.conn));`,
 	} {
 		if !strings.Contains(markup, want) {
 			t.Errorf("设备摘要区缺少布局约束 %q", want)

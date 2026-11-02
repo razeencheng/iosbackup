@@ -23,7 +23,7 @@ func TestHistoryReadDuringSlowGC(t *testing.T) {
 	if _, err = s.Commit(context.Background(), w2.ID, p2); err != nil {
 		t.Fatal(err)
 	}
-	req := RetentionRequest{Policy: Policy{Enabled: true, Days: 3}, EpochID: p.EpochID, GenerationID: p.Generation.ID, Now: time.Now().UTC()}
+	req := RetentionRequest{Policy: Policy{Enabled: true, Count: 1}, EpochID: p.EpochID, GenerationID: p.Generation.ID, Now: time.Now().UTC()}
 	plan, err := s.PlanGC(req)
 	if err != nil || len(plan.Delete) != 1 || plan.Delete[0] != old.ID {
 		t.Fatalf("unexpected fixture retention plan: %+v, %v", plan, err)
@@ -78,7 +78,7 @@ func pausedRecycle(t *testing.T, explicit bool) (*Store, Point, Point, func(), <
 	if err != nil {
 		t.Fatal(err)
 	}
-	req := RetentionRequest{Policy: Policy{Enabled: true, Days: 3}, EpochID: p.EpochID, GenerationID: p.Generation.ID, Now: time.Now().UTC()}
+	req := RetentionRequest{Policy: Policy{Enabled: true, Count: 1}, EpochID: p.EpochID, GenerationID: p.Generation.ID, Now: time.Now().UTC()}
 	plan, err := s.PlanGC(req)
 	if err != nil {
 		t.Fatal(err)
@@ -214,7 +214,7 @@ func TestGCSkipsPointLeasedDuringEarlierDeletion(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	req := RetentionRequest{Policy: Policy{Enabled: true, Days: 3}, EpochID: p.EpochID, GenerationID: p.Generation.ID, Now: time.Now().UTC()}
+	req := RetentionRequest{Policy: Policy{Enabled: true, Count: 1}, EpochID: p.EpochID, GenerationID: p.Generation.ID, Now: time.Now().UTC()}
 	plan, err := s.PlanGC(req)
 	if err != nil || len(plan.Delete) != 2 {
 		t.Fatalf("plan %+v %v", plan, err)

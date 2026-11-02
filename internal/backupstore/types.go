@@ -22,14 +22,14 @@ var (
 
 type Policy struct {
 	Enabled bool `json:"enabled"`
-	Days    int  `json:"days"`
+	Count   int  `json:"count"`
 }
 
 func (p Policy) Normalize() (Policy, error) {
-	if p.Days == 0 {
-		p.Days = 3
+	if p.Count == 0 {
+		p.Count = 2
 	}
-	if p.Days < 1 || p.Days > 365 {
+	if p.Count < 1 || p.Count > 365 {
 		return p, ErrInvalid
 	}
 	return p, nil

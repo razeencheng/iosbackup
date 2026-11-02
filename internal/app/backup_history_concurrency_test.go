@@ -15,8 +15,8 @@ import (
 func TestReviewHistoryPolicyConcurrentPreview(t *testing.T) {
 	a, h, _ := historyHTTPFixture(t)
 	requests := []map[string]any{}
-	for _, days := range []int{4, 5} {
-		body := map[string]any{"policy": backupstore.Policy{Enabled: true, Days: days}}
+	for _, count := range []int{4, 5} {
+		body := map[string]any{"policy": backupstore.Policy{Enabled: true, Count: count}}
 		w := historyRequest(t, a, h, "POST", "/api/backup-history/CONTROL/policy-preview", body)
 		if w.Code != 200 {
 			t.Fatal(w.Code, w.Body)

@@ -16,7 +16,7 @@ func TestHistoryRecoveryCleansOnlyUnreferencedOwnedWork(t *testing.T) {
 	if err := a.PerformBackup("CONTROL"); err != nil {
 		t.Fatal(err)
 	}
-	if err := a.applyHistoryPolicy(context.Background(), "CONTROL", backupstore.Policy{Days: 3}, nil); err != nil {
+	if err := a.applyHistoryPolicy(context.Background(), "CONTROL", backupstore.Policy{Count: 3}, nil); err != nil {
 		t.Fatal(err)
 	}
 	st, _ := a.backupStorage.deviceState("CONTROL")
@@ -57,7 +57,7 @@ func TestHistoryRetiredWorkCleanupResumesAfterRegistryFailure(t *testing.T) {
 				t.Fatal(err)
 			}
 			ctx := context.Background()
-			if err := a.applyHistoryPolicy(ctx, "CONTROL", backupstore.Policy{Days: 3}, nil); err != nil {
+			if err := a.applyHistoryPolicy(ctx, "CONTROL", backupstore.Policy{Count: 3}, nil); err != nil {
 				t.Fatal(err)
 			}
 			st, _ := a.backupStorage.deviceState("CONTROL")
@@ -88,7 +88,7 @@ func TestHistoryRetiredWorkCleanupResumesAfterRegistryFailure(t *testing.T) {
 				}
 				return persistence.WriteFileAtomic(path, data, mode)
 			}
-			policy := backupstore.Policy{Enabled: true, Days: 3}
+			policy := backupstore.Policy{Enabled: true, Count: 3}
 			if err = a.applyHistoryPolicy(ctx, "CONTROL", policy, nil); err == nil || !introduced {
 				t.Fatal("fault not reached", err)
 			}
@@ -124,7 +124,7 @@ func TestHistoryReenableReleasesSupersededWritable(t *testing.T) {
 		t.Fatal(err)
 	}
 	ctx := context.Background()
-	if err := a.applyHistoryPolicy(ctx, "CONTROL", backupstore.Policy{Days: 3}, nil); err != nil {
+	if err := a.applyHistoryPolicy(ctx, "CONTROL", backupstore.Policy{Count: 3}, nil); err != nil {
 		t.Fatal(err)
 	}
 	st, _ := a.backupStorage.deviceState("CONTROL")
@@ -133,7 +133,7 @@ func TestHistoryReenableReleasesSupersededWritable(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err = a.applyHistoryPolicy(ctx, "CONTROL", backupstore.Policy{Enabled: true, Days: 3}, nil); err != nil {
+	if err = a.applyHistoryPolicy(ctx, "CONTROL", backupstore.Policy{Enabled: true, Count: 3}, nil); err != nil {
 		t.Fatal(err)
 	}
 	if _, err = os.Stat(old.Parent); !os.IsNotExist(err) {
@@ -143,7 +143,7 @@ func TestHistoryReenableReleasesSupersededWritable(t *testing.T) {
 	if st.WritableID != "" || st.WritableStore != "" {
 		t.Fatal("stale writable reference retained")
 	}
-	if err = a.applyHistoryPolicy(ctx, "CONTROL", backupstore.Policy{Days: 3}, nil); err != nil {
+	if err = a.applyHistoryPolicy(ctx, "CONTROL", backupstore.Policy{Count: 3}, nil); err != nil {
 		t.Fatal(err)
 	}
 	st, _ = a.backupStorage.deviceState("CONTROL")

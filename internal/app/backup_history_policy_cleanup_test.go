@@ -44,7 +44,7 @@ func olderHistoryPoint(t *testing.T, a *application, days int, oldGeneration boo
 
 func TestHistoryPolicyShrinkCollectsEligiblePoints(t *testing.T) {
 	a := historyTestApp(t)
-	a.configs["CONTROL"].History.Days = 30
+	a.configs["CONTROL"].History.Count = 30
 	historyCommand(t, a, "finished", "base", 0, nil)
 	if err := a.PerformBackup("CONTROL"); err != nil {
 		t.Fatal(err)
@@ -66,7 +66,7 @@ func TestHistoryPolicyShrinkCollectsEligiblePoints(t *testing.T) {
 	if err = a.PerformBackup("CONTROL"); err != nil {
 		t.Fatal(err)
 	}
-	policy := backupstore.Policy{Enabled: true, Days: 3}
+	policy := backupstore.Policy{Enabled: true, Count: 2}
 	preview, err := a.previewHistoryPolicy(context.Background(), "CONTROL", policy)
 	if err != nil {
 		t.Fatal(err)
@@ -93,7 +93,7 @@ func TestHistoryPolicyShrinkCollectsEligiblePoints(t *testing.T) {
 
 func TestHistoryPolicyCleanupInterruptedKeepsSavedTarget(t *testing.T) {
 	a := historyTestApp(t)
-	a.configs["CONTROL"].History.Days = 30
+	a.configs["CONTROL"].History.Count = 30
 	historyCommand(t, a, "finished", "base", 0, nil)
 	if err := a.PerformBackup("CONTROL"); err != nil {
 		t.Fatal(err)
@@ -102,7 +102,7 @@ func TestHistoryPolicyCleanupInterruptedKeepsSavedTarget(t *testing.T) {
 	if err := a.PerformBackup("CONTROL"); err != nil {
 		t.Fatal(err)
 	}
-	policy := backupstore.Policy{Enabled: true, Days: 3}
+	policy := backupstore.Policy{Enabled: true, Count: 2}
 	preview, err := a.previewHistoryPolicy(context.Background(), "CONTROL", policy)
 	if err != nil {
 		t.Fatal(err)
@@ -111,7 +111,7 @@ func TestHistoryPolicyCleanupInterruptedKeepsSavedTarget(t *testing.T) {
 	defer cancel()
 	a.backupStorage.write = func(path string, data []byte, mode os.FileMode) error {
 		err := persistence.WriteFileAtomic(path, data, mode)
-		if err == nil && a.backupStorage.locations.Devices["CONTROL"].Days == 3 {
+		if err == nil && a.backupStorage.locations.Devices["CONTROL"].Count == 2 {
 			cancel()
 		}
 		return err

@@ -41,20 +41,20 @@
  var controller=createController({get:request,render:render,error:error});
  function policyFields(v){
   var host=doc.getElementById('historySettings-'+v.udid);if(!host)return;
-  var enabled=doc.getElementById('historyEnabled-'+v.udid),days=doc.getElementById('historyDays-'+v.udid);
+  var enabled=doc.getElementById('historyEnabled-'+v.udid),count=doc.getElementById('historyCount-'+v.udid);
   if(!enabled){
    var title=el('h3',tr('history.title'));title.dataset.i18n='history.title';host.appendChild(title);
    var fields=el('div',undefined,'history-policy-fields'),toggle=el('label');enabled=el('input');enabled.type='checkbox';enabled.id='historyEnabled-'+v.udid;enabled.dataset.historyField='enabled';toggle.appendChild(enabled);var copy=el('span',tr('history.enable'));copy.dataset.i18n='history.enable';toggle.appendChild(copy);fields.appendChild(toggle);
-   var daylabel=el('label');copy=el('span',tr('history.days'));copy.dataset.i18n='history.days';daylabel.appendChild(copy);days=el('input');days.type='number';days.min='1';days.max='365';days.id='historyDays-'+v.udid;days.dataset.historyField='days';days.className='iosbk-in';daylabel.appendChild(days);fields.appendChild(daylabel);host.appendChild(fields);
+   var countLabel=el('label');copy=el('span',tr('history.count'));copy.dataset.i18n='history.count';countLabel.appendChild(copy);count=el('input');count.type='number';count.min='1';count.max='365';count.id='historyCount-'+v.udid;count.dataset.historyField='count';count.className='iosbk-in';countLabel.appendChild(count);fields.appendChild(countLabel);host.appendChild(fields);
    ['cost','retention','disableHint'].forEach(function(key){var n=el('p',tr('history.'+key),'history-note');n.dataset.i18n='history.'+key;host.appendChild(n);});
    var clone=el('p',undefined,'history-note'),cloneLabel=el('span',tr('term.clone.title'));cloneLabel.dataset.i18n='term.clone.title';clone.appendChild(cloneLabel);clone.appendChild(hint('clone'));host.appendChild(clone);
    var save=button(tr('history.preview'),'policy');save.id='historyPolicySave-'+v.udid;save.dataset.i18n='history.preview';host.appendChild(save);var dirty=el('span','', 'history-note');dirty.id='historyDirty-'+v.udid;host.appendChild(dirty);
    var operation=el('p','','history-note');operation.id='historyPolicyOperation-'+v.udid;operation.setAttribute('role','status');host.appendChild(operation);
    var retry=button(tr('history.policyRetry'),'retryPolicy');retry.id='historyPolicyRetry-'+v.udid;retry.dataset.i18n='history.policyRetry';host.appendChild(retry);
   }
-  if(v.draft){enabled.checked=!!v.draft.enabled;if(days.value!==String(v.draft.days))days.value=v.draft.days;}
-  enabled.disabled=days.disabled=pending||!v.data||!v.data.can_edit_policy;
-  var save=doc.getElementById('historyPolicySave-'+v.udid);save.disabled=pending||!v.data||!v.data.can_edit_policy||!v.draft||!Number.isInteger(Number(v.draft.days))||Number(v.draft.days)<1||Number(v.draft.days)>365;
+  if(v.draft){enabled.checked=!!v.draft.enabled;if(count.value!==String(v.draft.count))count.value=v.draft.count;}
+  enabled.disabled=count.disabled=pending||!v.data||!v.data.can_edit_policy;
+  var save=doc.getElementById('historyPolicySave-'+v.udid);save.disabled=pending||!v.data||!v.data.can_edit_policy||!v.draft||!Number.isInteger(Number(v.draft.count))||Number(v.draft.count)<1||Number(v.draft.count)>365;
   set('historyDirty-'+v.udid,v.dirty?tr('bset.unsaved'):'');
   set('historyPolicyOperation-'+v.udid,v.dirty?'':policyNotice(v.data));
   var retry=show('historyPolicyRetry-'+v.udid,!!(v.data&&v.data.can_retry_policy));if(retry)retry.disabled=pending;
@@ -64,7 +64,7 @@
   latest=v;var u=v.udid,op=v.data&&v.data.policy_operation;
   if(op&&op.state==='succeeded'&&policyTracking[u]===op.id){delete policyTracking[u];if(global.toast)global.toast('bset.saved');}
   policyFields(v);if(!v.data)return;
-  var data=v.data;if(global.IOSBKConsole)global.IOSBKConsole.updateHistory(v);set('historySummaryText-'+u,tr(data.policy.enabled?'history.summary':'history.summaryOff',{days:data.policy.days,count:data.total})+(policyNotice(data)?'\n'+policyNotice(data):''));
+  var data=v.data;if(global.IOSBKConsole)global.IOSBKConsole.updateHistory(v);set('historySummaryText-'+u,tr(data.policy.enabled?'history.summary':'history.summaryOff',{limit:data.policy.count,count:data.total})+(policyNotice(data)?'\n'+policyNotice(data):''));
   set('historyStorage-'+u,tr('history.storage',{size:bytes(data.logical_bytes||0)})+(data.bytes_known?'':' · '+tr('history.sizePartial')));
   var warning=[];if(data.unavailable_stores.length)warning.push(tr('history.unavailable'));if(data.busy)warning.push(tr('history.busy'));if(data.phase==='enabling'||data.phase==='disabling')warning.push(tr('history.transition'));if(data.phase==='disabled'&&data.total)warning.push(tr('history.manualHint'));
   set('historyWarning-'+u,warning.join(' '));show('historyWarning-'+u,warning.length>0);
@@ -133,7 +133,7 @@
   if(pending||!latest)return;var actionEpoch=pollEpoch,u=latest.udid,p=latest.points.find(function(p){return p.id===latest.selected;}),draft=Object.assign({},latest.draft),originalPoints=latest.points.slice();pending=true;controller.repaint();
   try{
    if(action==='policy'){
-    draft.days=Number(draft.days);var preview=await request('/api/backup-history/'+encodeURIComponent(u)+'/policy-preview',null,'POST',{policy:draft});if(actionEpoch!==pollEpoch||visible!==u)return;var text=tr(draft.enabled?'history.enableConfirm':'history.disableHint')+'\n\n'+tr('history.previewCount',{count:preview.affected_count});
+    draft.count=Number(draft.count);var preview=await request('/api/backup-history/'+encodeURIComponent(u)+'/policy-preview',null,'POST',{policy:draft});if(actionEpoch!==pollEpoch||visible!==u)return;var text=tr(draft.enabled?'history.enableConfirm':'history.disableHint')+'\n\n'+tr('history.previewCount',{count:preview.affected_count});
     var affected=[];Object.keys(preview.preview.stores).forEach(function(s){(preview.preview.stores[s].delete||[]).forEach(function(id){var point=originalPoints.find(function(p){return p.id===id});affected.push(point?pointDate(point):id);});});if(affected.length)text+='\n'+affected.join('\n');
     if(policyNeedsConfirmation(preview)&&!await confirmAction(tr('history.policyTitle'),text))return;
     if(actionEpoch!==pollEpoch||visible!==u)return;
@@ -141,7 +141,19 @@
    }else if(action==='retryPolicy'){
     var retry=await request('/api/backup-history/'+encodeURIComponent(u)+'/policy-retry',null,'POST',{});if(retry.operation)policyTracking[u]=retry.operation.id;if(global.toast)global.toast('history.policyStarted');
    }else if(p){var base='/api/backup-point/'+p.id+'?udid='+encodeURIComponent(u);
-    if(action==='pin'){if(p.pinned&&!await confirmAction(tr('console.unpinTitle'),tr('console.unpinHint')))return;await request('/api/backup-point/'+p.id+'/pin?udid='+encodeURIComponent(u),null,'POST',{revision:p.revision,pinned:!p.pinned});}
+    if(action==='pin'){
+     var pinBody={revision:p.revision,pinned:!p.pinned};
+     if(p.pinned){
+      var pinPreview=await request('/api/backup-point/'+p.id+'/pin-preview?udid='+encodeURIComponent(u),null,'POST',pinBody);
+      if(actionEpoch!==pollEpoch||visible!==u)return;
+      var impact=tr('console.unpinHint')+'\n\n'+tr('history.unpinImpact',{count:pinPreview.affected_count});
+      (pinPreview.points||[]).forEach(function(point){impact+='\n'+pointDate(point);});
+      if(!await confirmAction(tr('console.unpinTitle'),impact))return;
+      if(actionEpoch!==pollEpoch||visible!==u)return;
+      pinBody.token=pinPreview.token;
+     }
+     await request('/api/backup-point/'+p.id+'/pin?udid='+encodeURIComponent(u),null,'POST',pinBody);
+    }
     else if(action==='delete'){if(!await confirmAction(tr('history.deleteTitle'),pointDate(p)+'\n'+tr('history.deleteConfirm')+(p.pinned?'\n'+tr('history.deletePin'):'')+(p.baseline?'\n'+tr('history.deleteBaseline'):'')))return;await request(base,null,'DELETE',{revision:p.revision,confirm:p.id});if(actionEpoch===pollEpoch&&visible===u&&latest&&latest.selected===p.id)global.IOSBKConsole.closePoint(u);}
     else if(action==='check'){var result=await request('/api/backup-point/'+p.id+'/check',null,'POST',{revision:p.revision,action:'start'});reviewSession={id:result.id,point_id:p.id,result:{kind:'manifest',state:'running',freshness:'current'}};}
     else if(action==='export'){var prepared=await request('/api/backup-point/'+p.id+'/exports',null,'POST',{});if(actionEpoch===pollEpoch&&visible===u&&latest&&latest.selected===p.id){exportSession=prepared;if(autoDownload&&prepared.state==='ready'&&prepared.can_download===true){var frame=doc.getElementById('historyDownloadFrame');if(frame)frame.src='/api/backup-export/'+encodeURIComponent(prepared.id)+'/download';}}}
@@ -166,7 +178,7 @@
  }
  function section(u,sec){if(visible&&visible!==u)close(false);if(sec==='settings'||sec==='backups'){close(false);visible=u;mode=sec;show('historyPanel-'+u,sec==='backups');controller.open(u);schedule();}else close(false);}
  doc.addEventListener('click',function(e){var b=e.target.closest('[data-history-action]');if(b)act(b.dataset.historyAction,b);});
- doc.addEventListener('input',function(e){if(!e.target.dataset.historyField||!latest)return;var enabled=doc.getElementById('historyEnabled-'+latest.udid),days=doc.getElementById('historyDays-'+latest.udid);controller.edit({enabled:enabled.checked,days:days.value});});
+ doc.addEventListener('input',function(e){if(!e.target.dataset.historyField||!latest)return;var enabled=doc.getElementById('historyEnabled-'+latest.udid),count=doc.getElementById('historyCount-'+latest.udid);controller.edit({enabled:enabled.checked,count:count.value});});
  global.addEventListener('iosbk:localechange',function(){controller.repaint();});global.addEventListener('beforeunload',function(e){if(controller.hasDirty()){e.preventDefault();e.returnValue='';}});
  global.IOSBKHistory={policyNeedsConfirmation:policyNeedsConfirmation,policyNotice:policyNotice,pointChecks:pointChecks,isPending:function(){return pending;},refresh:function(){return controller.refresh();},back:function(){controller.back();},discard:function(u){controller.discard(u);},navigate:async function(u,id){var epoch=pollEpoch,targetMode=mode;if(visible!==u||(mode!=='backups'&&mode!=='archive'))return;await controller.open(u);if(epoch!==pollEpoch||visible!==u||mode!==targetMode)return;await controller.navigate(id);if(epoch!==pollEpoch||visible!==u||mode!==targetMode)return;if(latest&&latest.selected===id&&latest.points.some(function(p){return p.id===id;}))global.IOSBKConsole.pointDrawer(u);else global.toast(tr('console.pointMissing'),true);},createController:createController,open:open,openArchived:openArchived,close:close,section:section,hide:function(){close(false);}};
 })(window);

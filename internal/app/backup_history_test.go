@@ -27,7 +27,7 @@ func historyTestApp(t *testing.T) *application {
 			t.Error(err)
 		}
 	})
-	app.configs["CONTROL"].History = backupstore.Policy{Enabled: true, Days: 3}
+	app.configs["CONTROL"].History = backupstore.Policy{Enabled: true, Count: 3}
 	return app
 }
 func writeHistoryBackup(t *testing.T, dir, status, payload string) {
@@ -224,7 +224,7 @@ func TestBackupHistoryShrinkNeedsPreview(t *testing.T) {
 	if err := app.PerformBackup("CONTROL"); err != nil {
 		t.Fatal(err)
 	}
-	app.configs["CONTROL"].History.Days = 1
+	app.configs["CONTROL"].History.Count = 1
 	if err := app.PerformBackup("CONTROL"); !errors.Is(err, backupstore.ErrConflict) {
 		t.Fatalf("unconfirmed shortening allowed: %v", err)
 	}
@@ -449,7 +449,7 @@ func TestBackupHistoryDisabledCurrentCanBeDeleted(t *testing.T) {
 	if err := app.PerformBackup("CONTROL"); err != nil {
 		t.Fatal(err)
 	}
-	if err := app.applyHistoryPolicy(context.Background(), "CONTROL", backupstore.Policy{Days: 3}, nil); err != nil {
+	if err := app.applyHistoryPolicy(context.Background(), "CONTROL", backupstore.Policy{Count: 3}, nil); err != nil {
 		t.Fatal(err)
 	}
 	if err := app.DeleteDeviceBackup("CONTROL"); err != nil {
@@ -509,7 +509,7 @@ func TestBackupHistoryDisabledPathChangeCopiesCurrent(t *testing.T) {
 	if err := app.PerformBackup("CONTROL"); err != nil {
 		t.Fatal(err)
 	}
-	if err := app.applyHistoryPolicy(context.Background(), "CONTROL", backupstore.Policy{Days: 3}, nil); err != nil {
+	if err := app.applyHistoryPolicy(context.Background(), "CONTROL", backupstore.Policy{Count: 3}, nil); err != nil {
 		t.Fatal(err)
 	}
 	historyCommand(t, app, "finished", "newer current", 0, nil)
@@ -537,7 +537,7 @@ func TestBackupHistoryRestartKeepsDisabledCurrent(t *testing.T) {
 	if err := app.PerformBackup("CONTROL"); err != nil {
 		t.Fatal(err)
 	}
-	if err := app.applyHistoryPolicy(context.Background(), "CONTROL", backupstore.Policy{Days: 3}, nil); err != nil {
+	if err := app.applyHistoryPolicy(context.Background(), "CONTROL", backupstore.Policy{Count: 3}, nil); err != nil {
 		t.Fatal(err)
 	}
 	historyCommand(t, app, "finished", "ordinary", 0, nil)
@@ -563,7 +563,7 @@ func TestBackupHistoryDisabledPathChangeRestartsFromSameSource(t *testing.T) {
 	if err := app.PerformBackup("CONTROL"); err != nil {
 		t.Fatal(err)
 	}
-	if err := app.applyHistoryPolicy(context.Background(), "CONTROL", backupstore.Policy{Days: 3}, nil); err != nil {
+	if err := app.applyHistoryPolicy(context.Background(), "CONTROL", backupstore.Policy{Count: 3}, nil); err != nil {
 		t.Fatal(err)
 	}
 	historyCommand(t, app, "finished", "latest current", 0, nil)
@@ -612,13 +612,13 @@ func TestBackupHistoryReenableDoesNotResurrectDeletedCurrent(t *testing.T) {
 	if err := app.PerformBackup("CONTROL"); err != nil {
 		t.Fatal(err)
 	}
-	if err := app.applyHistoryPolicy(ctx, "CONTROL", backupstore.Policy{Days: 3}, nil); err != nil {
+	if err := app.applyHistoryPolicy(ctx, "CONTROL", backupstore.Policy{Count: 3}, nil); err != nil {
 		t.Fatal(err)
 	}
 	if err := app.DeleteDeviceBackup("CONTROL"); err != nil {
 		t.Fatal(err)
 	}
-	if err := app.applyHistoryPolicy(ctx, "CONTROL", backupstore.Policy{Enabled: true, Days: 3}, nil); err != nil {
+	if err := app.applyHistoryPolicy(ctx, "CONTROL", backupstore.Policy{Enabled: true, Count: 3}, nil); err != nil {
 		t.Fatal(err)
 	}
 	if app.hasLocalBackup("CONTROL") {
@@ -635,7 +635,7 @@ func TestBackupHistoryDeletedCurrentSurvivesPathChangeAndReenable(t *testing.T) 
 	if err := app.PerformBackup("CONTROL"); err != nil {
 		t.Fatal(err)
 	}
-	policy := backupstore.Policy{Days: 3}
+	policy := backupstore.Policy{Count: 3}
 	if err := app.applyHistoryPolicy(context.Background(), "CONTROL", policy, nil); err != nil {
 		t.Fatal(err)
 	}
@@ -691,7 +691,7 @@ func TestBackupHistoryImportUsesSourceDate(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			if err := app.applyHistoryPolicy(context.Background(), "CONTROL", backupstore.Policy{Enabled: true, Days: 3}, nil); err != nil {
+			if err := app.applyHistoryPolicy(context.Background(), "CONTROL", backupstore.Policy{Enabled: true, Count: 3}, nil); err != nil {
 				t.Fatal(err)
 			}
 			for _, p := range historyPoints(t, app) {
@@ -713,7 +713,7 @@ func TestBackupHistoryFailedOrdinaryWriteCannotImportOldCompletion(t *testing.T)
 	if err := app.PerformBackup("CONTROL"); err != nil {
 		t.Fatal(err)
 	}
-	if err := app.applyHistoryPolicy(context.Background(), "CONTROL", backupstore.Policy{Days: 3}, nil); err != nil {
+	if err := app.applyHistoryPolicy(context.Background(), "CONTROL", backupstore.Policy{Count: 3}, nil); err != nil {
 		t.Fatal(err)
 	}
 	// A failing external writer can leave old 'finished' metadata behind.
@@ -721,7 +721,7 @@ func TestBackupHistoryFailedOrdinaryWriteCannotImportOldCompletion(t *testing.T)
 	if err := app.PerformBackup("CONTROL"); err == nil {
 		t.Fatal("failure not injected")
 	}
-	if err := app.applyHistoryPolicy(context.Background(), "CONTROL", backupstore.Policy{Enabled: true, Days: 3}, nil); err != nil {
+	if err := app.applyHistoryPolicy(context.Background(), "CONTROL", backupstore.Policy{Enabled: true, Count: 3}, nil); err != nil {
 		t.Fatal(err)
 	}
 	st, _ := app.backupStorage.deviceState("CONTROL")

@@ -135,7 +135,7 @@ func TestBackupConsoleCurrentSourceAndStorage(t *testing.T) {
 	if storage["state"] != "available" || storage["available_bytes"] == nil || storage["checked_at"] == nil || storage["copy_strategy"] != "unknown" {
 		t.Errorf("missing capacity: %#v", storage)
 	}
-	if err := a.applyHistoryPolicy(context.Background(), "CONTROL", backupstore.Policy{Days: 3}, nil); err != nil {
+	if err := a.applyHistoryPolicy(context.Background(), "CONTROL", backupstore.Policy{Count: 3}, nil); err != nil {
 		t.Fatal(err)
 	}
 	body = consoleResponse(t, a, h, "/api/backup-history/CONTROL")

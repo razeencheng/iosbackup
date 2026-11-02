@@ -184,7 +184,7 @@ func TestBackupGenerationsConfigDefaults(t *testing.T) {
 	store := newBackupConfigStore(filepath.Join(root, "config.json"), []string{root})
 	for _, days := range []int{0, 7} {
 		cfg := backupConfig{UDID: "PHONE", StartTime: "22:00", EndTime: "06:00", BackupInterval: 24, BackupDirectory: root}
-		cfg.History.Days = days
+		cfg.History.Count = days
 		if err := store.Put(cfg); err != nil {
 			t.Fatal(err)
 		}
@@ -194,9 +194,9 @@ func TestBackupGenerationsConfigDefaults(t *testing.T) {
 		}
 		want := days
 		if want == 0 {
-			want = 3
+			want = 2
 		}
-		if loaded["PHONE"].History.Enabled || loaded["PHONE"].History.Days != want {
+		if loaded["PHONE"].History.Enabled || loaded["PHONE"].History.Count != want {
 			t.Fatalf("defaults overwrote policy: %+v", loaded["PHONE"].History)
 		}
 	}

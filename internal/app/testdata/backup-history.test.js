@@ -13,7 +13,7 @@ assert.equal(api.policyNeedsConfirmation({}),true,'missing impact data must not 
   const listeners={},calls=[],closed=[];let resolveSave;
   const host={document:{addEventListener:(name,fn)=>listeners[name]=fn,getElementById:()=>null,querySelector:()=>null},addEventListener(){},setTimeout(){return 1},clearTimeout(){},toast(){},IOSBKI18n:{t:key=>key,has:()=>true,message:()=>''},IOSBKConsole:{updateHistory(){},policyAccepted:u=>closed.push(u)},csrfFetch:async(url,options)=>{
    calls.push([url,options]);if(options.method==='PUT')return new Promise(resolve=>{resolveSave=resolve});
-   return {ok:true,json:async()=>url.endsWith('/policy-preview')?{token:'confirmed-preview',affected_count:0,preview:{previous:{enabled:true},policy:{enabled:true},stores:{}}}:{policy:{enabled:true,days:3},points:[],unavailable_stores:[],total:0}};
+   return {ok:true,json:async()=>url.endsWith('/policy-preview')?{token:'confirmed-preview',affected_count:0,preview:{previous:{enabled:true},policy:{enabled:true},stores:{}}}:{policy:{enabled:true,count:3},points:[],unavailable_stores:[],total:0}};
   }};
   vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../static/backup-history.js'),'utf8'),{window:host,AbortController,console});
   host.IOSBKHistory.section('A','settings');await host.IOSBKHistory.refresh();
@@ -35,7 +35,7 @@ assert.equal(api.pointChecks({review:passed,review_attempt:issues}).primary,issu
 (async()=>{
  for(const [canDownload,leave] of [[true,false],[false,false],[true,true]]){
   const listeners={},frame={src:''},point='a'.repeat(32),requests=[];let finishExport;
-  const host={document:{activeElement:{isConnected:true},addEventListener(type,fn){listeners[type]=fn;},getElementById:id=>id==='historyDownloadFrame'?frame:null,querySelector(){return null;}},addEventListener(){},setTimeout(){return 1;},clearTimeout(){},IOSBKI18n:{t:key=>key,has:()=>true,message:()=>''},IOSBKConsole:{updateHistory(){},pointDrawer(){}},csrfFetch:async(url,options)=>{requests.push(url);if(leave&&url.endsWith('/exports'))await new Promise(resolve=>{finishExport=resolve;});return {ok:true,json:async()=>url.endsWith('/exports')?{id:'export-1',point_id:point,state:'ready',can_download:canDownload}:{policy:{enabled:true,days:3},points:[{id:point,can_export:true}],unavailable_stores:[],total:1}};}};
+  const host={document:{activeElement:{isConnected:true},addEventListener(type,fn){listeners[type]=fn;},getElementById:id=>id==='historyDownloadFrame'?frame:null,querySelector(){return null;}},addEventListener(){},setTimeout(){return 1;},clearTimeout(){},IOSBKI18n:{t:key=>key,has:()=>true,message:()=>''},IOSBKConsole:{updateHistory(){},pointDrawer(){}},csrfFetch:async(url,options)=>{requests.push(url);if(leave&&url.endsWith('/exports'))await new Promise(resolve=>{finishExport=resolve;});return {ok:true,json:async()=>url.endsWith('/exports')?{id:'export-1',point_id:point,state:'ready',can_download:canDownload}:{policy:{enabled:true,count:3},points:[{id:point,can_export:true}],unavailable_stores:[],total:1}};}};
   vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../static/backup-history.js'),'utf8'),{window:host,AbortController,console});
   host.IOSBKHistory.section('A','backups');await host.IOSBKHistory.refresh();
   listeners.click({target:{closest(){return {dataset:{historyAction:'downloadPoint',point}};}}});
@@ -49,7 +49,7 @@ assert.equal(api.pointChecks({review:passed,review_attempt:issues}).primary,issu
 })().catch(e=>{console.error(e);process.exitCode=1});
 (async()=>{
  const listeners={},notices=[];let state='interrupted';
- const host={document:{addEventListener(type,fn){listeners[type]=fn;},getElementById(){return null;},querySelector(){return null;}},addEventListener(){},setTimeout(){return 1;},clearTimeout(){},toast:key=>notices.push(key),IOSBKI18n:{t:key=>key,has:()=>true,message:()=>''},csrfFetch:async(url)=>({ok:true,json:async()=>url.endsWith('/policy-retry')?{operation:{id:'policy-1',state:'running'}}:{policy:{enabled:true,days:3},policy_operation:{id:'policy-1',state},can_retry_policy:state==='interrupted',points:[],unavailable_stores:[],total:0}})};
+ const host={document:{addEventListener(type,fn){listeners[type]=fn;},getElementById(){return null;},querySelector(){return null;}},addEventListener(){},setTimeout(){return 1;},clearTimeout(){},toast:key=>notices.push(key),IOSBKI18n:{t:key=>key,has:()=>true,message:()=>''},csrfFetch:async(url)=>({ok:true,json:async()=>url.endsWith('/policy-retry')?{operation:{id:'policy-1',state:'running'}}:{policy:{enabled:true,count:3},policy_operation:{id:'policy-1',state},can_retry_policy:state==='interrupted',points:[],unavailable_stores:[],total:0}})};
  vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../static/backup-history.js'),'utf8'),{window:host,AbortController,console});
  host.IOSBKHistory.section('A','settings');await host.IOSBKHistory.refresh();
  listeners.click({target:{closest(){return {dataset:{historyAction:'retryPolicy'}};}}});
@@ -62,7 +62,7 @@ assert.equal(api.pointChecks({review:passed,review_attempt:issues}).primary,issu
  const listeners={},requests=[];
  const host={document:{addEventListener(type,listener){listeners[type]=listener;},getElementById(){return null;},querySelector(){return null;}},addEventListener(){},setTimeout(){return 1;},clearTimeout(){},
   IOSBKI18n:{t:key=>key,has:()=>true,message:()=>''},
-  csrfFetch(url,options){requests.push([url,options.method,options.body]);return Promise.resolve({ok:true,json:async()=>({policy:{enabled:true,days:3},policy_operation:{state:'interrupted'},can_retry_policy:true,points:[],unavailable_stores:[],total:0})});}
+  csrfFetch(url,options){requests.push([url,options.method,options.body]);return Promise.resolve({ok:true,json:async()=>({policy:{enabled:true,count:3},policy_operation:{state:'interrupted'},can_retry_policy:true,points:[],unavailable_stores:[],total:0})});}
  };
  vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../static/backup-history.js'),'utf8'),{window:host,AbortController,console});
  host.IOSBKHistory.section('A','settings');await host.IOSBKHistory.refresh();
@@ -88,7 +88,7 @@ assert.equal(api.pointChecks({review:passed,review_attempt:issues}).primary,issu
    IOSBKConsole:{updateHistory(){},pointDrawer(){},closePoint(u){closed.push(['point',u]);},closeLayers(){closed.push(['all']);}},
    csrfFetch(url,options){
     if(options.method==='DELETE')return new Promise(resolve=>{resolveDelete=resolve;});
-    return Promise.resolve({ok:true,json:async()=>({policy:{enabled:true,days:3},points:(deleted?[second]:[first,second]).map(id=>({id,revision:1})),unavailable_stores:[],logical_bytes:0,bytes_known:true,total:deleted?1:2})});
+    return Promise.resolve({ok:true,json:async()=>({policy:{enabled:true,count:3},points:(deleted?[second]:[first,second]).map(id=>({id,revision:1})),unavailable_stores:[],logical_bytes:0,bytes_known:true,total:deleted?1:2})});
    }
   };
   vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../static/backup-history.js'),'utf8'),{window:host,AbortController,console});
@@ -121,30 +121,51 @@ assert.equal(api.pointChecks({review:passed,review_attempt:issues}).primary,issu
  vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../static/backup-history.js'),'utf8'),{window:host,AbortController,console});
  host.IOSBKHistory.section('A','backups');const nav=host.IOSBKHistory.navigate('A','target');
  host.IOSBKHistory.section('A','settings');await new Promise(setImmediate);
- pending.at(-1).resolve({ok:true,json:async()=>({policy:{enabled:true,days:3},points:[{id:'target'}],unavailable_stores:[],logical_bytes:0,bytes_known:true,total:1})});
+ pending.at(-1).resolve({ok:true,json:async()=>({policy:{enabled:true,count:3},points:[{id:'target'}],unavailable_stores:[],logical_bytes:0,bytes_known:true,total:1})});
  await nav;assert.deepEqual(drawers,[],'late navigation cannot open a backup drawer over settings');
  console.log('same-device cross-section navigation remains cancelled');
 })().catch(e=>{console.error(e);process.exitCode=1});
 (async()=>{
- const views=[];const c=api.createController({get(){return Promise.resolve({policy:{enabled:true,days:3},points:[]})},render(v){views.push(v)},error(e){throw e}});
- await c.open('A');c.edit({enabled:false,days:12});c.discard('A');
- assert.equal(views.at(-1).draft.days,3);assert.equal(views.at(-1).draft.enabled,true);assert.equal(c.hasDirty(),false,'cancel discards the unsaved policy without changing the saved policy');
+ const views=[];const c=api.createController({get(){return Promise.resolve({policy:{enabled:true,count:3},points:[]})},render(v){views.push(v)},error(e){throw e}});
+ await c.open('A');c.edit({enabled:false,count:12});c.discard('A');
+ assert.equal(views.at(-1).draft.count,3);assert.equal(views.at(-1).draft.enabled,true);assert.equal(c.hasDirty(),false,'cancel discards the unsaved policy without changing the saved policy');
  c.close();console.log('history settings cancellation restores saved policy');
 })().catch(e=>{console.error(e);process.exitCode=1});
 (async()=>{
  let resolveA,calls=0;const views=[],errors=[];
- const c=api.createController({get(url){calls++;if(url.endsWith('/A'))return new Promise(r=>{resolveA=r});return Promise.resolve({udid:'B',policy:{enabled:true,days:3},points:[{id:'b'.repeat(32)},{id:'c'.repeat(32)}],total:2})},render(v){views.push(v)},error(e){errors.push(e)}});
- const old=c.open('A');c.refresh();assert.equal(calls,1,'deduplicate concurrent reads');await c.open('B');resolveA({udid:'A',policy:{days:1},points:[]});await old;assert.equal(views.at(-1).udid,'B');
- c.select('c'.repeat(32));c.edit({enabled:true,days:12});c.repaint();assert.equal(views.at(-1).selected,'c'.repeat(32));assert.equal(views.at(-1).draft.days,12);
- await c.refresh();assert.equal(views.at(-1).draft.days,12,'refresh cannot discard unsaved policy');c.close();await c.open('B');assert.equal(views.at(-1).selected,'c'.repeat(32));assert.equal(views.at(-1).draft.days,12,'return keeps draft');
+ const c=api.createController({get(url){calls++;if(url.endsWith('/A'))return new Promise(r=>{resolveA=r});return Promise.resolve({udid:'B',policy:{enabled:true,count:3},points:[{id:'b'.repeat(32)},{id:'c'.repeat(32)}],total:2})},render(v){views.push(v)},error(e){errors.push(e)}});
+ const old=c.open('A');c.refresh();assert.equal(calls,1,'deduplicate concurrent reads');await c.open('B');resolveA({udid:'A',policy:{count:1},points:[]});await old;assert.equal(views.at(-1).udid,'B');
+ c.select('c'.repeat(32));c.edit({enabled:true,count:12});c.repaint();assert.equal(views.at(-1).selected,'c'.repeat(32));assert.equal(views.at(-1).draft.count,12);
+ await c.refresh();assert.equal(views.at(-1).draft.count,12,'refresh cannot discard unsaved policy');c.close();await c.open('B');assert.equal(views.at(-1).selected,'c'.repeat(32));assert.equal(views.at(-1).draft.count,12,'return keeps draft');
  assert.equal(errors.length,0);console.log('history navigation ignores late results, deduplicates, preserves selection and unsaved edits');
 })().catch(e=>{console.error(e);process.exitCode=1});
 (async()=>{
- const views=[];const c=api.createController({get(url){return Promise.resolve({udid:url.split('/').pop(),policy:{enabled:true,days:3},points:[],next_offset:0})},render(v){views.push(v)},error(e){throw e}});
- await c.open('A');c.edit({enabled:true,days:7});await c.open('B');c.edit({enabled:true,days:12});c.saved('A');await c.refresh();assert.equal(views.at(-1).draft.days,12,'saving A cannot clear B draft');assert.equal(views.at(-1).dirty,true);await c.open('A');assert.equal(views.at(-1).dirty,false);console.log('policy completion is bound to the originating device');
+ const views=[];const c=api.createController({get(url){return Promise.resolve({udid:url.split('/').pop(),policy:{enabled:true,count:3},points:[],next_offset:0})},render(v){views.push(v)},error(e){throw e}});
+ await c.open('A');c.edit({enabled:true,count:7});await c.open('B');c.edit({enabled:true,count:12});c.saved('A');await c.refresh();assert.equal(views.at(-1).draft.count,12,'saving A cannot clear B draft');assert.equal(views.at(-1).dirty,true);await c.open('A');assert.equal(views.at(-1).dirty,false);console.log('policy completion is bound to the originating device');
 })().catch(e=>{console.error(e);process.exitCode=1});
 (async()=>{
  let shifted=false;const views=[],target='a'.repeat(32),first='b'.repeat(32);
- const c=api.createController({get(url){if(url.startsWith('/api/backup-point/'))return Promise.resolve({id:target});return Promise.resolve({policy:{days:3},points:shifted?[{id:first}]:[{id:target}],next_offset:0})},render(v){views.push(v)},error(e){throw e}});
+ const c=api.createController({get(url){if(url.startsWith('/api/backup-point/'))return Promise.resolve({id:target});return Promise.resolve({policy:{count:3},points:shifted?[{id:first}]:[{id:target}],next_offset:0})},render(v){views.push(v)},error(e){throw e}});
  await c.open('A');c.select(target);shifted=true;await c.refresh();assert.equal(views.at(-1).selected,target,'new points cannot evict the selected point');console.log('selected point survives changes to the list window');
+})().catch(e=>{console.error(e);process.exitCode=1});
+(async()=>{
+ for(const confirm of [true,false]){
+  const listeners={},dialogs=[],requests=[],point='a'.repeat(32);
+  const document={activeElement:{isConnected:true,focus(){}},addEventListener(k,fn){listeners[k]=fn;},getElementById(){return null;},querySelector(){return null;},createElement(tag){return {tag,dataset:{},children:[],classList:{add(){}},setAttribute(){},addEventListener(){},appendChild(child){this.children.push(child);},showModal(){dialogs.push(this);},close(){},remove(){},focus(){}};},body:{appendChild(){}}};
+  const host={document,addEventListener(){},setTimeout(){return 1;},clearTimeout(){},IOSBKI18n:{t:(key,p)=>key+(p?' '+JSON.stringify(p):''),has:()=>true,message:()=>'',formatDate:x=>x},IOSBKConsole:{updateHistory(){},pointDrawer(){}},csrfFetch:async(url,options)=>{
+   requests.push([url,options]);return {ok:true,json:async()=>url.includes('/pin-preview')?{token:'unpin-token',affected_count:1,points:[{id:point,completed_at:'2026-10-31T10:00:00Z'}]}:{policy:{enabled:true,count:2},points:[{id:point,revision:5,pinned:true}],unavailable_stores:[],total:1}};
+  }};
+  vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../static/backup-history.js'),'utf8'),{window:host,AbortController,console});
+  host.IOSBKHistory.section('A','backups');await host.IOSBKHistory.refresh();await host.IOSBKHistory.navigate('A',point);
+  listeners.click({target:{closest:()=>({dataset:{historyAction:'pin'}})}});
+  await new Promise(setImmediate);
+  const dialog=dialogs.at(-1);assert.ok(dialog,'unpin waits for an impact preview');
+  assert.match(dialog.children[1].textContent,/2026-10-31/);assert.match(dialog.children[1].textContent,/"count":1/);
+  dialog.children.at(-1).children.find(b=>b.dataset.historyAction===(confirm?'dialogConfirm':'dialogCancel')).onclick();
+  await new Promise(setImmediate);
+  const submitted=requests.find(([url])=>url.includes('/pin?'));assert.equal(!!submitted,confirm);
+  if(submitted)assert.deepEqual(JSON.parse(submitted[1].body),{revision:5,pinned:false,token:'unpin-token'});
+  host.IOSBKHistory.hide();
+ }
+ console.log('unpin confirms actual cleanup candidates and submits the matching preview token');
 })().catch(e=>{console.error(e);process.exitCode=1});

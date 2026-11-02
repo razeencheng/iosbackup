@@ -65,7 +65,7 @@ func (m *backupStorage) load(ctx context.Context) error {
 		paths[location.Path] = true
 	}
 	for udid, st := range locations.Devices {
-		if !udidPattern.MatchString(udid) || !backupstore.ValidID(st.EpochID) || !ids[st.StoreID] || st.Days < 1 || st.Days > 365 || !filepath.IsAbs(st.Root) || filepath.Clean(st.Root) != st.Root {
+		if !udidPattern.MatchString(udid) || !backupstore.ValidID(st.EpochID) || !ids[st.StoreID] || st.Count < 1 || st.Count > 365 || !filepath.IsAbs(st.Root) || filepath.Clean(st.Root) != st.Root {
 			return backupstore.ErrInvalid
 		}
 		if st.Phase != "enabling" && st.Phase != "active" && st.Phase != "disabling" && st.Phase != "disabled" {

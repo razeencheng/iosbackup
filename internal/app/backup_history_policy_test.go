@@ -13,7 +13,7 @@ func TestBackupHistoryPolicyPreviewAndApply(t *testing.T) {
 	if err := app.PerformBackup("CONTROL"); err != nil {
 		t.Fatal(err)
 	}
-	policy := backupstore.Policy{Enabled: true, Days: 1}
+	policy := backupstore.Policy{Enabled: true, Count: 1}
 	preview, err := app.previewHistoryPolicy(context.Background(), "CONTROL", policy)
 	if err != nil {
 		t.Fatal(err)
@@ -37,10 +37,10 @@ func TestBackupHistoryPolicyPreviewAndApply(t *testing.T) {
 	if err = app.applyHistoryPolicy(context.Background(), "CONTROL", policy, &preview); err != nil {
 		t.Fatal(err)
 	}
-	if app.configs["CONTROL"].History.Days != 1 {
+	if app.configs["CONTROL"].History.Count != 1 {
 		t.Fatal("policy not saved")
 	}
-	if err = app.applyHistoryPolicy(context.Background(), "CONTROL", backupstore.Policy{Days: 1}, nil); err != nil {
+	if err = app.applyHistoryPolicy(context.Background(), "CONTROL", backupstore.Policy{Count: 1}, nil); err != nil {
 		t.Fatal(err)
 	}
 	for _, p := range historyPoints(t, app) {

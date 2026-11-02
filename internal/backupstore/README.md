@@ -36,7 +36,7 @@ Tests cover ordinary copy isolation, cancellation, insufficient capacity, partia
 
 ## Retention and metadata changes
 
-The default window is three natural days including today, configurable from 1 to 365 days. Within each stored timezone/day bucket, the latest normal point wins. Missing days do not create synthetic points. Pinning, manual retention, old generations/epochs, the latest normal baseline and active read leases take precedence. Pending results have an independent latest-one rule within the current generation and epoch. A new result must be committed before it can supersede an older result.
+The default policy is disabled with a count of two, configurable from 1 to 365 backups. Select the latest N unpinned normal points in the active epoch and generation by completion time, then commit time and ID. Same-day backups each count, including the latest version. Elapsed calendar time does not expire points. Pinned and manually retained points do not consume ordinary slots. Pinning, manual retention, old generations/epochs, the latest normal baseline and active read leases take precedence. Pending results have an independent latest-one rule within the current generation and epoch. A new result must be committed before it can supersede an older result.
 
 `PlanGC` returns the catalog revision, eligible IDs and reasons for retaining other points. `GC` rechecks the revision and leases under the catalog lock. An occupied point is skipped without blocking cleanup of other eligible points. Atomic metadata transactions keep descriptors and the catalog consistent when pinning or freezing a store; recovery can finish any interrupted step. Pinning never changes a check result or promotes a pending point to a baseline.
 

@@ -113,7 +113,7 @@ func TestBackupHistoryHTTP(t *testing.T) {
 }
 func TestBackupHistoryHTTPPolicy(t *testing.T) {
 	a, h, _ := historyHTTPFixture(t)
-	body := map[string]any{"policy": backupstore.Policy{Enabled: true, Days: 1}}
+	body := map[string]any{"policy": backupstore.Policy{Enabled: true, Count: 1}}
 	w := historyRequest(t, a, h, "PUT", "/api/backup-history/CONTROL/policy", body)
 	if w.Code != 409 {
 		t.Fatal("unpreviewed change", w.Code)
@@ -138,7 +138,7 @@ func TestBackupHistoryHTTPPolicy(t *testing.T) {
 	done := service.policies["CONTROL"].done
 	service.mu.Unlock()
 	<-done
-	if a.configs["CONTROL"].History.Days != 1 {
+	if a.configs["CONTROL"].History.Count != 1 {
 		t.Fatal("policy not saved")
 	}
 	w = historyRequest(t, a, h, "PUT", "/api/backup-history/CONTROL/policy", body)

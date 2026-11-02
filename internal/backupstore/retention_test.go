@@ -21,46 +21,112 @@ func retentionPoint(c *Catalog, r RetentionRequest, n, ago int, zone string) str
 	c.Points[id] = Point{ID: id, EpochID: r.EpochID, Generation: Generation{ID: r.GenerationID}, CompletedAt: at, CommittedAt: at, Day: at.In(loc).Format("2006-01-02"), Timezone: zone, State: "normal"}
 	return id
 }
-func TestRetentionNaturalDays(t *testing.T) {
-	for _, days := range []int{0, 1, 3, 7, 30} {
-		t.Run(fmt.Sprint(days), func(t *testing.T) {
+func TestRetentionLatestCount(t *testing.T) {
+	for _, count := range []int{0, 1, 2, 3, 7, 30, 365} {
+		t.Run(fmt.Sprint(count), func(t *testing.T) {
 			c, r := retentionFixture()
-			r.Policy.Days = days
+			r.Policy.Count = count
 			for i := 0; i < 35; i++ {
-				retentionPoint(&c, r, i, i, "UTC")
+				retentionPoint(&c, r, i, i*30, "UTC")
 			}
-			p, err := PlanRetention(c, r, nil)
+			plan, err := PlanRetention(c, r, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
-			want := days
+			want := count
 			if want == 0 {
-				want = 3
+				want = 2
 			}
-			if len(p.Delete) != 35-want {
-				t.Fatalf("deleted %d want %d", len(p.Delete), 35-want)
+			if want > 35 {
+				want = 35
+			}
+			if len(plan.Retain) != want {
+				t.Fatalf("retained %d, want %d: %+v", len(plan.Retain), want, plan)
+			}
+			r.Now = r.Now.AddDate(1, 0, 0)
+			later, err := PlanRetention(c, r, nil)
+			if err != nil || len(later.Retain) != want {
+				t.Fatalf("elapsed time lost history: %+v %v", later, err)
 			}
 		})
 	}
 }
-
-func TestRetentionMidnightDSTUsesCalendarDates(t *testing.T) {
-	loc, err := time.LoadLocation("America/Sao_Paulo")
-	if err != nil {
-		t.Fatal(err)
-	}
+func TestRetentionCountsSameDayBackups(t *testing.T) {
 	c, r := retentionFixture()
-	r.Now = time.Date(2018, 11, 6, 12, 0, 0, 0, loc)
-	r.Policy.Days = 3
-	for i := 0; i < 5; i++ {
-		retentionPoint(&c, r, i, i, loc.String())
+	r.Policy.Count = 3
+	ids := []string{}
+	for i := 0; i < 4; i++ {
+		id := retentionPoint(&c, r, i, 0, "UTC")
+		p := c.Points[id]
+		p.CompletedAt = p.CompletedAt.Add(time.Duration(i) * time.Minute)
+		p.CommittedAt = p.CompletedAt
+		c.Points[id] = p
+		ids = append(ids, id)
+	}
+	c.Baselines[r.GenerationID] = ids[3]
+	plan, err := PlanRetention(c, r, nil)
+	if err != nil || len(plan.Retain) != 3 || len(plan.Delete) != 1 || plan.Delete[0] != ids[0] {
+		t.Fatalf("same-day backups must occupy separate slots including current: %+v %v", plan, err)
+	}
+	// 固定点退出普通名额；取消固定后重新参与排序。
+	pinned := c.Points[ids[3]]
+	pinned.Pinned = true
+	c.Points[pinned.ID] = pinned
+	plan, err = PlanRetention(c, r, nil)
+	if err != nil || len(plan.Retain) != 4 {
+		t.Fatalf("pin consumed ordinary slot: %+v %v", plan, err)
+	}
+	pinned.Pinned = false
+	c.Points[pinned.ID] = pinned
+	plan, err = PlanRetention(c, r, nil)
+	if err != nil || len(plan.Delete) != 1 || plan.Delete[0] != ids[0] {
+		t.Fatalf("unpin plan: %+v %v", plan, err)
+	}
+}
+func TestRetentionPendingAndProtectedExtrasDoNotDisplaceNormal(t *testing.T) {
+	c, r := retentionFixture()
+	r.Policy.Count = 2
+	normal := []string{retentionPoint(&c, r, 1, 10, "UTC"), retentionPoint(&c, r, 2, 20, "UTC")}
+	for i := 3; i <= 6; i++ {
+		id := retentionPoint(&c, r, i, 0, "UTC")
+		p := c.Points[id]
+		switch i {
+		case 3:
+			p.State = "pending"
+		case 4:
+			p.Pinned = true
+		case 5:
+			p.Manual = true
+		case 6:
+			p.Generation.ID = "old"
+		}
+		c.Points[id] = p
 	}
 	plan, err := PlanRetention(c, r, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(plan.Retain) != 3 || len(plan.Delete) != 2 {
-		t.Fatalf("midnight DST changed natural-day retention: %+v", plan)
+	for _, id := range normal {
+		if plan.Retain[id] == "" {
+			t.Fatalf("extra result displaced healthy point: %+v", plan)
+		}
+	}
+}
+func TestRetentionStableTieBreak(t *testing.T) {
+	c, r := retentionFixture()
+	r.Policy.Count = 1
+	older := retentionPoint(&c, r, 1, 0, "UTC")
+	newer := retentionPoint(&c, r, 2, 0, "UTC")
+	plan, err := PlanRetention(c, r, nil)
+	if err != nil || len(plan.Delete) != 1 || plan.Delete[0] != older {
+		t.Fatalf("ID tie-break: %+v %v", plan, err)
+	}
+	p := c.Points[older]
+	p.CommittedAt = p.CommittedAt.Add(time.Second)
+	c.Points[older] = p
+	plan, err = PlanRetention(c, r, nil)
+	if err != nil || len(plan.Delete) != 1 || plan.Delete[0] != newer {
+		t.Fatalf("commit tie-break: %+v %v", plan, err)
 	}
 }
 func TestRetentionProtectionAndPending(t *testing.T) {
@@ -119,35 +185,6 @@ func TestRetentionProtectionAndPending(t *testing.T) {
 		t.Fatal("disabled cleanup")
 	}
 }
-func TestRetentionSameDayAndCalendarBoundaries(t *testing.T) {
-	for _, zone := range []string{"America/New_York", "Asia/Shanghai", "Pacific/Kiritimati"} {
-		t.Run(zone, func(t *testing.T) {
-			c, r := retentionFixture()
-			r.Now = time.Date(2026, 3, 9, 4, 30, 0, 0, time.UTC)
-			id := retentionPoint(&c, r, 1, 2, zone)
-			// Calendar subtraction, not 72 elapsed hours, across DST and midnight.
-			plan, err := PlanRetention(c, r, nil)
-			if err != nil || len(plan.Delete) != 0 {
-				t.Fatalf("calendar point lost %s %v %+v", id, err, plan)
-			}
-			newer := retentionPoint(&c, r, 2, 2, zone)
-			p := c.Points[newer]
-			p.CompletedAt = p.CompletedAt.Add(time.Minute)
-			c.Points[newer] = p
-			plan, _ = PlanRetention(c, r, nil)
-			if len(plan.Delete) != 1 || plan.Delete[0] != id {
-				t.Fatalf("same day %+v", plan)
-			}
-			p = c.Points[id]
-			p.Pinned = true
-			c.Points[id] = p
-			plan, _ = PlanRetention(c, r, nil)
-			if len(plan.Delete) != 0 {
-				t.Fatal("pinned daily point lost")
-			}
-		})
-	}
-}
 func TestStoreGCRevisionLeaseAndPin(t *testing.T) {
 	s := storeFixture(t)
 	w, p := preparePoint(t, s)
@@ -163,7 +200,7 @@ func TestStoreGCRevisionLeaseAndPin(t *testing.T) {
 	if _, err = s.Commit(context.Background(), w.ID, next); err != nil {
 		t.Fatal(err)
 	}
-	req := RetentionRequest{Policy: Policy{Enabled: true}, EpochID: p.EpochID, GenerationID: p.Generation.ID, Now: time.Now()}
+	req := RetentionRequest{Policy: Policy{Enabled: true, Count: 1}, EpochID: p.EpochID, GenerationID: p.Generation.ID, Now: time.Now()}
 	plan, err := s.PlanGC(req)
 	if err != nil || len(plan.Delete) != 1 {
 		t.Fatalf("%+v %v", plan, err)
@@ -255,7 +292,7 @@ func TestStoreGCPinCannotRacePastCommittedDeletion(t *testing.T) {
 	if _, err = s.Commit(context.Background(), w.ID, next); err != nil {
 		t.Fatal(err)
 	}
-	req := RetentionRequest{Policy: Policy{Enabled: true}, EpochID: p.EpochID, GenerationID: p.Generation.ID, Now: time.Now()}
+	req := RetentionRequest{Policy: Policy{Enabled: true, Count: 1}, EpochID: p.EpochID, GenerationID: p.Generation.ID, Now: time.Now()}
 	plan, _ := s.PlanGC(req)
 	entered, proceed := make(chan struct{}), make(chan struct{})
 	s.step = func(stage string) error {

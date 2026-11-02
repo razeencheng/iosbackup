@@ -6,19 +6,19 @@ import (
 )
 
 func TestHistoryPolicyDefaults(t *testing.T) {
-	for _, days := range []int{0, 1, 3, 7, 30, 365} {
-		p, err := (Policy{Days: days}).Normalize()
-		want := days
+	for _, count := range []int{0, 1, 3, 7, 30, 365} {
+		p, err := (Policy{Count: count}).Normalize()
+		want := count
 		if want == 0 {
-			want = 3
+			want = 2
 		}
-		if err != nil || p.Enabled || p.Days != want {
-			t.Fatalf("days %d: %+v %v", days, p, err)
+		if err != nil || p.Enabled || p.Count != want {
+			t.Fatalf("count %d: %+v %v", count, p, err)
 		}
 	}
-	for _, days := range []int{-1, 366} {
-		if _, err := (Policy{Days: days}).Normalize(); err == nil {
-			t.Fatalf("accepted %d", days)
+	for _, count := range []int{-1, 366} {
+		if _, err := (Policy{Count: count}).Normalize(); err == nil {
+			t.Fatalf("accepted %d", count)
 		}
 	}
 }

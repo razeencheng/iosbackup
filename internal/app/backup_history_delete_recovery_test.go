@@ -14,10 +14,17 @@ import (
 func TestHistoryDeleteLatestSelectsCompatibleRemainingPoint(t *testing.T) {
 	for _, kind := range []string{"compatible", "old_generation", "unreadable_metadata"} {
 		t.Run(kind, func(t *testing.T) {
-			a, h, _ := historyHTTPFixture(t)
+			a, h, first := historyHTTPFixture(t)
 			old := olderHistoryPoint(t, a, 1, kind == "old_generation")
 			if err := a.PerformBackup("CONTROL"); err != nil {
 				t.Fatal(err)
+			}
+			// 按份数会保留同日的初始点；显式移除它，仅测试指定候选的兼容性。
+			initialStore, _ := a.backupStorage.store(first.StoreID)
+			initialCatalog, _ := initialStore.Snapshot()
+			removed := historyRequest(t, a, h, http.MethodDelete, "/api/backup-point/"+first.ID, map[string]any{"revision": initialCatalog.Revision, "confirm": first.ID})
+			if removed.Code != 200 {
+				t.Fatal(removed.Code, removed.Body)
 			}
 			if kind == "unreadable_metadata" {
 				s, _ := a.backupStorage.store(old.StoreID)

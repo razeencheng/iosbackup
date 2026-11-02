@@ -58,10 +58,10 @@ func TestHistoryPreparationHasLocalPhaseBeforePhoneCommand(t *testing.T) {
 
 func TestHistoryPolicyPreparationReportsLocalProgress(t *testing.T) {
 	a := historyTestApp(t)
-	a.configs["CONTROL"].History = backupstore.Policy{Days: 3}
+	a.configs["CONTROL"].History = backupstore.Policy{Count: 3}
 	writeHistoryBackup(t, filepath.Join(a.paths.BackupsRoot, "CONTROL"), "finished", "legacy")
 	a.backupStorage.slot <- struct{}{}
-	op, err := a.startHistoryPolicy(context.Background(), "CONTROL", backupstore.Policy{Enabled: true, Days: 3}, nil)
+	op, err := a.startHistoryPolicy(context.Background(), "CONTROL", backupstore.Policy{Enabled: true, Count: 3}, nil)
 	if err != nil {
 		<-a.backupStorage.slot
 		t.Fatal(err)

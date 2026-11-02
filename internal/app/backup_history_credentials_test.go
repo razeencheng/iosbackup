@@ -236,7 +236,7 @@ func TestBackupHistoryLegacyCredentialPreservedWithoutAssumingCompatibility(t *t
 		t.Fatal(err)
 	}
 	app.configs["CONTROL"].LastBackup = time.Now().AddDate(0, 0, -1)
-	if err = app.applyHistoryPolicy(context.Background(), "CONTROL", backupstore.Policy{Enabled: true, Days: 3}, nil); err != nil {
+	if err = app.applyHistoryPolicy(context.Background(), "CONTROL", backupstore.Policy{Enabled: true, Count: 3}, nil); err != nil {
 		t.Fatal(err)
 	}
 	var point backupstore.Point
@@ -282,7 +282,7 @@ func TestBackupHistoryImportDoesNotAssumeCurrentPasswordGeneration(t *testing.T)
 	if err = app.ChangeBackupPassword(context.Background(), "CONTROL", "old-password", "new-password"); err != nil {
 		t.Fatal(err)
 	}
-	if err = app.applyHistoryPolicy(context.Background(), "CONTROL", backupstore.Policy{Enabled: true, Days: 3}, nil); err != nil {
+	if err = app.applyHistoryPolicy(context.Background(), "CONTROL", backupstore.Policy{Enabled: true, Count: 3}, nil); err != nil {
 		t.Fatal(err)
 	}
 	current, err := app.generationRegistry().load("CONTROL")

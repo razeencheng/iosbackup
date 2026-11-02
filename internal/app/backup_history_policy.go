@@ -173,7 +173,7 @@ func (app *application) prepareHistoryPolicyChange(ctx context.Context, udid str
 		if err != nil {
 			return nil, err
 		}
-		if policy.Enabled && st.Phase == "active" && policy.Days < st.Days && confirmed == nil {
+		if policy.Enabled && st.Phase == "active" && policy.Count < st.Count && confirmed == nil {
 			return nil, backupstore.ErrConflict
 		}
 	}

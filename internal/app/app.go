@@ -296,7 +296,7 @@ func (app *application) replaceNotificationManager(manager *notificationManager)
 // defaultBackupConfig 返回新设备的默认备份配置（唯一来源，避免多处漂移）。
 func (app *application) defaultBackupConfig(udid, name string) *backupConfig {
 	return &backupConfig{
-		History:           backupstore.Policy{Days: 3},
+		History:           backupstore.Policy{Count: 2},
 		UDID:              udid,
 		Name:              name,
 		StartTime:         "18:00",
@@ -313,8 +313,8 @@ func (app *application) defaultBackupConfig(udid, name string) *backupConfig {
 // applyBackupConfigDefaults 补齐旧版或部分配置缺少的必填字段。
 func (app *application) applyBackupConfigDefaults(cfg *backupConfig) {
 	defaults := app.defaultBackupConfig(cfg.UDID, cfg.Name)
-	if cfg.History.Days == 0 {
-		cfg.History.Days = 3
+	if cfg.History.Count == 0 {
+		cfg.History.Count = 2
 	}
 	if cfg.StartTime == "" {
 		cfg.StartTime = defaults.StartTime

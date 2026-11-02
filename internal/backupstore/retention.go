@@ -18,7 +18,7 @@ type RetentionPlan struct {
 	Retain   map[string]string `json:"retain"`
 }
 
-// PlanRetention is pure. Each point keeps its original calendar and timezone.
+// PlanRetention 按完成时间选取最近 N 份普通正常备份，不受日历日期影响。
 func PlanRetention(c Catalog, r RetentionRequest, leases map[string]int) (RetentionPlan, error) {
 	plan := RetentionPlan{Revision: c.Revision, Delete: []string{}, Retain: map[string]string{}}
 	policy, err := r.Policy.Normalize()
@@ -28,18 +28,32 @@ func PlanRetention(c Catalog, r RetentionRequest, leases map[string]int) (Retent
 	if policy.Enabled && (!ValidID(r.EpochID) || !ValidID(r.GenerationID)) {
 		return plan, ErrInvalid
 	}
-	latest := map[string]Point{}
+	var normal []Point
+	var pending Point
 	for _, p := range c.Points {
 		if p.Manual || p.EpochID != r.EpochID || p.Generation.ID != r.GenerationID {
 			continue
 		}
-		key := p.Timezone + "/" + p.Day
-		if p.State == "pending" {
-			key = "pending"
+		switch p.State {
+		case "normal":
+			if !p.Pinned {
+				normal = append(normal, p)
+			}
+		case "pending":
+			if pending.ID == "" || pointAfter(p, pending) {
+				pending = p
+			}
+		default:
+			return plan, ErrInvalid
 		}
-		if old, ok := latest[key]; !ok || pointAfter(p, old) {
-			latest[key] = p
+	}
+	sort.Slice(normal, func(i, j int) bool { return pointAfter(normal[i], normal[j]) })
+	newest := map[string]bool{}
+	for i, p := range normal {
+		if i >= policy.Count {
+			break
 		}
+		newest[p.ID] = true
 	}
 	baselines := map[string]bool{}
 	for _, id := range c.Baselines {
@@ -63,23 +77,14 @@ func PlanRetention(c Catalog, r RetentionRequest, leases map[string]int) (Retent
 		case leases[id] > 0:
 			reason = "in_use"
 		case p.State == "pending":
-			if latest["pending"].ID == id {
+			if pending.ID == id {
 				reason = "latest_pending"
 			}
 		case p.State == "normal":
-			loc, e := time.LoadLocation(p.Timezone)
-			if e != nil {
-				return plan, ErrInvalid
+			if newest[id] {
+				reason = "recent"
 			}
-			if p.Day != p.CompletedAt.In(loc).Format("2006-01-02") {
-				return plan, ErrInvalid
-			}
-			today := r.Now.In(loc)
-			// 自然日运算不经过当地午夜；部分时区切换夏令时会跳过午夜。
-			cutoff := time.Date(today.Year(), today.Month(), today.Day(), 0, 0, 0, 0, time.UTC).AddDate(0, 0, 1-policy.Days).Format("2006-01-02")
-			if p.Day >= cutoff && latest[p.Timezone+"/"+p.Day].ID == id {
-				reason = "daily"
-			}
+
 		default:
 			return plan, ErrInvalid
 		}

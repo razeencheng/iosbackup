@@ -193,7 +193,7 @@
     text('consoleCount-' + u, String(data.total));
     text('consoleSize-' + u, bytes(data.logical_bytes) + (data.bytes_known ? '' : ' + ?'));
     text('consoleFree-' + u, tr('console.freeSpace',{size:bytes((data.storage || {}).available_bytes)}));
-    text('historyPolicySummary-' + u, tr(data.policy.enabled ? 'history.summary' : 'history.summaryOff',{days:data.policy.days,count:data.total})+(global.IOSBKHistory&&global.IOSBKHistory.policyNotice?' '+global.IOSBKHistory.policyNotice(data):''));
+    text('historyPolicySummary-' + u, tr(data.policy.enabled ? 'history.summary' : 'history.summaryOff',{limit:data.policy.count,count:data.total})+(global.IOSBKHistory&&global.IOSBKHistory.policyNotice?' '+global.IOSBKHistory.policyNotice(data):''));
     var currentCard = get('currentBackup-' + u);
     if (currentCard) {
       currentCard.classList.toggle('hidden', source.kind === 'point' && source.available);

@@ -15,7 +15,7 @@ import (
 
 func interruptInitialHistory(t *testing.T, app *application) {
 	t.Helper()
-	app.configs["CONTROL"].History = backupstore.Policy{Days: 3}
+	app.configs["CONTROL"].History = backupstore.Policy{Count: 3}
 	writeHistoryBackup(t, filepath.Join(app.paths.BackupsRoot, "CONTROL"), "finished", "original")
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -26,7 +26,7 @@ func interruptInitialHistory(t *testing.T, app *application) {
 		}
 		return err
 	}
-	err := app.applyHistoryPolicy(ctx, "CONTROL", backupstore.Policy{Enabled: true, Days: 3}, nil)
+	err := app.applyHistoryPolicy(ctx, "CONTROL", backupstore.Policy{Enabled: true, Count: 3}, nil)
 	app.backupStorage.write = nil
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("interrupt: %v", err)
@@ -52,7 +52,7 @@ func TestHistoryEnablePersistsIntentAndKeepsOriginalSource(t *testing.T) {
 	if err != nil || string(data) != "original" {
 		t.Fatal("original source lost", err)
 	}
-	if err = app.applyHistoryPolicy(context.Background(), "CONTROL", backupstore.Policy{Enabled: true, Days: 3}, nil); err != nil {
+	if err = app.applyHistoryPolicy(context.Background(), "CONTROL", backupstore.Policy{Enabled: true, Count: 3}, nil); err != nil {
 		t.Fatal(err)
 	}
 	if len(historyPoints(t, app)) == 0 {
@@ -84,7 +84,7 @@ func TestHistoryOldInterruptedEnableDoesNotSwitchToEmptyCurrent(t *testing.T) {
 
 func TestHistoryMigrationDoesNotBlockOtherSettings(t *testing.T) {
 	app := historyTestApp(t)
-	app.configs["CONTROL"].History = backupstore.Policy{Days: 3}
+	app.configs["CONTROL"].History = backupstore.Policy{Count: 3}
 	writeHistoryBackup(t, filepath.Join(app.paths.BackupsRoot, "CONTROL"), "finished", "original")
 	app.backupStorage.slot <- struct{}{}
 	started := make(chan struct{})
@@ -101,7 +101,7 @@ func TestHistoryMigrationDoesNotBlockOtherSettings(t *testing.T) {
 	}
 	done := make(chan error, 1)
 	go func() {
-		done <- app.applyHistoryPolicy(context.Background(), "CONTROL", backupstore.Policy{Enabled: true, Days: 3}, nil)
+		done <- app.applyHistoryPolicy(context.Background(), "CONTROL", backupstore.Policy{Enabled: true, Count: 3}, nil)
 	}()
 	select {
 	case <-started:
@@ -136,14 +136,14 @@ func TestHistoryMigrationDoesNotBlockOtherSettings(t *testing.T) {
 
 func TestHistoryPolicyHTTPReturnsBeforeCopyFinishes(t *testing.T) {
 	app := historyTestApp(t)
-	app.configs["CONTROL"].History = backupstore.Policy{Days: 3}
+	app.configs["CONTROL"].History = backupstore.Policy{Count: 3}
 	writeHistoryBackup(t, filepath.Join(app.paths.BackupsRoot, "CONTROL"), "finished", "original")
 	if err := app.initializeSecurity(); err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(app.closeHistoryHTTP)
 	h := app.setupRoutes()
-	body := map[string]any{"policy": backupstore.Policy{Enabled: true, Days: 3}}
+	body := map[string]any{"policy": backupstore.Policy{Enabled: true, Count: 3}}
 	w := historyRequest(t, app, h, "POST", "/api/backup-history/CONTROL/policy-preview", body)
 	var preview struct {
 		Token string `json:"token"`
@@ -170,12 +170,12 @@ func TestHistoryPolicyHTTPReturnsBeforeCopyFinishes(t *testing.T) {
 
 func TestHistoryPolicyContinuesAfterRequestCancellation(t *testing.T) {
 	app := historyTestApp(t)
-	app.configs["CONTROL"].History = backupstore.Policy{Days: 3}
+	app.configs["CONTROL"].History = backupstore.Policy{Count: 3}
 	writeHistoryBackup(t, filepath.Join(app.paths.BackupsRoot, "CONTROL"), "finished", "original")
 	app.backupStorage.slot <- struct{}{}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	_, err := app.startHistoryPolicy(ctx, "CONTROL", backupstore.Policy{Enabled: true, Days: 3}, nil)
+	_, err := app.startHistoryPolicy(ctx, "CONTROL", backupstore.Policy{Enabled: true, Count: 3}, nil)
 	if err != nil {
 		<-app.backupStorage.slot
 		t.Fatal(err)
@@ -234,7 +234,7 @@ func TestHistoryPendingPolicyResumesAfterRestart(t *testing.T) {
 
 func TestHistoryPolicyFinalSaveFailureCanRetryWithoutDuplicateImport(t *testing.T) {
 	app := historyTestApp(t)
-	app.configs["CONTROL"].History = backupstore.Policy{Days: 3}
+	app.configs["CONTROL"].History = backupstore.Policy{Count: 3}
 	writeHistoryBackup(t, filepath.Join(app.paths.BackupsRoot, "CONTROL"), "finished", "original")
 	app.configStore.writeAtomic = func(path string, data []byte, mode os.FileMode) error {
 		var envelope backupConfigEnvelope
@@ -246,7 +246,7 @@ func TestHistoryPolicyFinalSaveFailureCanRetryWithoutDuplicateImport(t *testing.
 		}
 		return persistence.WriteFileAtomic(path, data, mode)
 	}
-	policy := backupstore.Policy{Enabled: true, Days: 3}
+	policy := backupstore.Policy{Enabled: true, Count: 3}
 	if err := app.applyHistoryPolicy(context.Background(), "CONTROL", policy, nil); err == nil {
 		t.Fatal("fault not reached")
 	}

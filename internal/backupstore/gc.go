@@ -11,6 +11,26 @@ func (s *Store) PlanGC(r RetentionRequest) (RetentionPlan, error) {
 	return PlanRetention(s.catalog, r, s.leases)
 }
 
+// PlanPinChange 在同一目录版本及读租约下预览固定状态变更，不写入目录。
+func (s *Store) PlanPinChange(r RetentionRequest, id string, pinned bool, revision uint64) (RetentionPlan, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if err := s.checkReady(); err != nil {
+		return RetentionPlan{}, err
+	}
+	if s.catalog.Revision != revision {
+		return RetentionPlan{}, ErrConflict
+	}
+	p, ok := s.catalog.Points[id]
+	if !ok {
+		return RetentionPlan{}, ErrConflict
+	}
+	c := s.snapshotUnsafe()
+	p.Pinned = pinned
+	c.Points[id] = p
+	return PlanRetention(c, r, s.leases)
+}
+
 // GC rechecks the revision and all read leases while holding the catalog lock.
 // Completed IDs are returned even on an error; errors never imply freed space.
 func (s *Store) GC(ctx context.Context, r RetentionRequest, revision uint64) ([]string, error) {
