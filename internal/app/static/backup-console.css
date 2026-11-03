@@ -1,10 +1,21 @@
 /* B 方案：设备卡保留上下文，操作围绕所选备份或任务展开。 */
 .backup-action{border-radius:8px}
-.console-check-details{margin:16px 0;color:#64748b;font-size:13px}
-.console-check-details summary{cursor:pointer;color:#2c62c6;padding:8px 0}
-.console-check-details summary:focus-visible{outline:2px solid #2c62c6;outline-offset:3px}
-.history-detail .console-check-time{margin-top:-6px;font-size:12px}
-.console-check-caption{font-weight:600}
+.check-card{margin:8px 0 24px;border:1px solid #e1e8ef;border-radius:10px;background:#fff;color:#213247}
+.check-card-top{display:flex;align-items:center;gap:12px;padding:20px}
+.check-card-icon{color:#2d61ce;flex:none}.check-card-icon .ui-icon{width:26px;height:26px}
+.check-card-copy{flex:1;min-width:0}.check-card-title{font-size:15px;font-weight:650}
+.check-card-meta{display:flex;align-items:center;gap:6px;flex-wrap:wrap;color:#758598;font-size:11px;margin-top:4px;font-variant-numeric:tabular-nums}
+.check-card-info{display:inline-grid;place-items:center;border:1px solid #a8b7c9;color:#718198;width:16px;height:16px;border-radius:50%;font:11px/1 serif;padding:0;background:#fff;cursor:help}
+.check-card-action{border:0;background:transparent;color:#2d61ce;font:inherit;font-size:12px;padding:10px 0 10px 8px;cursor:pointer;max-width:120px;flex:none}.check-card-action:disabled{opacity:.45;cursor:default}
+.check-card .check-card-note{margin:0 20px 16px 58px;font-size:12px;color:#758598;line-height:1.6;overflow-wrap:anywhere}
+.check-card-attention .check-card-icon,.check-card-attention .check-card-title,.check-card .console-amber{color:#a16315}
+.check-card-details{border-top:1px solid #e1e8ef;background:#fafbfd;border-radius:0 0 10px 10px}
+.check-card-details summary{padding:12px 20px;color:#63778d;font-size:12px;cursor:pointer;list-style:none}.check-card-details summary::-webkit-details-marker{display:none}.check-card-details summary::after{content:'⌄';float:right}.check-card-details[open] summary::after{content:'⌃'}
+.check-card-counts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));padding:8px 20px 20px;gap:14px;margin:0}.check-card-counts>div{padding-left:18px;border-left:1px solid #e1e8ef;min-width:0}.check-card-counts>div:first-child{padding-left:0;border:0}.check-card-counts dt{color:#758598;font-size:11px}.check-card-counts dd{margin:5px 0 0;font-size:21px;font-weight:600;line-height:1.4;letter-spacing:-.4px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.check-card-info:focus-visible,.check-card-action:focus-visible,.check-card-details summary:focus-visible{outline:2px solid #2d61ce;outline-offset:3px}
+.history-detail{display:flex;flex-direction:column;min-height:calc(100dvh - 82px)}.history-detail .console-point-hero{margin-bottom:28px}.history-detail .console-related{margin-top:6px;padding-top:0}.history-detail .console-navigation-row{color:#506780;font-weight:400}.history-detail .console-point-delete{align-self:flex-start;margin:24px 0;border:0;padding:7px 0;min-height:32px;color:#b43c35;font-size:12px;background:transparent}
+.history-detail .history-actions.console-point-footer{position:sticky;bottom:-24px;z-index:1;margin: auto -24px -24px;padding:18px 24px;background:#fff;border-top:1px solid #e1e8ef;display:flex;justify-content:space-between;gap:12px}.console-point-footer .history-button{min-width:100px;min-height:42px}.console-point-footer .primary{min-width:140px}
+@media(max-width:540px){.check-card-top{padding:18px 16px;gap:10px}.check-card-action{max-width:100px}.check-card-title{font-size:14px}.check-card-counts{padding-inline:16px;gap:8px}.check-card-counts>div{padding-left:10px}.check-card-counts dd{font-size:18px}.check-card .check-card-note{margin-left:52px}.history-detail .history-actions.console-point-footer{bottom:-18px;margin-inline:-18px;margin-bottom:-18px;padding:16px 18px}.console-point-footer .history-button{min-width:95px}.console-point-footer .primary{min-width:130px}}
 @media(max-width:540px){.device-action-row{column-gap:8px}.device-action-row .backup-action{min-width:0!important;padding-inline:12px!important}.device-action-row .connection-badge{font-size:11px!important;gap:5px!important;padding-inline:7px!important}}
 .console-tabs{display:flex;gap:12px;padding:0 22px;border-bottom:1px solid #d8e2ea;background:#fff}
 .console-tabs .snav{padding:15px 4px;margin-right:20px;border-radius:0;background:transparent;box-shadow:none;border-bottom:2px solid transparent}
@@ -28,7 +39,7 @@
 .history-layout,.history-layout.has-selection{display:block;margin-top:14px}.history-layout.has-selection .history-list-column{display:block}
 .history-toolbar h3{font-size:16px}.history-toolbar>.history-button{border:0;background:transparent;padding-inline:0;min-height:30px}
 .history-detail{position:static;border:0;border-radius:0;padding:24px}
-.history-detail h3{margin-top:0;font-size:20px}.console-point-hero{font-size:16px;color:#405162;margin:8px 0 22px}
+.history-detail h3{margin-top:0;font-size:26px}.console-point-hero{font-size:16px;color:#405162;margin:8px 0 22px}
 .history-detail .history-actions{margin:22px 0}.history-detail .history-note{margin:12px 0}
 .console-related{margin-top:24px;padding-top:16px;border-top:1px solid #e5ebf0}.console-related h4{font-size:14px;margin:0 0 10px}
 .console-navigation-row{display:block;width:100%;padding:14px 0;color:#2c62c6;border:0;border-bottom:1px solid #e5ebf0;background:transparent;text-align:left;font:600 13px/1.5 inherit;cursor:pointer}
@@ -64,6 +75,7 @@
 .console-layer-head{padding-top:max(18px,env(safe-area-inset-top,0px))}
 @media(max-width:540px){.console-drawer .history-button,.console-close{min-height:44px}.console-layer-body,.history-detail{padding-left:max(18px,env(safe-area-inset-left,0px));padding-right:max(18px,env(safe-area-inset-right,0px))}.console-outcomes{gap:6px}.console-outcomes>div{padding:10px 6px}.console-outcomes strong{overflow-wrap:anywhere}}
 .console-export-filename{overflow-wrap:anywhere;}
+.backup-browser-metrics.no-file-count .backup-browser-metric:last-child{grid-column:1/-1}
 
 /* 列表摘要与容量共用工具栏；历史保留只在设备设置中编辑。 */
 .console-list-toolbar{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px 24px;padding:2px 0 18px;border-bottom:1px solid #e5ebf0;font-size:12px;color:#718090}

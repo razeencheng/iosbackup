@@ -387,17 +387,13 @@
 <section id="historySummary-{{$d.UDID}}" class="console-list-toolbar" aria-label="{{t $.Locale "console.summary"}}" data-i18n-aria="console.summary"><div class="console-history-count"><strong id="consoleCount-{{$d.UDID}}">—</strong><span class="console-summary-divider" aria-hidden="true">/</span><span id="historySummaryText-{{$d.UDID}}"></span></div><div class="console-capacity"><span data-i18n="console.logicalSize">{{t $.Locale "console.logicalSize"}}</span><button type="button" class="term-hint" data-term="logical" aria-label="{{t $.Locale "term.logical.title"}}">?</button><strong id="consoleSize-{{$d.UDID}}">—</strong><button type="button" class="console-free" id="consoleFree-{{$d.UDID}}" data-hint=""></button></div></section><p id="consoleStorageNotice-{{$d.UDID}}" class="history-note console-storage-notice hidden" role="status"></p>
 <section id="currentBackup-{{$d.UDID}}" class="console-current hidden"><div><strong><span data-i18n="console.currentSet">{{t $.Locale "console.currentSet"}}</span></strong><p id="currentBackupState-{{$d.UDID}}" class="history-note"></p></div><button type="button" class="history-button" data-console-action="current" data-udid="{{$d.UDID}}" ><span data-i18n="console.currentDetails">{{t $.Locale "console.currentDetails"}}</span></button></section>
 <div id="backupOverview-{{$d.UDID}}" class="hidden console-layer-body">
-            <section id="currentCheck-{{$d.UDID}}" class="jobs-summary">
-              <div class="jobs-toolbar"><strong data-i18n="check.title">{{t $.Locale "check.title"}}</strong><div><button id="backupCheckStart-{{$d.UDID}}" class="jobs-button" data-check-action="start" data-udid="{{$d.UDID}}" data-i18n="check.start" data-i18n-title="check.scope" title="{{t $.Locale "check.scope"}}">{{t $.Locale "check.start"}}</button> <button id="backupCheckCancel-{{$d.UDID}}" class="jobs-button hidden" data-check-action="cancel" data-udid="{{$d.UDID}}" data-i18n="check.cancel">{{t $.Locale "check.cancel"}}</button></div></div>
-              <p id="backupCheckResult-{{$d.UDID}}" style="white-space:pre-wrap" role="status" data-i18n="check.none">{{t $.Locale "check.none"}}</p>
-              <p class="jobs-note" data-i18n="check.scope">{{t $.Locale "check.scope"}}</p>
-            </section>
+            <section id="currentCheck-{{$d.UDID}}" class="check-card" aria-label="{{t $.Locale "check.title"}}" data-i18n-aria="check.title"></section>
             <div id="bkOffline-{{$d.UDID}}" class="backup-offline-note{{if $d.IsOnline}} hidden{{end}}"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-info"></use></svg><span data-i18n="bindex.offlineNote">{{t $.Locale "bindex.offlineNote"}}</span></div>
             <div>
               <div class="backup-browser-heading"><div class="backup-browser-title" data-i18n="bmgmt.infoTitle">{{t $.Locale "bmgmt.infoTitle"}}</div><button id="bkRefresh-{{$d.UDID}}" class="backup-browser-link" onclick="loadBackups('{{$d.UDID}}')"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-refresh"></use></svg><span id="bkRefreshLabel-{{$d.UDID}}" data-i18n="bmgmt.infoRefresh">{{t $.Locale "bmgmt.infoRefresh"}}</span></button></div>
-              <div class="backup-browser-metrics">
+              <div id="bkMetrics-{{$d.UDID}}" class="backup-browser-metrics">
                 <div class="backup-browser-metric"><div class="backup-metric-label" data-i18n="bmgmt.size">{{t $.Locale "bmgmt.size"}}</div><div id="bkSize-{{$d.UDID}}" class="backup-metric-value">—</div><div class="backup-metric-caption" data-i18n="bindex.sizeNote">{{t $.Locale "bindex.sizeNote"}}</div></div>
-                <div class="backup-browser-metric"><div class="backup-metric-label" data-i18n="bindex.count">{{t $.Locale "bindex.count"}}</div><div id="bkCount-{{$d.UDID}}" class="backup-metric-value">—</div><div class="backup-metric-caption" data-i18n="bindex.countNote">{{t $.Locale "bindex.countNote"}}</div></div>
+                <div id="bkCountMetric-{{$d.UDID}}" class="backup-browser-metric"><div class="backup-metric-label" data-i18n="bindex.count">{{t $.Locale "bindex.count"}}</div><div id="bkCount-{{$d.UDID}}" class="backup-metric-value">—</div><div class="backup-metric-caption" data-i18n="bindex.countNote">{{t $.Locale "bindex.countNote"}}</div></div>
                 <div class="backup-browser-metric"><div class="backup-metric-label" data-i18n="bmgmt.encrypted">{{t $.Locale "bmgmt.encrypted"}}</div><div id="bkEnc-{{$d.UDID}}" class="backup-metric-value backup-metric-text">—</div></div>
                 <div class="backup-browser-metric"><div class="backup-metric-label" data-i18n="bindex.latest">{{t $.Locale "bindex.latest"}}</div><div id="bkLatest-{{$d.UDID}}" class="backup-metric-value backup-metric-date">—</div><div class="backup-metric-caption" data-i18n="bindex.latestNote">{{t $.Locale "bindex.latestNote"}}</div></div>
               </div>
@@ -405,6 +401,7 @@
                 <svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-info"></use></svg>
                 <div><strong id="bkStatusTitle-{{$d.UDID}}" data-i18n="bindex.firstTitle">{{t $.Locale "bindex.firstTitle"}}</strong><p id="bkStatusBody-{{$d.UDID}}" data-i18n="bindex.firstBody">{{t $.Locale "bindex.firstBody"}}</p><p id="bkReadAt-{{$d.UDID}}" class="backup-read-at"></p><p id="bkReadDetail-{{$d.UDID}}" class="backup-read-at hidden"></p></div>
               </div>
+              <section id="bkFileSection-{{$d.UDID}}">
               <div class="backup-browser-heading backup-files-heading"><div><div class="backup-browser-title" data-i18n="bmgmt.filesTitle">{{t $.Locale "bmgmt.filesTitle"}}</div><p class="backup-files-subtitle" data-i18n="bindex.filesNote">{{t $.Locale "bindex.filesNote"}}</p></div><a id="bkCSV-{{$d.UDID}}" class="backup-browser-link" aria-disabled="true" tabindex="-1"><svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-download"></use></svg><span data-i18n="bindex.downloadCsv">{{t $.Locale "bindex.downloadCsv"}}</span></a></div>
               <input id="bkSearch-{{$d.UDID}}" type="search" data-i18n-ph="bindex.search" data-i18n-aria="bindex.search" oninput="filterBackupList('{{$d.UDID}}',this.value)" class="iosbk-in backup-list-search" placeholder="{{t $.Locale "bindex.search"}}" aria-label="{{t $.Locale "bindex.search"}}" disabled>
               <div class="backup-preview-meta"><span id="bkPreview-{{$d.UDID}}"></span><span data-i18n="bindex.previewNote">{{t $.Locale "bindex.previewNote"}}</span></div>
@@ -412,6 +409,7 @@
               <div id="list-{{$d.UDID}}" class="backup-file-list" role="region" tabindex="0" data-i18n-aria="bmgmt.filesTitle" aria-label="{{t $.Locale "bmgmt.filesTitle"}}"><div class="backup-list-empty" data-i18n="bindex.readingList">{{t $.Locale "bindex.readingList"}}</div></div>
               <div class="backup-list-pagination"><span id="listMeta-{{$d.UDID}}"></span><span class="backup-page-controls"><button id="bkPrev-{{$d.UDID}}" onclick="pageBackupList('{{$d.UDID}}',-1)" data-i18n="bmgmt.prev" disabled>{{t $.Locale "bmgmt.prev"}}</button><span id="listPage-{{$d.UDID}}">—</span><button id="bkNext-{{$d.UDID}}" onclick="pageBackupList('{{$d.UDID}}',1)" data-i18n="bmgmt.next" disabled>{{t $.Locale "bmgmt.next"}}</button></span></div>
               <p class="backup-browser-footnote" data-i18n="bindex.trustNote">{{t $.Locale "bindex.trustNote"}}</p>
+              </section>
               {{if $.ExperimentalOperationsEnabled}}
               <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;margin-top:20px;padding-top:16px;border-top:1px solid #F3F7FA">
                 <div style="flex:1;min-width:200px"><div style="font-size:13px;font-weight:600" data-i18n="bmgmt.deleteTitle">{{t $.Locale "bmgmt.deleteTitle"}}</div><div style="font-size:12px;color:#718090;margin-top:3px;line-height:1.4" data-i18n="bmgmt.deleteNote">{{t $.Locale "bmgmt.deleteNote"}}</div></div>
@@ -1530,7 +1528,7 @@ const listState={};
 const backupBrowserRenderer=window.IOSBKBackupBrowser.domRenderer({document:document,tr:tr,formatDate:function(value){return IOSBKI18n.formatDate(value);},locale:function(){return IOSBKI18n.getLocale();},message:apiMessage});
 const backupBrowser=window.IOSBKBackupBrowser.create({
   fetch:function(url,options){return options.method==='POST'?csrfFetch(url,options):IOSBKI18n.fetch(url,options);},
-  render:backupBrowserRenderer,
+  render:function(udid,state){backupBrowserRenderer(udid,state);if(window.IOSBKChecks)IOSBKChecks.source(udid,state.snapshot);},
   isVisible:function(udid){var card=document.getElementById('panel-'+udid),section=document.querySelector('[data-sec-panel="backups"][data-udid="'+udid+'"]');return !!document.getElementById('backupOverview-'+udid).closest('dialog[open]')&&!document.hidden&&card&&!card.classList.contains('hidden')&&section&&!section.classList.contains('hidden');},
   setTimeout:function(fn,delay){return setTimeout(fn,delay);},clearTimeout:function(timer){clearTimeout(timer);}
 });

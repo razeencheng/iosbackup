@@ -61,7 +61,9 @@ jobs:
           node internal/app/testdata/backup-progress.test.js
           node internal/app/testdata/backup-control-ui.test.js
       - name: Backup check UI behavior
-        run: node internal/app/testdata/backup-checks.test.js
+        run: |
+          node internal/app/testdata/backup-checks.test.js
+          node --test internal/app/testdata/backup-check-card.test.js
       - name: History and accessible term behavior
         run: |
           node internal/app/testdata/backup-history.test.js

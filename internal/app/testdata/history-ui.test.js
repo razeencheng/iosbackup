@@ -8,7 +8,7 @@ function fixture(locale='en'){
   const attrs={},n={tagName:tag.toUpperCase(),children:[],dataset:{},style:{},className:'',textContent:'',value:'',checked:false,disabled:false,open:false,isConnected:true};
   Object.defineProperty(n,'id',{get(){return attrs.id||'';},set(v){attrs.id=v;nodes.set(v,n)}});
   n.classList={contains:k=>n.className.split(' ').includes(k),add(k){if(!this.contains(k))n.className+=' '+k},remove(k){n.className=n.className.split(' ').filter(c=>c!==k).join(' ')},toggle(k,on){if(on===undefined)on=!this.contains(k);on?this.add(k):this.remove(k)}};
-  n.setAttribute=(k,v)=>attrs[k]=String(v);n.getAttribute=k=>attrs[k]??null;n.removeAttribute=k=>delete attrs[k];n.appendChild=child=>{n.children.push(child);return child};n.append=(...children)=>children.forEach(n.appendChild);n.replaceChildren=()=>n.children=[];n.closest=()=>null;n.querySelector=selector=>n.children.find(c=>c.tagName===selector.toUpperCase())||null;n.querySelectorAll=()=>[];n.addEventListener=()=>{};n.focus=()=>{};return n;
+  n.setAttribute=(k,v)=>attrs[k]=String(v);n.getAttribute=k=>attrs[k]??null;n.removeAttribute=k=>delete attrs[k];n.appendChild=child=>{child.parentNode=n;n.children.push(child);return child};n.append=(...children)=>children.forEach(n.appendChild);n.replaceChildren=()=>{n.children.forEach(c=>c.parentNode=null);n.children=[]};n.closest=()=>null;n.querySelector=selector=>flatten(n).find(c=>c!==n&&c.tagName===selector.toUpperCase())||null;n.querySelectorAll=()=>[];n.addEventListener=()=>{};n.focus=()=>{};return n;
  }
  app.document.createElement=node;app.document.getElementById=id=>nodes.get(id)||null;app.document.querySelector=()=>null;app.document.querySelectorAll=()=>[];app.document.addEventListener=(k,fn)=>listeners[k]=fn;app.document.body=node('body');app.document.activeElement=app.document.body;
  const get=id=>nodes.get(id);for(const prefix of ['historySettings','historyList','historyDetail','historyLayout','historyMore','historyWarning','historyError','consoleCount','consoleSize','consoleFree','consoleStorageNotice','consoleStorageHint','consoleFreeHint','historySummaryText','historyPolicySummary']){const n=node();n.id=prefix+'-A';}
@@ -33,7 +33,7 @@ for(const locale of ['en','zh-CN'])test('backup details prioritize completed che
  const show=async changes=>{point={...point,...changes};f.setData({points:[point],total:1});await f.open();await f.select(point.id);return f.get('historyDetail-A')};
  let detail=await show({}),text=n=>f.flatten(n).map(c=>c.textContent).join('\n');
  assert.ok(detail.children.find(n=>n.classList.contains('console-point-hero')).textContent.includes(catalogs[locale]['history.reason.baseline']));
- assert.ok(text(detail).includes(catalogs[locale]['history.checkQuickPassed']));
+ assert.ok(text(detail).includes(catalogs[locale]['check.card.quickPassed']));
  assert.ok(!text(detail).includes(catalogs[locale]['history.restoreHint']));
  assert.ok(!text(detail).includes(catalogs[locale]['check.limitations']));
  assert.ok(!text(detail).includes(catalogs[locale]['history.downloadHint']));
@@ -41,18 +41,19 @@ for(const locale of ['en','zh-CN'])test('backup details prioritize completed che
  assert.equal(detail.children.some(n=>n.textContent.includes(catalogs[locale]['jobs.state.succeeded'])),false);
  detail=await show({review,review_attempt:review});
  let more=detail.querySelector('details');assert.ok(more);assert.equal(more.open,false);
- const visible=detail.children.filter(n=>n!==more).map(text).join('\n');
- assert.ok(visible.includes(catalogs[locale]['history.checkManifestPassed']));assert.ok(!visible.includes(catalogs[locale]['history.checkQuickPassed']));assert.ok(!visible.includes('145905'));
- assert.ok(text(more).includes('145905'));assert.ok(text(more).includes(catalogs[locale]['history.checkQuickPassed']));
+ const frontText=n=>n.tagName==='DETAILS'?'':n.textContent+'\n'+n.children.map(frontText).join('\n'),visible=frontText(detail);
+ assert.ok(visible.includes(catalogs[locale]['check.state.passed']));assert.ok(!visible.includes(catalogs[locale]['check.card.quickPassed']));assert.ok(!visible.includes('145,905'));
+ assert.ok(text(more).includes('145,905'));assert.ok(!text(more).includes('2026'),'expanded details do not repeat timestamps or results');
  more.open=true;point={...point,revision:2};f.setData({points:[point]});await f.refresh();assert.equal(f.get('historyDetail-A').querySelector('details').open,true,'poll refresh preserves disclosure');
  for(const reason of ['cancelled','timeout','read_failed']){
   detail=await show({review_attempt:{scope:'manifest',state:'unavailable',reason,checked_at:'2026-11-02T16:00:00Z'}});
   assert.ok(detail.children.filter(n=>n.tagName!=='DETAILS').map(text).join('\n').includes(catalogs[locale]['check.reason.'+reason]));
-  assert.ok(text(detail).includes(catalogs[locale]['history.checkManifestPassed']),'last completed evidence is still accessible');
+  assert.ok(text(detail).includes(catalogs[locale]['check.state.passed']),'last completed evidence is still accessible');
  }
  detail=await show({review_attempt:{...review,state:'issues',reason:'missing_objects',missing_objects:1,checked_at:'2026-11-02T17:00:00Z'},review_save_failed:true});
- const front=detail.children.filter(n=>n.tagName!=='DETAILS').map(text).join('\n');assert.ok(front.includes(catalogs[locale]['check.reason.missing_objects']));assert.ok(front.includes(catalogs[locale]['history.reviewSaveFailed']));assert.ok(!front.includes(catalogs[locale]['history.checkManifestPassed']));
+ const front=frontText(detail);assert.ok(front.includes(catalogs[locale]['check.reason.missing_objects']));assert.ok(front.includes(catalogs[locale]['history.reviewSaveFailed']));assert.ok(!front.includes(catalogs[locale]['check.state.passed']));
  detail=await show({state:'pending',completion_unknown:true,review:null,review_attempt:null,review_save_failed:false});assert.ok(text(detail).includes(catalogs[locale]['history.state.pending']));assert.ok(text(detail).includes(catalogs[locale]['history.unknownDateHint']));
+ detail=await show({review:{scope:'manifest',state:'unavailable',reason:'cancelled',checked_at:'2026-11-02T18:00:00Z'}});assert.ok(text(detail).includes(catalogs[locale]['check.reason.cancelled']),'older review records still expose their incomplete attempt');
 });
 for(const locale of ['en','zh-CN'])test('list highlights only actual current version and uses concise check details '+locale,async()=>{
  const f=fixture(locale);const check={state:'passed',scope:'quick',checked_at:'2026-11-01T10:00:00Z'};
@@ -67,11 +68,12 @@ for(const locale of ['en','zh-CN'])test('list highlights only actual current ver
  f.setData({current_source:{kind:'point',available:false,point_id:'latest'}});await f.refresh();assert.equal(f.flatten(f.get('historyList-A')).filter(n=>n.classList.contains('console-current-point')).length,0);
 });
 for(const locale of ['en','zh-CN'])test('finished checks are shown once and export guidance appears with the download '+locale,async()=>{
- const f=fixture(locale),quick={scope:'quick',state:'passed',checked_at:'2026-11-02T15:00:00Z'},point={id:'latest',state:'normal',encryption:'encrypted',check:quick,can_check:true,can_export:true};
+ const f=fixture(locale),quick={scope:'quick',state:'passed',checked_at:'2026-11-02T15:00:00Z'},point={id:'latest',state:'normal',encryption:'unencrypted',check:quick,can_check:true,can_export:true};
  f.setData({points:[point],total:1});await f.open();await f.select(point.id);
- f.responses.set('/api/backup-point/latest/check',{id:'check-1'});await f.act('check');assert.ok(f.flatten(f.get('historyReview-A')).some(n=>n.dataset.historyAction==='cancelCheck'));
+ f.responses.set('/api/backup-point/latest/check',{id:'check-1'});await f.act('check');assert.ok(f.flatten(f.get('historyCheck-A')).some(n=>n.dataset.historyAction==='cancelCheck'));
  const review={scope:'manifest',state:'passed',metadata_complete:true,manifest_complete:true,checked_at:'2026-11-02T15:31:00Z'};
- f.setData({points:[{...point,review,review_attempt:review}]});f.responses.set('/api/backup-point/latest/check',{saved:true,result:{...review,kind:'manifest',completed_at:review.checked_at}});await f.poll();assert.equal(f.get('historyReview-A').children.length,0,'completed result is represented in the main check block');
+ f.setData({points:[{...point,review,review_attempt:review}]});f.responses.set('/api/backup-point/latest/check',{saved:true,result:{...review,kind:'manifest',completed_at:'2026-11-02T23:31:00+08:00'}});await f.poll();assert.equal(f.flatten(f.get('historyDetail-A')).filter(n=>n.classList.contains('check-card')).length,1,'completed result appears once even when timestamp offsets differ');assert.equal(f.flatten(f.get('historyDetail-A')).filter(n=>n.tagName==='TIME').length,1);
+ f.setData({points:[{...point,encryption:'encrypted',can_check:false,check_unavailable_reason:'encrypted_manifest'}]});await f.refresh();assert.ok(!f.flatten(f.get('historyCheck-A')).some(n=>n.dataset.historyAction==='check'));assert.equal(f.get('historyCheck-A').querySelector('details'),null);
  f.responses.set('/api/backup-point/latest/exports',{id:'export-1',point_id:'latest',state:'ready',can_download:true});await f.act('export');
  const text=f.flatten(f.get('historyDownload-A')).map(n=>n.textContent).join('\n');assert.ok(text.includes(catalogs[locale]['history.downloadHint']));assert.ok(text.includes(catalogs[locale]['history.passwordHint']));assert.ok(text.includes(catalogs[locale]['history.exportInstructions']));
 });

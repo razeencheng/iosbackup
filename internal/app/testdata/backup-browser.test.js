@@ -72,7 +72,7 @@ async function tick(){for(let i=0;i<8;i++)await Promise.resolve();}
  const unknown=browser.view({snapshot:snapshot({overview:{status:'unavailable',size_bytes:null,encrypted:null},file_list:{status:'unavailable',entry_count:null}}),query:'',page:0});
  assert.equal(unknown.size,null);assert.equal(unknown.count,null,'missing counts cannot become zero');
  // 路径和域名通过文本节点输出，即使它们含有 HTML。
- const nodes=new Map();function node(){return {style:{},dataset:{},children:[],textContent:'',classList:{toggle(){}},setAttribute(k,v){this[k]=String(v);},removeAttribute(k){delete this[k];},appendChild(n){this.children.push(n);},replaceChildren(){this.children=[];}};}
+ const nodes=new Map();function node(){return {style:{},dataset:{},children:[],textContent:'',classList:{values:new Set(),toggle(k,on){on?this.values.add(k):this.values.delete(k)},contains(k){return this.values.has(k)}},setAttribute(k,v){this[k]=String(v);},removeAttribute(k){delete this[k];},appendChild(n){this.children.push(n);},replaceChildren(){this.children=[];}};}
  const document={getElementById(id){if(!nodes.has(id))nodes.set(id,node());return nodes.get(id);},createElement:node};
  const tr=(k,p)=>k+JSON.stringify(p||{});const renderer=browser.domRenderer({document,tr,formatDate:s=>s,locale:()=> 'en'});
  renderer('PHONE',{snapshot:snapshot({file_list:{...snapshot().file_list,entries:[{relative_path:'<img src=x onerror=alert(1)>',domain:'<script>bad</script>',flags:1}]}}),query:'',page:0});
@@ -83,5 +83,10 @@ async function tick(){for(let i=0;i<8;i++)await Promise.resolve();}
  assert.equal(nodes.get('bkStatusTitle-PHONE').textContent,'bindex.firstFailedTitle{}','encrypted-list limitation must not claim unreadable overview is available');
  assert.equal(nodes.get('bkSize-PHONE').textContent,'—');
  assert.equal(nodes.get('bkCSV-PHONE')['aria-disabled'],'true');
+ const encrypted=snapshot({overview:{status:'available',freshness:'current',encrypted:true},file_list:{status:'unsupported',message_code:'api.backup_index_encrypted'},refresh:{state:'idle'}});
+ renderer('PHONE',{snapshot:encrypted});assert.ok(nodes.get('bkFileSection-PHONE').classList.contains('hidden'));assert.ok(nodes.get('bkCountMetric-PHONE').classList.contains('hidden'));assert.ok(nodes.get('bkStatus-PHONE').classList.contains('hidden'),'the visible check card already explains the encryption limitation');
+ renderer('PHONE',{snapshot:{...encrypted,overview:{...encrypted.overview,freshness:'stale'}}});assert.ok(!nodes.get('bkStatus-PHONE').classList.contains('hidden'));assert.equal(nodes.get('bkStatusBody-PHONE').textContent,'bindex.previousRead{}','stale metadata still needs a visible explanation');
+ renderer('PHONE',{snapshot:{...encrypted,file_list:{...snapshot().file_list,freshness:'stale'}}});assert.ok(!nodes.get('bkFileSection-PHONE').classList.contains('hidden'),'a readable same-source cached list remains accessible');
+ nodes.get('currentCheck-PHONE').classList.toggle('hidden',true);renderer('PHONE',{snapshot:encrypted});assert.ok(!nodes.get('bkStatus-PHONE').classList.contains('hidden'),'without a check card the browser keeps its own limitation explanation');
  console.log('offline backup browser states, requests, pagination and safe rendering passed');
 })().catch(error=>{console.error(error);process.exitCode=1;});

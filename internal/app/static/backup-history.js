@@ -26,6 +26,7 @@
  function pointDate(p){return p.completion_unknown?tr('history.timeUnknown'):date(p.completed_at);}
  function pointChecks(p){
   var primary=p.review&&['passed','issues'].indexOf(p.review.state)>=0?p.review:p.check,attempt=p.review_attempt&&p.review_attempt.scope?p.review_attempt:null;
+  if(p.encryption==='encrypted'&&attempt&&attempt.state==='unavailable'&&attempt.reason==='encrypted_manifest')attempt=null;
   if(attempt&&['passed','issues'].indexOf(attempt.state)>=0&&(!primary||(Date.parse(attempt.checked_at)||0)>=(Date.parse(primary.checked_at)||0)))primary=attempt;
   return {primary:primary,attempt:attempt&&attempt!==primary&&(!primary||attempt.checked_at!==primary.checked_at)?attempt:null};
  }
@@ -104,53 +105,36 @@
   if(p.state!=='normal')detail.appendChild(el('p',label('state',p.state),'history-warning'));
   if(p.completion_unknown)detail.appendChild(el('p',tr('history.unknownDateHint'),'history-warning'));
   renderPointChecks(detail,p,checksOpen);
-  var actions=el('div',undefined,'history-actions');actions.appendChild(button(tr(p.pinned?'history.unpin':'history.pin'),'pin',pending||!p.can_pin));actions.appendChild(button(tr('history.check'),'check',pending||!p.can_check));actions.appendChild(button(tr('history.export'),'export',pending||!p.can_export));detail.appendChild(actions);
-  if(p.check_unavailable_reason)detail.appendChild(el('p',tr('check.reason.'+p.check_unavailable_reason),'history-note'));
-  if(p.review_save_failed)detail.appendChild(el('p',tr('history.reviewSaveFailed'),'history-warning'));
-  var review=el('div');review.id='historyReview-'+u;detail.appendChild(review);var download=el('div');download.id='historyDownload-'+u;detail.appendChild(download);
-  var related=el('section',undefined,'console-related');related.appendChild(el('h4',tr('console.related')));
+  if(p.check_unavailable_reason&&p.check_unavailable_reason!=='encrypted_manifest')detail.appendChild(el('p',tr('check.reason.'+p.check_unavailable_reason),'history-note'));
+  var download=el('div');download.id='historyDownload-'+u;detail.appendChild(download);
+  var related=el('section',undefined,'console-related');related.setAttribute('aria-label',tr('console.related'));
   if(p.job_id){var job=el('button',tr('console.openGeneratingJob'),'console-navigation-row');job.type='button';job.dataset.consoleAction='job';job.dataset.udid=u;job.dataset.job=p.job_id;related.appendChild(job);}
   if(global.IOSBKConsole&&global.IOSBKConsole.isCurrentPoint(data,p)){var files=el('button',tr('console.browseCurrent'),'console-navigation-row');files.type='button';files.dataset.consoleAction='current';files.dataset.udid=u;related.appendChild(files);}
   detail.appendChild(related);
-  var danger=el('section',undefined,'console-danger-zone');danger.appendChild(el('h4',tr('history.deleteTitle')));danger.appendChild(el('p',tr('history.deleteConfirm'),'history-note'));var remove=button(tr('history.delete'),'delete',pending||!p.can_delete);remove.classList.add('danger');danger.appendChild(remove);detail.appendChild(danger);
+  var remove=button(tr('history.delete'),'delete',pending||!p.can_delete);remove.classList.add('console-point-delete');detail.appendChild(remove);
+  var actions=el('footer',undefined,'history-actions console-point-footer');actions.appendChild(button(tr(p.pinned?'history.unpin':'history.pin'),'pin',pending||!p.can_pin));var exportButton=button(tr('history.export'),'export',pending||!p.can_export);exportButton.classList.add('primary');actions.appendChild(exportButton);detail.appendChild(actions);
   renderSessions();
  }
- function compactCheck(host,c){
-  if(!c||!c.scope){host.appendChild(el('p',tr('check.none'),'history-note'));return;}
-  var kind=tr('check.kind.'+c.scope),text=tr('history.checkResult',{kind:kind,state:tr(c.state==='unavailable'&&c.reason?'check.reason.'+c.reason:'check.state.'+c.state)});
-  if(c.state==='passed')text+=tr('history.checkCoverage',{coverage:tr(c.scope==='manifest'?'history.checkManifestPassed':'history.checkQuickPassed')});
-  else if(c.reason&&c.state!=='unavailable')text+=' · '+tr('check.reason.'+c.reason);
-  host.appendChild(el('p',text,c.state==='issues'||c.state==='unavailable'?'history-note console-amber':'history-note'));
-  host.appendChild(el('p',tr('history.checkTime',{kind:kind,time:date(c.checked_at)}),'history-note console-check-time'));
- }
+ function checkResult(c){return c&&c.scope?Object.assign({},c,{kind:c.scope,completed_at:c.checked_at,freshness:'current'}):null;}
  function renderPointChecks(detail,p,open){
-  var checks=pointChecks(p),primary=checks.primary,attempt=checks.attempt;
-  // Older records may store an incomplete attempt in review itself.
-  if(!attempt&&p.review&&p.review.scope&&['passed','issues'].indexOf(p.review.state)<0)attempt=p.review;
-  if(attempt){compactCheck(detail,attempt);detail.appendChild(el('p',tr('check.lastCompleted'),'history-note console-check-caption'));}
-  compactCheck(detail,primary);
-  var evidence=[primary,attempt].filter(function(c){return c&&c.scope==='manifest';}),original=p.check&&p.check.scope&&primary!==p.check;
-  if(!evidence.length&&!original)return;
-  var more=el('details',undefined,'console-check-details');more.open=!!open;more.appendChild(el('summary',tr('history.checkDetails')));
-  evidence.forEach(function(c){more.appendChild(el('p',tr('history.checkEvidence',{kind:tr('check.kind.'+c.scope),time:date(c.checked_at)})+'\n'+tr('check.coverage',{metadata:tr(c.metadata_complete?'check.yes':'check.no'),manifest:tr(c.manifest_complete?'check.yes':'check.no'),records:c.records_checked||0,objects:c.objects_checked||0,missing:c.missing_objects||0}),'history-note'));});
-  if(original){more.appendChild(el('p',tr('history.automaticCheck'),'history-note console-check-caption'));compactCheck(more,p.check);}
-  detail.appendChild(more);
+  var checks=pointChecks(p),attempt=checks.attempt;
+  if(!attempt&&p.review&&p.review.scope&&['passed','issues'].indexOf(p.review.state)<0&&!(p.encryption==='encrypted'&&p.review.reason==='encrypted_manifest'))attempt=p.review;
+  var result=checkResult(attempt||checks.primary),previous=attempt?checkResult(checks.primary):null;
+  var session=reviewSession&&reviewSession.point_id===p.id?reviewSession:null;
+  if(session&&(session.result.state==='running'||!result||(Date.parse(session.result.completed_at)||0)>=(Date.parse(result.completed_at)||0))){result=session.result;previous=checkResult(checks.primary);}
+  var active=session&&session.result.state==='running',action;
+  if(active||p.encryption!=='encrypted'&&p.encryption!=='unknown'){action=button(tr(active?'check.cancel':result&&result.kind==='manifest'?'check.card.retry':'history.check'),active?'cancelCheck':'check',pending||!active&&!p.can_check);action.className='check-card-action';}
+  var host=doc.getElementById('historyCheck-'+latest.udid);if(!host||host.parentNode!==detail){host=el('section');host.id='historyCheck-'+latest.udid;host.setAttribute('aria-label',tr('check.title'));detail.appendChild(host);}
+  global.IOSBKChecks.card(host,{result:result,previous:previous,encrypted:p.encryption==='encrypted',saveFailed:!!p.review_save_failed||!!(session&&session.result.state!=='running'&&!session.saved),action:action,actionKey:[active,pending,p.can_check],open:open});
  }
  function renderSessions(){
-  if(!latest)return;var u=latest.udid,p=latest.selected,host=doc.getElementById('historyDownload-'+u),review=doc.getElementById('historyReview-'+u);
+  if(!latest)return;var u=latest.udid,p=latest.selected,host=doc.getElementById('historyDownload-'+u),point=latest.points.find(function(point){return point.id===p;}),detail=doc.getElementById('historyDetail-'+u);
+  if(point&&detail)renderPointChecks(detail,point);
   if(host&&exportSession&&exportSession.point_id===p&&host.dataset.sessionSignature!==JSON.stringify([exportSession.id,exportSession.state,exportSession.can_download,exportSession.download_error,pending,global.IOSBKI18n.getLocale()])){host.dataset.sessionSignature=JSON.stringify([exportSession.id,exportSession.state,exportSession.can_download,exportSession.download_error,pending,global.IOSBKI18n.getLocale()]);host.replaceChildren();host.appendChild(el('p',label('export',exportSession.state),'history-warning'));if(exportSession.filename)host.appendChild(el('p',exportSession.filename+(exportSession.bytes_known?' · '+bytes(exportSession.logical_bytes):''),'history-note console-export-filename'));if(exportSession.state==='ready'){if(exportSession.can_download===false)host.appendChild(el('p',tr('history.downloadBusy'),'history-warning'));else{if(exportSession.download_error==='busy')host.appendChild(el('p',tr('history.downloadRetry'),'history-warning'));var link=el('a',tr('history.download'),'history-button primary');link.href='/api/backup-export/'+exportSession.id+'/download';link.target='history-download';link.setAttribute('download','');host.appendChild(link);}}
    if(exportSession.state==='ready'||exportSession.state==='streaming'){
     host.appendChild(el('p',tr('history.exportInstructions'),'history-note'));
     var point=latest.points.find(function(point){return point.id===p;});if(point&&point.encryption==='encrypted')host.appendChild(el('p',tr('history.passwordHint'),'history-note'));
     host.appendChild(el('p',tr('history.downloadHint'),'history-note'));host.appendChild(button(tr('history.cancelDownload'),'cancelExport',pending));
-   }
-  }
-  if(review&&reviewSession&&reviewSession.point_id===p){
-   var point=latest.points.find(function(point){return point.id===p;}),result=reviewSession.result;
-   var represented=point&&[point.check,point.review,point.review_attempt].some(function(c){return c&&c.scope===result.kind&&c.checked_at===result.completed_at&&c.state===result.state&&c.reason===result.reason;});
-   var signature=JSON.stringify([reviewSession,represented,pending,global.IOSBKI18n.getLocale()]);
-   if(review.dataset.sessionSignature!==signature){review.dataset.sessionSignature=signature;review.replaceChildren();
-    if(result.state==='running'||!represented){review.appendChild(el('p',global.IOSBKChecks?global.IOSBKChecks.summary(result):label('check',result.state),'history-note'));if(result.state==='running')review.appendChild(button(tr('check.cancel'),'cancelCheck',pending));else if(!reviewSession.saved)review.appendChild(el('p',tr('history.reviewSaveFailed'),'history-warning'));}
    }
   }
  }
@@ -168,7 +152,9 @@
   if(action==='policyCancel'){if(!pending){controller.discard(visible);global.IOSBKConsole.closeLayers();}return;}
   if(action==='open'){open(buttonNode.dataset.udid);return;}if(action==='back'){close(true);return;}if(action==='settings'){var u=visible;global.switchSection(u,'settings');global.IOSBKConsole.settings(u,'history');return;}
   if(action==='select'){controller.select(buttonNode.dataset.point);global.IOSBKConsole.pointDrawer(visible,buttonNode);return;}if(action==='list'){global.IOSBKConsole.closeLayers();controller.back();return;}if(action==='more'){controller.refresh(true);return;}if(action==='refresh'){controller.refresh();return;}
-  if(pending||!latest)return;var actionEpoch=pollEpoch,u=latest.udid,p=latest.points.find(function(p){return p.id===latest.selected;}),draft=Object.assign({},latest.draft),originalPoints=latest.points.slice();pending=true;controller.repaint();
+  if(pending||!latest)return;var actionEpoch=pollEpoch,u=latest.udid,p=latest.points.find(function(p){return p.id===latest.selected;}),draft=Object.assign({},latest.draft),originalPoints=latest.points.slice();
+  if(action==='check'&&p&&(p.can_check===false||p.encryption==='encrypted'||p.encryption==='unknown'))return;
+  pending=true;controller.repaint();
   try{
    if(action==='policy'){
     draft.count=Number(draft.count);var preview=await request('/api/backup-history/'+encodeURIComponent(u)+'/policy-preview',null,'POST',{policy:draft});if(actionEpoch!==pollEpoch||visible!==u)return;var text=tr(draft.enabled?'history.enableConfirm':'history.disableHint')+'\n\n'+tr('history.previewCount',{count:preview.affected_count});
