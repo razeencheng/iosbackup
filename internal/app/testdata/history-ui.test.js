@@ -12,11 +12,11 @@ function fixture(locale='en'){
  }
  app.document.createElement=node;app.document.getElementById=id=>nodes.get(id)||null;app.document.querySelector=()=>null;app.document.querySelectorAll=()=>[];app.document.addEventListener=(k,fn)=>listeners[k]=fn;app.document.body=node('body');app.document.activeElement=app.document.body;
  const get=id=>nodes.get(id);for(const prefix of ['historySettings','historyList','historyDetail','historyLayout','historyMore','historyWarning','historyError','consoleCount','consoleSize','consoleFree','consoleStorageNotice','consoleStorageHint','consoleFreeHint','historySummaryText','historyPolicySummary']){const n=node();n.id=prefix+'-A';}
- let data={policy:{enabled:false,count:2},points:[],unavailable_stores:[],total:0,can_edit_policy:true,bytes_known:false,logical_bytes:10,storage:{state:'unavailable'},current_source:{kind:'missing',available:false}};
- app.window.setTimeout=()=>1;app.window.clearTimeout=()=>{};app.window.formatBackupBytes=x=>x+' B';app.window.fetch=async()=>({ok:true,json:async()=>({jobs:[]})});app.window.csrfFetch=async()=>({ok:true,json:async()=>data});
- Object.assign(app.context,{AbortController,console});for(const file of ['backup-console.js','backup-history.js'])vm.runInContext(fs.readFileSync(path.join(root,'static',file),'utf8'),app.context);
+ let data={policy:{enabled:false,count:2},points:[],unavailable_stores:[],total:0,can_edit_policy:true,bytes_known:false,logical_bytes:10,storage:{state:'unavailable'},current_source:{kind:'missing',available:false}},poll;const responses=new Map();
+ app.window.setTimeout=fn=>{poll=fn;return 1};app.window.clearTimeout=()=>{};app.window.formatBackupBytes=x=>x+' B';app.window.fetch=async()=>({ok:true,json:async()=>({jobs:[]})});app.window.csrfFetch=async url=>({ok:true,json:async()=>responses.get(url)||data});
+ Object.assign(app.context,{AbortController,console});for(const file of ['backup-checks.js','backup-console.js','backup-history.js'])vm.runInContext(fs.readFileSync(path.join(root,'static',file),'utf8'),app.context);
  function flatten(n){return [n,...n.children.flatMap(flatten)]}
- return {...app,get,flatten,listeners,setData:d=>data={...data,...d},async open(){app.window.IOSBKHistory.section('A','backups');await app.window.IOSBKHistory.refresh()},async refresh(){await app.window.IOSBKHistory.refresh()}};
+ return {...app,get,flatten,listeners,responses,setData:d=>data={...data,...d},async poll(){await poll()},async act(action){const button=flatten(get('historyDetail-A')).find(n=>n.dataset.historyAction===action);assert.ok(button);listeners.click({target:{closest:()=>button}});await new Promise(setImmediate)},async open(){app.window.IOSBKHistory.section('A','backups');await app.window.IOSBKHistory.refresh()},async refresh(){await app.window.IOSBKHistory.refresh()},async select(id){app.window.IOSBKConsole.pointDrawer=()=>{};await app.window.IOSBKHistory.navigate('A',id)}};
 }
 for(const locale of ['en','zh-CN'])test('retention settings use saved count, disable off input, discard drafts '+locale,async()=>{
  const f=fixture(locale);await f.open();
@@ -26,6 +26,33 @@ for(const locale of ['en','zh-CN'])test('retention settings use saved count, dis
  f.get('historyCount-A').value='0';f.listeners.input({target:{dataset:{historyField:'count'}}});assert.equal(f.get('historyPolicySave-A').disabled,true);
  f.window.IOSBKHistory.discard('A');assert.equal(String(f.get('historyCount-A').value),'2');assert.equal(f.get('historyCount-A').disabled,true);
  f.setData({policy:{enabled:true,count:7}});await f.refresh();assert.equal(String(f.get('historyCount-A').value),'7','explicit saved count survives default initialization');
+});
+for(const locale of ['en','zh-CN'])test('backup details prioritize completed checks, preserve exceptions and collapse evidence '+locale,async()=>{
+ const f=fixture(locale),quick={state:'passed',scope:'quick',metadata_complete:true,checked_at:'2026-11-02T15:26:00Z'},review={state:'passed',scope:'manifest',metadata_complete:true,manifest_complete:true,records_checked:145905,objects_checked:120602,missing_objects:0,checked_at:'2026-11-02T15:31:00Z'};
+ let point={id:'latest',state:'normal',reason:'baseline',encryption:'unencrypted',bytes_known:true,bytes:20500,completed_at:quick.checked_at,check:quick,can_check:true,can_export:true};
+ const show=async changes=>{point={...point,...changes};f.setData({points:[point],total:1});await f.open();await f.select(point.id);return f.get('historyDetail-A')};
+ let detail=await show({}),text=n=>f.flatten(n).map(c=>c.textContent).join('\n');
+ assert.ok(detail.children.find(n=>n.classList.contains('console-point-hero')).textContent.includes(catalogs[locale]['history.reason.baseline']));
+ assert.ok(text(detail).includes(catalogs[locale]['history.checkQuickPassed']));
+ assert.ok(!text(detail).includes(catalogs[locale]['history.restoreHint']));
+ assert.ok(!text(detail).includes(catalogs[locale]['check.limitations']));
+ assert.ok(!text(detail).includes(catalogs[locale]['history.downloadHint']));
+ assert.equal(detail.children.some(n=>n.textContent.includes('2026-11-02 ·')),false);
+ assert.equal(detail.children.some(n=>n.textContent.includes(catalogs[locale]['jobs.state.succeeded'])),false);
+ detail=await show({review,review_attempt:review});
+ let more=detail.querySelector('details');assert.ok(more);assert.equal(more.open,false);
+ const visible=detail.children.filter(n=>n!==more).map(text).join('\n');
+ assert.ok(visible.includes(catalogs[locale]['history.checkManifestPassed']));assert.ok(!visible.includes(catalogs[locale]['history.checkQuickPassed']));assert.ok(!visible.includes('145905'));
+ assert.ok(text(more).includes('145905'));assert.ok(text(more).includes(catalogs[locale]['history.checkQuickPassed']));
+ more.open=true;point={...point,revision:2};f.setData({points:[point]});await f.refresh();assert.equal(f.get('historyDetail-A').querySelector('details').open,true,'poll refresh preserves disclosure');
+ for(const reason of ['cancelled','timeout','read_failed']){
+  detail=await show({review_attempt:{scope:'manifest',state:'unavailable',reason,checked_at:'2026-11-02T16:00:00Z'}});
+  assert.ok(detail.children.filter(n=>n.tagName!=='DETAILS').map(text).join('\n').includes(catalogs[locale]['check.reason.'+reason]));
+  assert.ok(text(detail).includes(catalogs[locale]['history.checkManifestPassed']),'last completed evidence is still accessible');
+ }
+ detail=await show({review_attempt:{...review,state:'issues',reason:'missing_objects',missing_objects:1,checked_at:'2026-11-02T17:00:00Z'},review_save_failed:true});
+ const front=detail.children.filter(n=>n.tagName!=='DETAILS').map(text).join('\n');assert.ok(front.includes(catalogs[locale]['check.reason.missing_objects']));assert.ok(front.includes(catalogs[locale]['history.reviewSaveFailed']));assert.ok(!front.includes(catalogs[locale]['history.checkManifestPassed']));
+ detail=await show({state:'pending',completion_unknown:true,review:null,review_attempt:null,review_save_failed:false});assert.ok(text(detail).includes(catalogs[locale]['history.state.pending']));assert.ok(text(detail).includes(catalogs[locale]['history.unknownDateHint']));
 });
 for(const locale of ['en','zh-CN'])test('list highlights only actual current version and uses concise check details '+locale,async()=>{
  const f=fixture(locale);const check={state:'passed',scope:'quick',checked_at:'2026-11-01T10:00:00Z'};
@@ -38,4 +65,13 @@ for(const locale of ['en','zh-CN'])test('list highlights only actual current ver
  assert.ok(f.get('consoleFree-A').getAttribute('data-hint'),'capacity measurement details remain accessible');
  assert.ok(!f.get('consoleFree-A').textContent.includes('0 B'),'unavailable free space must not become zero');
  f.setData({current_source:{kind:'point',available:false,point_id:'latest'}});await f.refresh();assert.equal(f.flatten(f.get('historyList-A')).filter(n=>n.classList.contains('console-current-point')).length,0);
+});
+for(const locale of ['en','zh-CN'])test('finished checks are shown once and export guidance appears with the download '+locale,async()=>{
+ const f=fixture(locale),quick={scope:'quick',state:'passed',checked_at:'2026-11-02T15:00:00Z'},point={id:'latest',state:'normal',encryption:'encrypted',check:quick,can_check:true,can_export:true};
+ f.setData({points:[point],total:1});await f.open();await f.select(point.id);
+ f.responses.set('/api/backup-point/latest/check',{id:'check-1'});await f.act('check');assert.ok(f.flatten(f.get('historyReview-A')).some(n=>n.dataset.historyAction==='cancelCheck'));
+ const review={scope:'manifest',state:'passed',metadata_complete:true,manifest_complete:true,checked_at:'2026-11-02T15:31:00Z'};
+ f.setData({points:[{...point,review,review_attempt:review}]});f.responses.set('/api/backup-point/latest/check',{saved:true,result:{...review,kind:'manifest',completed_at:review.checked_at}});await f.poll();assert.equal(f.get('historyReview-A').children.length,0,'completed result is represented in the main check block');
+ f.responses.set('/api/backup-point/latest/exports',{id:'export-1',point_id:'latest',state:'ready',can_download:true});await f.act('export');
+ const text=f.flatten(f.get('historyDownload-A')).map(n=>n.textContent).join('\n');assert.ok(text.includes(catalogs[locale]['history.downloadHint']));assert.ok(text.includes(catalogs[locale]['history.passwordHint']));assert.ok(text.includes(catalogs[locale]['history.exportInstructions']));
 });
