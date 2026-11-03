@@ -16,11 +16,12 @@ listeners.click({target:{closest:()=>({dataset:{udid:'PHONE',checkAction:'start'
 api.render({udid:'PHONE',backup_index:{source_key:'one'},backup_check:prior});
 api.source('PHONE',{source_key:'one',overview:{status:'available',freshness:'current',encrypted:true}});assert.equal(actions().length,0,'fresh local backup metadata hides file checks before an unsupported attempt');
 api.render({udid:'PHONE',backup_index:{source_key:'two'},backup_check:{...prior,freshness:'stale'}});assert.equal(actions().length,1,'encryption from another backup source cannot control this source');assert.match(text(),/out of date/);
-api.source('PHONE',{source_key:'two',overview:{status:'available',freshness:'stale',encrypted:true}});assert.equal(actions().length,1,'stale encryption evidence is not authoritative');
+api.source('PHONE',{source_key:'two',overview:{status:'available',freshness:'stale',encrypted:true}});assert.equal(actions().length,0,'same-source encrypted metadata constrains capability even when cached');assert.match(text(),/out of date/,'cached metadata cannot make the previous check current');
 api.source('PHONE',{source_key:'two',overview:{status:'available',freshness:'current',encrypted:false}});assert.equal(actions().length,1);
 api.render({udid:'PHONE',backup_index:{source_key:'two',revision:'new'},backup_check:prior});
-api.source('PHONE',{source_key:'two',revision:'old',overview:{status:'available',freshness:'current',encrypted:true}});assert.equal(actions().length,1,'an older index revision cannot set the current capability');
+api.source('PHONE',{source_key:'two',revision:'old',overview:{status:'available',freshness:'unknown',encrypted:true}});assert.equal(actions().length,0,'restarting does not expose unsupported checks for the displayed encrypted backup');
 api.source('PHONE',{source_key:'two',revision:'new',overview:{status:'available',freshness:'current',encrypted:true}});assert.equal(actions().length,0);
+api.render({udid:'PHONE',backup_index:{source_key:'two'},backup_check:{...prior,kind:'manifest'}});assert.equal(actions().length,1,'a current successful file check supersedes cached encryption');
 const quick=api.summary({...check,kind:'quick',state:'passed',reason:''});assert.match(quick,/metadata/i);assert.doesNotMatch(quick,/manifest scan complete: No|records read: 0|missing objects: 0/);
 const cancelled=api.summary({...check,reason:'cancelled',last_completed:{...check,state:'passed',reason:'',completed_at:'2026-10-30T12:00:00Z'}});assert.match(cancelled,/cancelled/i);assert.match(cancelled,/Previous completed check/);
 locale='zh-CN';listeners['iosbk:localechange']();assert.match(api.summary({...check,state:'passed',reason:'',freshness:'stale'}),/已过期/);

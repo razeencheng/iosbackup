@@ -52,8 +52,10 @@
  }
  function encrypted(d){
   var c=d.backup_check;if(c&&c.freshness==='current'&&c.reason==='encrypted_manifest')return true;
+  if(c&&c.freshness==='current'&&c.kind==='manifest'&&c.state==='passed')return false;
   var source=sources[d.udid],brief=d.backup_index,o=source&&source.overview;
-  if(o&&o.status==='available'&&o.freshness==='current'&&brief&&brief.source_key===source.source_key&&brief.revision===source.revision&&typeof o.encrypted==='boolean')return o.encrypted;
+  // 同源概况中的加密标记只约束操作能力；旧检查仍按自身 freshness 显示，不能升级为当前通过。
+  if(o&&o.status==='available'&&brief&&brief.source_key===source.source_key&&typeof o.encrypted==='boolean')return o.encrypted;
   return false;
  }
  function render(d){
