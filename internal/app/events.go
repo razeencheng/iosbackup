@@ -89,6 +89,7 @@ type deviceStatusDTO struct {
 	RequestedMode             string             `json:"requested_mode,omitempty"`
 	ObservedMode              string             `json:"observed_mode,omitempty"`
 	BackupJobActive           bool               `json:"backup_job_active"`
+	BackupStorageMode         string             `json:"backup_storage_mode,omitempty"`
 	BackupIndex               *backupIndexBrief  `json:"backup_index,omitempty"`
 	PresenceKnown             bool               `json:"presence_known"`
 	LastSeen                  string             `json:"last_seen,omitempty"`
@@ -231,11 +232,12 @@ func (app *application) buildStatusSnapshot() statusSnapshot {
 		if !d.LastSeen.IsZero() {
 			lastSeen = app.inDeploymentTime(d.LastSeen).Format(time.RFC3339)
 		}
-		jobID, requestedMode, observedMode := "", "", ""
+		jobID, requestedMode, observedMode, storageMode := "", "", "", ""
 		jobActive := false
 		hold := app.backupHoldUnsafe(udid)
 		if job := app.backupJobs[udid]; job != nil {
 			jobID, requestedMode, observedMode = job.id, job.request.Mode, job.observedMode
+			storageMode = job.storageMode()
 			if observedMode == "" {
 				observedMode = "unknown"
 			}
@@ -246,6 +248,7 @@ func (app *application) buildStatusSnapshot() statusSnapshot {
 			BackupCheck:     app.backupCheckSnapshotUnsafe(udid), BackupCheckActive: app.backupChecks[udid] != nil,
 			BackupIndex: indexStatus, RequestedMode: requestedMode, ObservedMode: observedMode, BackupJobActive: jobActive,
 			BackupJobID:               jobID,
+			BackupStorageMode:         storageMode,
 			AutoBackupHold:            hold.Held,
 			AutoBackupHoldVersion:     hold.Version,
 			AutoBackupHoldPersistence: hold.Persistence,

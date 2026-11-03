@@ -647,7 +647,7 @@
 <div id="stopBackupModal" class="remove-device-overlay hidden" onclick="closeStopBackup()">
   <section class="remove-device-dialog" role="dialog" aria-modal="true" aria-labelledby="stopBackupTitle" aria-describedby="stopBackupRisk" onclick="event.stopPropagation()">
     <div class="remove-dialog-head"><div><h2 id="stopBackupTitle" style="margin:0;font-size:18px" data-i18n="control.confirmTitle">{{t $.Locale "control.confirmTitle"}}</h2><div id="stopBackupDevice" style="margin-top:6px;color:#718090;font-size:13px"></div></div></div>
-    <div class="remove-dialog-body"><p id="stopBackupRisk" style="margin:0;padding:13px;background:#FFF8EB;border:1px solid #EEDAB4;color:#78521E;line-height:1.7;border-radius:var(--iosbk-radius)" data-i18n="control.stopRisk">{{t $.Locale "control.stopRisk"}}</p><p style="margin:14px 0 0;color:#718090;font-size:13px;line-height:1.6" data-i18n="control.stopDetail">{{t $.Locale "control.stopDetail"}}</p></div>
+    <div class="remove-dialog-body"><p id="stopBackupRisk" style="margin:0;padding:13px;background:#FFF8EB;border:1px solid #EEDAB4;color:#78521E;line-height:1.7;border-radius:var(--iosbk-radius)">{{t $.Locale "control.stopRisk"}}</p><p id="stopBackupDetail" style="margin:14px 0 0;color:#718090;font-size:13px;line-height:1.6">{{t $.Locale "control.stopDetail"}}</p></div>
     <div class="remove-dialog-actions"><button id="stopBackupCancel" type="button" class="remove-dialog-cancel" onclick="closeStopBackup()" data-i18n="control.keepRunning">{{t $.Locale "control.keepRunning"}}</button><button id="stopBackupConfirm" type="button" class="remove-dialog-confirm" onclick="submitStopBackup()" data-i18n="control.confirmStop">{{t $.Locale "control.confirmStop"}}</button></div>
   </section>
 </div>
@@ -1243,6 +1243,7 @@ function patchDevice(d){
   var lb=document.getElementById('lastbackup-'+u); if(lb){ if(d.last_backup_at||d.last_backup){ setLiveAttribute(lb,'data-time',d.last_backup_at||d.last_backup);setLiveText(lb,IOSBKI18n.formatDate(d.last_backup_at||d.last_backup)); } else { lb.removeAttribute('data-time'); setLiveText(lb,tr('device.never'));setLiveAttribute(lb,'data-i18n','device.never'); } }
   renderBackupProgress(d);
   renderBackupControl(d);
+  if(backupStopTarget&&backupStopTarget.udid===u)renderStopBackupDialog();
 }
 
 /* ============== header actions ============== */
@@ -1413,7 +1414,7 @@ function submitBackup(udid,btn,mode){
     // SSE 可能先到，甚至已报告任务结束；迟到的启动响应不能覆盖它。
     var current=latestDeviceStatuses[udid];
     if(data.backup_job_id&&(!current||current.backup_job_id===previousJob)){
-      patchDevice(Object.assign({},current||{udid:udid},{backup_job_id:data.backup_job_id,backup_state:data.backup_state||'starting',backup_job_active:true,backing_up:true,active_operation:'backup'}));
+      patchDevice(Object.assign({},current||{udid:udid},{backup_job_id:data.backup_job_id,backup_storage_mode:data.backup_storage_mode||'',backup_state:data.backup_state||'starting',backup_job_active:true,backing_up:true,active_operation:'backup'}));
     }
     toast('action.fail.backupStartedYourDeviceWill');
   }).catch(function(){toast('common.operationFailed',true);}).finally(function(){
@@ -1450,7 +1451,11 @@ function renderBackupControl(d){
 }
 function renderStopBackupDialog(){
   if(!backupStopTarget)return;
-  document.getElementById('stopBackupRisk').textContent=tr('control.stopRisk');
+  var d=latestDeviceStatuses[backupStopTarget.udid];
+  if(d&&d.backup_job_id===backupStopTarget.jobID&&(d.backup_storage_mode==='history'||d.backup_storage_mode==='in_place'))backupStopTarget.storageMode=d.backup_storage_mode;
+  var mode=backupStopTarget.storageMode;
+  document.getElementById('stopBackupRisk').textContent=tr(mode==='history'?'control.stopRiskHistory':(mode==='in_place'?'control.stopRiskInPlace':'control.stopRisk'));
+  document.getElementById('stopBackupDetail').textContent=tr(mode==='history'?'control.stopDetailHistory':'control.stopDetail');
   document.getElementById('stopBackupConfirm').disabled=backupStopSubmitting;
   document.getElementById('stopBackupCancel').disabled=backupStopSubmitting;
   document.getElementById('stopBackupConfirm').textContent=tr(backupStopSubmitting?'control.submitting':'control.confirmStop');
@@ -1458,7 +1463,7 @@ function renderStopBackupDialog(){
 function openStopBackup(udid){
   var d=latestDeviceStatuses[udid];
   if(!d||!IOSBKConsole.isBackupRunning(d)||d.backup_job_active===false||!d.backup_job_id||d.backup_state==='stopping'||backupControlPending[udid])return;
-  backupStopTarget={udid:udid,jobID:d.backup_job_id};
+  backupStopTarget={udid:udid,jobID:d.backup_job_id,storageMode:d.backup_storage_mode};
   backupStopFocus=document.activeElement;
   backupStopSubmitting=false;
   document.getElementById('stopBackupDevice').textContent=d.name||udid;

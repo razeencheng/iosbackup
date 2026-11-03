@@ -6,6 +6,8 @@ Each device card has three tabs: **Backup list / Task records / Device settings*
 
 The card's **Back up now** button uses automatic mode and becomes **Stop backup** while a task is running. To request a complete backup again, open **Device settings → Advanced actions → Force full backup** and confirm after reading the explanation. This affects only that manual backup, not the automatic schedule or retention policy. After a task stops or fails, any measured progress remains static and identifies its scope; without progress data, only the execution result is shown.
 
+The stop confirmation describes the selected task's storage mode. In history mode, stopping interrupts the independent work copy without changing saved historical backups; incomplete temporary data is cleaned up after the task exits. With history off, stopping may leave the current backup set incomplete, while any previously retained history remains unchanged. Stopping holds automatic backups until you explicitly resume them. A later backup starts a new task and is not guaranteed to continue from the same progress.
+
 ## Enable and retain versions
 
 Enable history under **Device settings → Backup retention → Edit**, choose **1–365 backups**, then save. History is off by default and the count is prefilled with **2**. Retain the latest N normal backups by completion time, including the latest version; backups on the same day each count. Pinned backups are retained separately. Without a new successful backup, the retained normal backups do not expire. Enabling, disabling or making points eligible for cleanup requires confirmation. Changes with no cleanup impact save directly after a server preview. Saving an active policy also cleans up eligible points; a stale preview must be refreshed.

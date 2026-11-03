@@ -29,15 +29,16 @@ for(const language of ['en','zh-CN'])test('one stable primary action across task
  assert.ok(advanced.includes('id="backupAdvanced-'),'the full-backup action belongs to device settings advanced actions');
 });
 test('start submission stays disabled across status and language refreshes',async()=>{
- const app=setup();patch(app,{});let resolve,calls=0;
+ const app=setup();patch(app,{backup_storage_mode:'history'});let resolve,calls=0;
  app.window.fetch=()=>{calls++;return new Promise(r=>{resolve=r;});};
  const promise=app.run("startBackup('PHONE',document.getElementById('backupBtn-PHONE'))");
  app.run("startBackup('PHONE',document.getElementById('backupBtn-PHONE'))");
  patch(app,{});app.api.setLocale('zh-CN');assert.equal(calls,1);assert.equal(app.get('backupBtn-PHONE').disabled,true);assert.equal(label(app,app.get('backupBtn-PHONE')),catalogs['zh-CN']['control.starting']);
  assert.equal(app.get('backupAdvanced-PHONE').disabled,true,'pending auto submission also blocks full backup');
- resolve({ok:true,json:()=>Promise.resolve({backup_job_id:'job-new',backup_state:'starting',requested_mode:'auto'})});await promise;
+ resolve({ok:true,json:()=>Promise.resolve({backup_job_id:'job-new',backup_storage_mode:'in_place',backup_state:'starting',requested_mode:'auto'})});await promise;
  assert.equal(label(app,app.get('backupBtn-PHONE')),catalogs['zh-CN']['control.stop']);assert.equal(app.get('backupBtn-PHONE').disabled,false);
  app.run("backupAction('PHONE',document.getElementById('backupBtn-PHONE'))");assert.equal(app.run('backupStopTarget.jobID'),'job-new');
+ assert.equal(app.get('stopBackupRisk').textContent,catalogs['zh-CN']['control.stopRiskInPlace'],'new task response supplies its own storage mode');
 });
 test('late accepted response cannot revive an already finished task',async()=>{
  const app=setup();patch(app,{});let resolve;
@@ -46,4 +47,21 @@ test('late accepted response cannot revive an already finished task',async()=>{
  patch(app,{backup_job_id:'job-fast',backup_state:'succeeded',backup_job_active:false});
  resolve({ok:true,json:()=>Promise.resolve({backup_job_id:'job-fast',backup_state:'starting'})});await promise;
  assert.equal(app.run('latestDeviceStatuses.PHONE.backup_state'),'succeeded');assert.equal(label(app,app.get('backupBtn-PHONE')),catalogs.en['device.backupNow']);
+});
+for(const language of ['en','zh-CN'])test('stop warning follows the selected task storage mode '+language,()=>{
+ const app=setup();app.api.setLocale(language);
+ const running={backing_up:true,backup_job_active:true,backup_job_id:'job-history',backup_state:'running'};
+ patch(app,{...running,backup_storage_mode:'history'});app.run("openStopBackup('PHONE')");
+ assert.equal(app.get('stopBackupRisk').textContent,catalogs[language]['control.stopRiskHistory']);
+ assert.equal(app.get('stopBackupDetail').textContent,catalogs[language]['control.stopDetailHistory']);
+ patch(app,{...running,backup_job_id:'job-current',backup_storage_mode:'in_place'});
+ app.api.setLocale(language==='en'?'zh-CN':'en');app.api.setLocale(language);
+ assert.equal(app.get('stopBackupRisk').textContent,catalogs[language]['control.stopRiskHistory'],'a new task must not change the old confirmation');
+ app.run("closeStopBackup();openStopBackup('PHONE')");
+ assert.equal(app.get('stopBackupRisk').textContent,catalogs[language]['control.stopRiskInPlace']);
+ assert.equal(app.get('stopBackupDetail').textContent,catalogs[language]['control.stopDetail']);
+ app.run('closeStopBackup()');patch(app,{...running,backup_storage_mode:undefined});app.run("openStopBackup('PHONE')");
+ assert.equal(app.get('stopBackupRisk').textContent,catalogs[language]['control.stopRisk'],'missing information must not promise protection');
+ patch(app,{...running,backup_storage_mode:'history'});
+ assert.equal(app.get('stopBackupRisk').textContent,catalogs[language]['control.stopRiskHistory'],'same-task status resolves an initially unknown mode');
 });

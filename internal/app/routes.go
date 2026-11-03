@@ -702,6 +702,7 @@ func (app *application) handleBackup(w http.ResponseWriter, r *http.Request) {
 	payload["backup_state"] = backupStateStarting
 	payload["backup_job_id"] = job.id
 	payload["requested_mode"] = job.request.Mode
+	payload["backup_storage_mode"] = job.storageMode()
 	writeJSON(w, http.StatusAccepted, payload)
 }
 

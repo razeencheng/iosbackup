@@ -31,6 +31,18 @@ type backupJob struct {
 	commandFinished                   bool
 }
 
+// 停止风险取自任务接收时的配置快照，不读取随后编辑的设备设置。
+// 历史模式准备失败会直接结束任务，不会退回原地覆盖。
+func (job *backupJob) storageMode() string {
+	if job.config == nil {
+		return ""
+	}
+	if job.config.History.Enabled {
+		return "history"
+	}
+	return "in_place"
+}
+
 func (app *application) beginBackupJob(udid, connection, sessionID string, automatic bool, requests ...backupRequest) (*backupJob, error) {
 	request := backupRequest{Mode: "auto"}
 	if len(requests) > 0 {

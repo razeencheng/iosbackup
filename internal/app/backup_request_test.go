@@ -60,6 +60,9 @@ func TestBackupHTTPModeAndTaskIdentity(t *testing.T) {
 			if !ok || jobID == "" {
 				t.Error("accepted request needs a job ID before execution")
 			}
+			if body["backup_storage_mode"] != "in_place" {
+				t.Errorf("accepted request missing stop context: %v", body["backup_storage_mode"])
+			}
 			select {
 			case args := <-gotArgs:
 				if strings.Contains(strings.Join(args, " "), "--full") != (mode == "full") {
