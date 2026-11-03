@@ -62,14 +62,14 @@ To disable future automatic jobs, turn **Automatic backup** off in **Device sett
 
 ## Stop a backup and hold automatic scheduling
 
-1. Select **Stop backup** on the active device card. Confirm once after reading the warning: interrupting this incremental backup may affect the recoverability of the previous backup.
-2. Wait through **Stopping…** until **Stopped · backup incomplete**. The device remains occupied until the process and output finish. The last-success timestamp remains a historical record, not proof that the current files can be restored.
-3. **Automatic backups on hold** persists after a normal restart or upgrade if saving succeeded. Original schedule settings are retained. **Back up once** runs one manual job without clearing the hold and still checks battery and charging requirements.
-4. Select **Resume automatic backups** when ready. This clears the hold without turning on a previously disabled schedule. A due backup may start at the next check if the original conditions are satisfied.
+1. Select **Stop backup** on the active device card and read the warning for this task's storage mode. History mode protects saved points; stopping an in-place update may leave the current backup set incomplete.
+2. Wait through **Stopping…** while the process and output finish. The primary action returns to **Back up now**, with one automatic-backup pause notice. Measured progress remains static; details stay in Task records.
+3. A saved pause survives normal restarts and upgrades. **Back up now** clears it after the new task passes battery, charging and other startup checks. Failed startup checks or a failed resume save leave automatic backups paused.
+4. Alternatively, select the **Resume automatic backups** text link in the notice to restore only the original schedule. Neither action enables a previously disabled schedule. A due backup may start at the next check if the original conditions are satisfied.
 
 If saving the hold fails, stopping still takes effect and automatic jobs are blocked in the current process. Persistence after restart is uncertain. Resolve the storage problem and select **Retry saving**. A failed resume also retains the hold in memory.
 
-Stopping retains existing files but does not roll back incremental updates or guarantee that the previous backup remains recoverable. Retrying starts a new protocol session. A stop just after completion preserves that result and holds future scheduling; an older request cannot stop a newer job. User stops update the page and logs without a failure notification. Actual failures still follow notification rules.
+Stopping leaves saved historical points unchanged and cleans up incomplete temporary history data after exit. In-place updates to the current set are not rolled back, and its restorability is not guaranteed. Retrying starts a new protocol session. A stop just after completion preserves that result and holds future scheduling; older requests cannot stop a newer job or clear a newer pause. User stops update the page and logs without a failure notification. Actual failures still follow notification rules.
 
 Re-adding a removed device preserves its settings. If automatic backup was on, a later scheduler check can start another job. To keep it disabled, turn it off and save before removing the device.
 

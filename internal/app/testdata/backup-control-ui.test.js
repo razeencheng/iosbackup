@@ -19,7 +19,8 @@ for(const language of ['en','zh-CN'])test('one stable primary action across task
  assert.equal(button.disabled,false,'device disconnect must not disable server-side cancellation');
  patch(app,{backing_up:true,active_operation:'backup',backup_job_active:true,backup_job_id:'job-2',backup_state:'stopping'});
  assert.equal(label(app,button),catalogs[language]['control.stopping']);assert.equal(button.disabled,true);
- patch(app,{backup_state:'stopped',auto_backup_hold:true});assert.equal(label(app,button),catalogs[language]['control.manualOnce']);
+ patch(app,{backup_state:'stopped',auto_backup_hold:true});assert.equal(label(app,button),catalogs[language]['device.backupNow']);
+ assert.equal(app.get('bkbar-PHONE').classList.contains('hidden'),true,'an unmeasured stop is summarized in the single hold notice');
  for(const operation of ['check','local']){patch(app,{backing_up:true,active_operation:operation});assert.equal(button.disabled,true);assert.notEqual(label(app,button),catalogs[language]['control.stop']);}
  patch(app,{conn:'offline'});assert.equal(button.disabled,true);assert.equal(app.get('backupAdvanced-PHONE').disabled,true);
  patch(app,{});assert.strictEqual(app.get('backupBtn-PHONE'),button);assert.equal(app.get('backupAdvanced-PHONE').disabled,false);

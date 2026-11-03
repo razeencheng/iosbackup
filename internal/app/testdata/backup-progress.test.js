@@ -75,4 +75,11 @@ for(const state of ['stopped','failed','interrupted']) {
 render(receiving);
 assert.equal(ui.get('bkbar-A').getAttribute('data-progress-terminal'),null,'a new active snapshot restores the live layout');
 assert.equal(ui.get('bkprogress-subtitle-A').classList.contains('hidden'),false);
+render({state:'interrupted'},{backup_state:'stopped',backing_up:false,backup_job_active:false,auto_backup_hold:true});
+assert.equal(ui.get('bkbar-A').classList.contains('hidden'),true,'the hold notice replaces the redundant stopped panel without measured progress');
+render({...receiving,state:'interrupted'},{backup_state:'stopped',backing_up:false,backup_job_active:false,auto_backup_hold:true});
+assert.equal(ui.get('bkbar-A').classList.contains('hidden'),false,'measured progress remains available after stopping');
+assert.equal(ui.get('bkprogress-status-A').classList.contains('hidden'),true,'manual stop must not show a second yellow notice');
+render({...receiving,state:'failed'},{backup_state:'failed',backing_up:false,backup_job_active:false,auto_backup_hold:true});
+assert.equal(ui.get('bkprogress-status-A').classList.contains('hidden'),false,'actual failures must remain visible even while held');
 console.log('progress snapshots update only changed values; waits, locale changes and local/phone scopes remain distinct');

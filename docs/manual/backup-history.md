@@ -4,9 +4,9 @@
 
 Each device card has three tabs: **Backup list / Task records / Device settings**. Expanding a card shows saved backup dates directly. History retention is edited separately under Device settings and is disabled by default for each device.
 
-The card's **Back up now** button uses automatic mode and becomes **Stop backup** while a task is running. To request a complete backup again, open **Device settings → Advanced actions → Force full backup** and confirm after reading the explanation. This affects only that manual backup, not the automatic schedule or retention policy. After a task stops or fails, any measured progress remains static and identifies its scope; without progress data, only the execution result is shown.
+The card's **Back up now** button uses automatic mode and becomes **Stop backup** while a task is running. To request a complete backup again, open **Device settings → Advanced actions → Force full backup** and confirm after reading the explanation. This affects only that manual backup, not the automatic schedule or retention policy. After a task stops or fails, any measured progress remains static and identifies its scope; a stop without progress data is summarized in the pause notice.
 
-The stop confirmation describes the selected task's storage mode. In history mode, stopping interrupts the independent work copy without changing saved historical backups; incomplete temporary data is cleaned up after the task exits. With history off, stopping may leave the current backup set incomplete, while any previously retained history remains unchanged. Stopping holds automatic backups until you explicitly resume them. A later backup starts a new task and is not guaranteed to continue from the same progress.
+The stop confirmation describes the selected task's storage mode. In history mode, stopping interrupts the independent work copy without changing saved historical backups; incomplete temporary data is cleaned up after the task exits. With history off, stopping may leave the current backup set incomplete, while any previously retained history remains unchanged. Stopping pauses automatic backups until you start another backup or use the resume link. A later backup starts a new task and is not guaranteed to continue from the same progress.
 
 ## Enable and retain versions
 

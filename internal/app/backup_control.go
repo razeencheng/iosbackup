@@ -15,6 +15,7 @@ type backupJob struct {
 	historyPolicyOnly                 bool
 	historyCleanup                    string
 	historyState                      string
+	resumeHoldVersion                 string
 	backupRoot                        string
 	request                           backupRequest
 	observedMode                      string
@@ -109,6 +110,9 @@ func (app *application) beginBackupJob(udid, connection, sessionID string, autom
 	}
 	ctx, cancel := context.WithCancelCause(app.rootCtx)
 	job := &backupJob{request: request, startedAt: app.nowTime(), id: sessionID, udid: udid, automatic: automatic, ctx: ctx, cancel: cancel, device: d, config: cfg, release: release}
+	if hold := app.backupHoldUnsafe(udid); !automatic && hold.Held {
+		job.resumeHoldVersion = hold.Version
+	}
 	if app.backupJobs == nil {
 		app.backupJobs = make(map[string]*backupJob)
 	}

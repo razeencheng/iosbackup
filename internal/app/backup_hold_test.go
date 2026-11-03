@@ -114,13 +114,17 @@ func TestBackupHoldSurvivesReloadAndConfigSave(t *testing.T) {
 	}
 }
 
-func TestBackupHoldManualBackupKeepsHoldAndStaleRequestsAreRejected(t *testing.T) {
+func TestBackupHoldManualBackupResumesAndStaleRequestsAreRejected(t *testing.T) {
 	app, oldID := completedHeldBackup(t)
 	if err := app.PerformBackup("CONTROL"); err != nil {
 		t.Fatal(err)
 	}
-	if !app.buildStatusSnapshot().Devices[0].AutoBackupHold {
-		t.Fatal("manual backup resumed automatic schedule")
+	if app.buildStatusSnapshot().Devices[0].AutoBackupHold {
+		t.Fatal("accepted manual backup did not resume automatic schedule")
+	}
+	restart := newApplicationWithRuntime(context.Background(), app.runtimeConfig)
+	if err := restart.loadConfigs(); err != nil || restart.configs["CONTROL"].AutoBackupHold {
+		t.Fatal("manual resume was not persisted", err)
 	}
 	newID := app.buildStatusSnapshot().Devices[0].BackupJobID
 	if err := app.stopBackup("CONTROL", oldID); err == nil {
@@ -134,6 +138,58 @@ func TestBackupHoldManualBackupKeepsHoldAndStaleRequestsAreRejected(t *testing.T
 	}
 	if !app.buildStatusSnapshot().Devices[0].AutoBackupHold {
 		t.Fatal("new hold cleared")
+	}
+}
+
+func TestBackupHoldManualStartFailureKeepsHold(t *testing.T) {
+	app, _ := completedHeldBackup(t)
+	app.configs["CONTROL"].MinBatteryLevel = 100
+	if err := app.PerformBackup("CONTROL"); err == nil {
+		t.Fatal("low battery start accepted")
+	}
+	if !app.buildStatusSnapshot().Devices[0].AutoBackupHold {
+		t.Fatal("failed preflight resumed automatic schedule")
+	}
+}
+
+func TestBackupHoldManualResumeKeepsDisabledScheduleOff(t *testing.T) {
+	app, _ := completedHeldBackup(t)
+	app.configs["CONTROL"].AutoBackupEnabled = false
+	if err := app.PerformBackup("CONTROL"); err != nil {
+		t.Fatal(err)
+	}
+	if app.buildStatusSnapshot().Devices[0].AutoBackupHold || app.configs["CONTROL"].AutoBackupEnabled {
+		t.Fatal("manual resume must only clear the hold, not enable scheduling")
+	}
+}
+
+func TestBackupHoldManualResumeSaveFailureKeepsHoldAndAllowsBackup(t *testing.T) {
+	app, _ := completedHeldBackup(t)
+	app.configStore.writeAtomic = func(string, []byte, os.FileMode) error { return errors.New("injected save failure") }
+	if err := app.PerformBackup("CONTROL"); err != nil {
+		t.Fatal("resume save failure prevented manual backup", err)
+	}
+	d := app.buildStatusSnapshot().Devices[0]
+	if !d.AutoBackupHold || d.AutoBackupHoldPersistence != "error" {
+		t.Fatal("unsaved resume reported success", d.AutoBackupHold, d.AutoBackupHoldPersistence)
+	}
+}
+
+func TestBackupHoldNewStopSurvivesManualStart(t *testing.T) {
+	app, _ := completedHeldBackup(t)
+	job, err := app.beginBackupJob("CONTROL", "", "", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := app.stopBackup("CONTROL", job.id); err != nil {
+		t.Fatal(err)
+	}
+	if err := app.runBackupJob(job); !errors.Is(err, errBackupStoppedByUser) {
+		t.Fatal(err)
+	}
+	d := app.buildStatusSnapshot().Devices[0]
+	if !d.AutoBackupHold || d.AutoBackupHoldVersion != job.id {
+		t.Fatal("new stop lost its hold")
 	}
 }
 

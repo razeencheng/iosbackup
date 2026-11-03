@@ -199,6 +199,10 @@ func (app *application) runBackupJob(job *backupJob) (retErr error) {
 			return i18n.NewError(i18n.LowBattery, map[string]any{"battery": device.BatteryLevel, "min_battery": cfg.MinBatteryLevel})
 		}
 	}
+	// 手动新任务通过启动检查后恢复原计划；新停止及保存失败仍保留暂缓。
+	if job.resumeHoldVersion != "" {
+		_ = app.persistBackupHold(udid, job.resumeHoldVersion, true)
+	}
 	backupDir := cfg.BackupDirectory
 	if backupDir == "" {
 		backupDir = app.paths.BackupsRoot

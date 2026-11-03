@@ -126,12 +126,10 @@
   .remove-dialog-cancel{border:1px solid #D8E2EA;background:#fff;color:#405162}
   .remove-dialog-confirm{border:1px solid #9F231C;background:#9F231C;color:#fff;min-width:132px}
   .remove-dialog-confirm:disabled{border-color:#D8E2EA;background:#F3F7FA;color:#ADB9C2;cursor:not-allowed}
-  .backup-control-button{border:1px solid #D8E2EA;background:#fff;color:#405162;border-radius:var(--iosbk-radius);padding:9px 13px;font:inherit;font-size:13px;font-weight:600;cursor:pointer;white-space:normal}
-  .backup-control-button.stop{border-color:#E2B8B3;color:#9F231C}
-  .backup-control-button:disabled{opacity:.55;cursor:not-allowed}
-  .backup-hold-banner{margin:0 20px 16px;padding:13px 14px;background:#FFF8EB;border:1px solid #EEDAB4;border-radius:var(--iosbk-radius);display:flex;flex-wrap:wrap;align-items:center;gap:12px;color:#78521E;font-size:13px;line-height:1.6}
-  .backup-hold-banner .copy{flex:1;min-width:180px}
-  .backup-hold-banner small{display:block;color:#847052;margin-top:3px}
+  .backup-hold-banner{margin:0 20px 16px;padding:10px 14px;background:#FFF8EB;border:1px solid #EEDAB4;border-radius:var(--iosbk-radius);color:#78521E;font-size:13px;line-height:1.8}
+  .backup-control-link{display:inline;border:0;background:none;padding:0;margin-left:6px;color:#2C62C6;font:inherit;cursor:pointer;text-decoration:underline;text-underline-offset:3px}
+  .backup-control-link:disabled{opacity:.55;cursor:not-allowed}
+  .backup-control-link:focus-visible{outline:2px solid #2C62C6;outline-offset:3px;border-radius:2px}
   .backup-control-error{color:#9F231C}
   /* top-bar menu */
   .menu-item{display:flex;gap:11px;align-items:flex-start;width:100%;text-align:left;padding:9px 11px;border-radius:var(--iosbk-radius);background:none;border:none;cursor:pointer;font-family:inherit;color:#27384A;text-decoration:none}
@@ -289,9 +287,9 @@
         </div>
 
         <div id="backupHold-{{$d.UDID}}" class="backup-hold-banner{{if not $cfg.AutoBackupHold}} hidden{{end}}" role="status">
-          <div class="copy"><strong data-i18n="control.held">{{t $.Locale "control.held"}}</strong><div id="backupHoldMessage-{{$d.UDID}}" data-i18n="control.holdHint">{{t $.Locale "control.holdHint"}}</div><small data-i18n="control.resumeHint">{{t $.Locale "control.resumeHint"}}</small></div>
-          <button id="retryHold-{{$d.UDID}}" type="button" class="backup-control-button hidden" onclick="retryBackupHold('{{$d.UDID}}')" data-i18n="control.retrySave">{{t $.Locale "control.retrySave"}}</button>
-          <button id="resumeBackup-{{$d.UDID}}" type="button" class="backup-control-button" disabled onclick="resumeAutomaticBackup('{{$d.UDID}}')" data-i18n="control.resume">{{t $.Locale "control.resume"}}</button>
+          <span id="backupHoldMessage-{{$d.UDID}}" data-i18n="control.holdHint">{{t $.Locale "control.holdHint"}}</span>
+          <button id="retryHold-{{$d.UDID}}" type="button" class="backup-control-link hidden" onclick="retryBackupHold('{{$d.UDID}}')" data-i18n="control.retrySave">{{t $.Locale "control.retrySave"}}</button>
+          <button id="resumeBackup-{{$d.UDID}}" type="button" class="backup-control-link" disabled onclick="resumeAutomaticBackup('{{$d.UDID}}')" data-i18n="control.resume" data-i18n-title="control.resumeHint" title="{{t $.Locale "control.resumeHint"}}">{{t $.Locale "control.resume"}}</button>
         </div>
         <div id="bkbar-{{$d.UDID}}" class="backup-progress-panel{{if or (not $backingUp) (eq $operation "check") (eq $operation "local")}} hidden{{end}}" data-progress-mode="preparing">
           <div class="backup-progress-heading">
@@ -1193,6 +1191,7 @@ function renderBackupProgress(d){
   // 本地准备结束后仍保留该阶段实测值；手机会话开始时服务端已清空 local。
   var local=(mode.indexOf('local-')===0||mode==='stopping'||(terminal&&mode!=='completed'))?progress.local:null;
   if(local){overall=null;if(local.totals_known && local.phase==='copying' && local.total_bytes>0)overall=Math.min(100,100*local.bytes/local.total_bytes);else if(local.totals_known&&local.phase==='verifying'&&local.total_files>0)overall=Math.min(100,100*local.scanned_files/local.total_files);}
+  if(mode==='stopped'&&d.auto_backup_hold&&overall===null)panel.classList.add('hidden');
   var indeterminate=!terminal&&mode!=='stopping'&&(mode==='preparing'||!!local) && overall===null;
   var subtitleKey=terminal&&mode!=='completed'?(local?'progress.endedLocalSubtitle':'progress.endedOverallSubtitle'):(local?'progress.localSubtitle':copy.subtitle);
   setLiveText(title,tr(copy.title)); setLiveText(subtitle,tr(subtitleKey)); setLiveText(value,overall===null?'':formatBackupPercent(overall));
@@ -1215,7 +1214,8 @@ function renderBackupProgress(d){
   setLiveText(currentValue,hasCurrentFile?formatBackupBytes(progress.current_bytes)+' / '+formatBackupBytes(progress.current_total_bytes)+(isBackupProgressNumber(progress.current_file_percent)?' · '+formatBackupPercent(progress.current_file_percent):''):(showFile?tr(terminal?'progress.fileFinished':'progress.fileWaiting'):''));
 
   var status=document.getElementById('bkprogress-status-'+u), statusTitle=document.getElementById('bkprogress-status-title-'+u), statusHint=document.getElementById('bkprogress-status-hint-'+u), statusIcon=document.getElementById('bkprogress-status-icon-'+u);
-  var statusClass='backup-status-message'+(copy.tone?' '+copy.tone:'');if(status.className!==statusClass)status.className=statusClass;
+  var statusClass='backup-status-message'+(copy.tone?' '+copy.tone:'')+(mode==='stopped'?' hidden':'');if(status.className!==statusClass)status.className=statusClass;
+  status.classList.toggle('hidden',mode==='stopped');
   setLiveText(statusTitle,tr(copy.title)); setLiveText(statusHint,(mode==='failed'||mode==='interrupted')?backupFailureMessage(d,copy.hint):tr(copy.hint));
   var activity=document.getElementById('bkprogress-activity-'+u);
   var lastActivity=progress.last_activity_at ? new Date(progress.last_activity_at) : null;
@@ -1431,7 +1431,7 @@ function renderBackupControl(d){
   var starting=!!backupStartPending[u], canStop=running&&!!d.backup_job_id;
   var busy=!!d.backing_up, unavailable=d.conn==='offline'||d.presence_known===false||d.operations_available===false;
   var retry=d.backup_progress&&(d.backup_progress.state==='interrupted'||d.backup_progress.state==='failed');
-  var key=canStop?(stopping?'control.stopping':'control.stop'):(starting?'control.starting':(busy?IOSBKConsole.busyLabel(d):(d.auto_backup_hold?'control.manualOnce':(retry?'progress.retry':'device.backupNow'))));
+  var key=canStop?(stopping?'control.stopping':'control.stop'):(starting?'control.starting':(busy?IOSBKConsole.busyLabel(d):(retry&&!d.auto_backup_hold?'progress.retry':'device.backupNow')));
   var disabled=canStop?(pending||stopping):(starting||busy||unavailable);
   var button=document.getElementById('backupBtn-'+u);
   if(button){
