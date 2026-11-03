@@ -2,6 +2,8 @@ package app
 
 import (
 	"context"
+	"errors"
+	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
@@ -9,6 +11,67 @@ import (
 	"testing"
 	"time"
 )
+
+func TestEncryptedCurrentCheckCreatesNoTask(t *testing.T) {
+	app, _, dir := checkFixture(t)
+	t.Cleanup(app.closeBackupIndex)
+	app.backupJobRecords = openJobTestStore(t, t.TempDir(), defaultBackupJobLimits())
+	if err := os.WriteFile(filepath.Join(dir, "Manifest.plist"), []byte(`<plist><dict><key>IsEncrypted</key><true/></dict></plist>`), 0600); err != nil {
+		t.Fatal(err)
+	}
+	previous := backupCheckResult{Kind: "quick", State: "passed", Freshness: "unknown"}
+	app.backupCheckResults = map[string]backupCheckResult{"OFFLINE": previous}
+	for attempt := 0; attempt < 3; attempt++ {
+		id, err := app.startBackupCheck("OFFLINE")
+		if id != "" || !errors.Is(err, errBackupIndexEncrypted) {
+			t.Fatalf("unsupported encrypted file check was admitted: id=%q err=%v", id, err)
+		}
+		if records := app.backupJobRecords.list("OFFLINE"); len(records) != 0 {
+			t.Fatal("unsupported check created task history")
+		}
+		if app.backupChecks["OFFLINE"] != nil || app.backupInProgress["OFFLINE"] {
+			t.Fatal("rejected check left the backup busy")
+		}
+		if app.backupCheckResults["OFFLINE"] != previous {
+			t.Fatal("rejected check replaced existing status evidence")
+		}
+	}
+	r := httptest.NewRequest(http.MethodPost, "/api/backup-check/OFFLINE", strings.NewReader(`{"action":"start"}`))
+	r.Header.Set(csrfHeader, "test")
+	w := httptest.NewRecorder()
+	app.handleBackupCheck(w, r)
+	if w.Code != http.StatusUnprocessableEntity || !strings.Contains(w.Body.String(), `"code":"api.history_check_encrypted"`) {
+		t.Fatalf("unsupported capability should be rejected synchronously: %d %s", w.Code, w.Body.String())
+	}
+	if len(app.backupJobRecords.list("OFFLINE")) != 0 {
+		t.Fatal("API retry created a task")
+	}
+}
+
+func TestCurrentCheckKeepsRealMetadataFailure(t *testing.T) {
+	app, _, dir := checkFixture(t)
+	t.Cleanup(app.closeBackupIndex)
+	app.backupJobRecords = openJobTestStore(t, t.TempDir(), defaultBackupJobLimits())
+	if err := os.WriteFile(filepath.Join(dir, "Manifest.plist"), []byte(`<plist><dict><key>IsEncrypted</key><string>invalid</string></dict></plist>`), 0600); err != nil {
+		t.Fatal(err)
+	}
+	manager := app.backupIndexManager()
+	manager.slot <- struct{}{}
+	id, err := app.startBackupCheck("OFFLINE")
+	if err != nil {
+		<-manager.slot
+		t.Fatal(err)
+	}
+	app.mu.RLock()
+	run := app.backupChecks["OFFLINE"]
+	app.mu.RUnlock()
+	<-manager.slot
+	<-run.done
+	record, _, ok := app.backupJobRecords.events(id, 0, 10)
+	if !ok || record.Check == nil || record.Check.State != "issues" || record.Check.Reason != "metadata_invalid" {
+		t.Fatal("invalid metadata was hidden as an unsupported encrypted check")
+	}
+}
 
 func checkFixture(t *testing.T) (*application, backupIndexSource, string) {
 	t.Helper()

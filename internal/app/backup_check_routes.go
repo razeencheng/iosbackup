@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"path/filepath"
 	"time"
@@ -26,6 +27,15 @@ func (app *application) startBackupCheck(udid string) (string, error) {
 	backupPath, release, err := app.acquireLocalBackupOp(udid)
 	if err != nil {
 		return "", err
+	}
+	// 已知不支持的加密清单在建立任务前拒绝，避免重复留下失败任务。
+	// 持有来源占用，只读所选备份的元数据，不使用手机当前的加密设置。
+	probeCtx, probeCancel := context.WithTimeout(app.rootCtx, backupQuickCheckTimeout)
+	encrypted := backupSourceIsEncrypted(probeCtx, udid, filepath.Dir(backupPath))
+	probeCancel()
+	if encrypted {
+		release()
+		return "", &i18n.Error{Code: i18n.HistoryCheckEncrypted, Cause: errBackupIndexEncrypted}
 	}
 	manager := app.backupIndexManager()
 	ctx, cancel := context.WithTimeout(app.rootCtx, backupManifestCheckTimeout)
@@ -86,6 +96,21 @@ func (app *application) startBackupCheck(udid string) (string, error) {
 	return run.id, nil
 }
 
+// 无法确定加密状态时仍走原检查流程，保留元数据缺失、损坏等真实诊断。
+func backupSourceIsEncrypted(ctx context.Context, udid, root string) bool {
+	src, err := resolveBackupIndexSourceAt(ctx, udid, root)
+	if err != nil {
+		return false
+	}
+	dir, err := openBackupIndexRoot(src)
+	if err != nil {
+		return false
+	}
+	defer dir.Close()
+	manifest, err := readBackupCheckPlist(ctx, dir, "Manifest.plist", nil)
+	return err == nil && manifest["IsEncrypted"] == true
+}
+
 func (app *application) checkBackupSourceAt(ctx context.Context, udid, root, kind string) backupCheckResult {
 	src, err := resolveBackupIndexSourceAt(ctx, udid, root)
 	var result backupCheckResult
@@ -143,6 +168,10 @@ func (app *application) handleBackupCheck(w http.ResponseWriter, r *http.Request
 	}
 	id, err := app.startBackupCheck(udid)
 	if err != nil {
+		if errors.Is(err, errBackupIndexEncrypted) {
+			writeOperationError(w, http.StatusUnprocessableEntity, err, i18n.HistoryCheckEncrypted)
+			return
+		}
 		writeOperationError(w, 409, err, i18n.OperationFailed)
 		return
 	}
