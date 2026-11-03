@@ -11,7 +11,8 @@ for(const language of ['en','zh-CN'])test('one stable primary action across task
  patch(app,{});assert.equal(label(app,button),catalogs[language]['device.backupNow']);assert.equal(button.disabled,false);
  patch(app,{backing_up:true,active_operation:'backup',backup_job_active:true,backup_job_id:'job-1',backup_state:'running'});
  assert.equal(label(app,button),catalogs[language]['control.stop']);assert.equal(button.disabled,false);
- assert.equal(app.get('backupAdvanced-PHONE').classList.contains('hidden'),true);
+ assert.equal(app.get('backupAdvanced-PHONE').disabled,true,'the full-backup action in settings cannot run during a backup');
+ assert.equal(app.get('backupAdvanced-PHONE').classList.contains('hidden'),false,'advanced actions remain discoverable while busy');
  app.run("backupAction('PHONE',document.getElementById('backupBtn-PHONE'))");
  assert.equal(app.run('backupStopTarget.jobID'),'job-1','action reads current task identity');
  patch(app,{conn:'offline',online:false,operations_available:false,backing_up:true,active_operation:'backup',backup_job_active:true,backup_job_id:'job-2',backup_state:'running'});
@@ -20,9 +21,12 @@ for(const language of ['en','zh-CN'])test('one stable primary action across task
  assert.equal(label(app,button),catalogs[language]['control.stopping']);assert.equal(button.disabled,true);
  patch(app,{backup_state:'stopped',auto_backup_hold:true});assert.equal(label(app,button),catalogs[language]['control.manualOnce']);
  for(const operation of ['check','local']){patch(app,{backing_up:true,active_operation:operation});assert.equal(button.disabled,true);assert.notEqual(label(app,button),catalogs[language]['control.stop']);}
- patch(app,{conn:'offline'});assert.equal(button.disabled,true);
- patch(app,{});assert.strictEqual(app.get('backupBtn-PHONE'),button);assert.equal(app.get('backupAdvanced-PHONE').classList.contains('hidden'),false);
+ patch(app,{conn:'offline'});assert.equal(button.disabled,true);assert.equal(app.get('backupAdvanced-PHONE').disabled,true);
+ patch(app,{});assert.strictEqual(app.get('backupBtn-PHONE'),button);assert.equal(app.get('backupAdvanced-PHONE').disabled,false);
  const html=fs.readFileSync(path.join(root,'templates/index.html'),'utf8');assert.ok(!html.includes('id="stopBackup-'),'there is no second backup action in the template');
+ assert.ok(!html.includes('backupSplit-'),'the header must not retain a split backup button');
+ const advanced=html.match(/<details class="console-advanced">[\s\S]*?<\/details>/)[0];
+ assert.ok(advanced.includes('id="backupAdvanced-'),'the full-backup action belongs to device settings advanced actions');
 });
 test('start submission stays disabled across status and language refreshes',async()=>{
  const app=setup();patch(app,{});let resolve,calls=0;
@@ -30,6 +34,7 @@ test('start submission stays disabled across status and language refreshes',asyn
  const promise=app.run("startBackup('PHONE',document.getElementById('backupBtn-PHONE'))");
  app.run("startBackup('PHONE',document.getElementById('backupBtn-PHONE'))");
  patch(app,{});app.api.setLocale('zh-CN');assert.equal(calls,1);assert.equal(app.get('backupBtn-PHONE').disabled,true);assert.equal(label(app,app.get('backupBtn-PHONE')),catalogs['zh-CN']['control.starting']);
+ assert.equal(app.get('backupAdvanced-PHONE').disabled,true,'pending auto submission also blocks full backup');
  resolve({ok:true,json:()=>Promise.resolve({backup_job_id:'job-new',backup_state:'starting',requested_mode:'auto'})});await promise;
  assert.equal(label(app,app.get('backupBtn-PHONE')),catalogs['zh-CN']['control.stop']);assert.equal(app.get('backupBtn-PHONE').disabled,false);
  app.run("backupAction('PHONE',document.getElementById('backupBtn-PHONE'))");assert.equal(app.run('backupStopTarget.jobID'),'job-new');

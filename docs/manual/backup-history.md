@@ -4,6 +4,8 @@
 
 Each device card has three tabs: **Backup list / Task records / Device settings**. Expanding a card shows saved backup dates directly. History retention is edited separately under Device settings and is disabled by default for each device.
 
+The card's **Back up now** button uses automatic mode and becomes **Stop backup** while a task is running. To request a complete backup again, open **Device settings → Advanced actions → Force full backup** and confirm after reading the explanation. This affects only that manual backup, not the automatic schedule or retention policy. After a task stops or fails, any measured progress remains static and identifies its scope; without progress data, only the execution result is shown.
+
 ## Enable and retain versions
 
 Enable history under **Device settings → Backup retention → Edit**, choose **1–365 backups**, then save. History is off by default and the count is prefilled with **2**. Retain the latest N normal backups by completion time, including the latest version; backups on the same day each count. Pinned backups are retained separately. Without a new successful backup, the retained normal backups do not expire. Enabling, disabling or making points eligible for cleanup requires confirmation. Changes with no cleanup impact save directly after a server preview. Saving an active policy also cleans up eligible points; a stale preview must be refreshed.
@@ -28,7 +30,7 @@ Deletion is separated from routine actions at the bottom of the details drawer a
 
 ## Export for a computer restore
 
-1. Choose **Download** in a backup's date row to prepare and start the download automatically; its details drawer shows progress. Alternatively, open Details, choose **Prepare full export**, and use the download link within five minutes. One transfer streams at a time, with at most four prepared/live sessions. A busy message lets you retry when the transfer slot is free. The details link is also available if the browser does not start the download.
+1. Select a backup date or **Details**, choose **Prepare full export**, and use the download link within five minutes after preparation. One transfer streams at a time, with at most four prepared/live sessions. A busy message lets you retry when the transfer slot is free.
 2. Download the `.tar` file. Its name identifies the device, backup time and a short point ID; an unknown original completion time uses a labelled saved date. Ensure the computer has space for the complete download and extraction. It contains the complete original `<SOURCE-UDID>/` directory, preserving encryption. The application does not load the entire archive into browser memory or create another full archive on the NAS. Application configuration, credentials, task logs and external indexes are outside that source; reserved unpack output is excluded.
 3. The status **Server transfer ended** only confirms the server stream ended. Confirm the download finished on the computer and discard partial files after cancellation or failure. An expired or restarted session requires a new export; resumable downloads are not provided. A Range request is explicitly rejected; retry with a new complete download.
 4. Extract into a new staging directory, preserving the source UDID and all contents. Do not merge two dates with the same UDID. Follow [Finder](restore-finder.md) or [Apple Devices](restore-apple-devices.md) for local placement and restore steps. For encrypted history, use the password from that backup's date, which may differ from the device's current password.

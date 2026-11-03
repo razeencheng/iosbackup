@@ -58,4 +58,21 @@ for(const state of ['stopping','stopped','failed','interrupted','completed']) {
  render({...receiving,state},{backup_state:state,backing_up:state==='stopping'});
  assert.equal(ui.get('bkbar-A').getAttribute('data-progress-mode'),state,'terminal/stop state is immediate');
 }
+for(const state of ['stopped','failed','interrupted']) {
+ render({...local,state,phase:state},{backup_state:state,backing_up:false,backup_job_active:false});
+ assert.equal(ui.get('bkprogress-value-A').textContent,'50%','ending during local copying must retain the last measured local progress');
+ assert.equal(ui.get('bkprogress-track-A').getAttribute('aria-label'),catalogs['zh-CN']['progress.localAria'],'local progress must not become phone progress after stopping');
+ assert.equal(ui.get('bkprogress-track-A').classList.contains('indeterminate'),false,'terminal progress must never animate');
+ assert.equal(ui.get('bkprogress-current-A').classList.contains('hidden'),true,'terminal summaries do not retain an empty current-file slot');
+ render({state},{backup_state:state,backing_up:false,backup_job_active:false});
+ assert.equal(ui.get('bkprogress-subtitle-A').classList.contains('hidden'),true,'without a reported percentage the terminal summary must not retain a progress subtitle');
+ assert.equal(ui.get('bkprogress-activity-A').classList.contains('hidden'),true,'terminal summaries omit an empty activity placeholder');
+ render({...receiving,state,phase:state},{backup_state:state,backing_up:false,backup_job_active:false});
+ assert.equal(ui.get('bkprogress-value-A').textContent,'3%','terminal phone progress remains the measured value, not 100%');
+ assert.equal(ui.get('bkprogress-track-A').classList.contains('empty'),false,'a known terminal percentage keeps its track');
+ assert.equal(ui.get('bkprogress-subtitle-A').textContent,catalogs['zh-CN']['progress.endedOverallSubtitle']);
+}
+render(receiving);
+assert.equal(ui.get('bkbar-A').getAttribute('data-progress-terminal'),null,'a new active snapshot restores the live layout');
+assert.equal(ui.get('bkprogress-subtitle-A').classList.contains('hidden'),false);
 console.log('progress snapshots update only changed values; waits, locale changes and local/phone scopes remain distinct');

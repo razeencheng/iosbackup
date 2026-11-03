@@ -85,7 +85,7 @@
    cell=el('div');cell.appendChild(el('strong',p.bytes_known?bytes(p.bytes):tr('history.sizeUnknown')));cell.appendChild(el('small',label('encryption',p.encryption),'console-subtle'));row.appendChild(cell);
    cell=el('div');
    if(check.state==='passed'){
-    var pass=el('button','✓','console-check-pass');pass.type='button';pass.setAttribute('aria-label',tr('check.kind.'+(check.scope||'quick'))+' · '+tr('check.state.passed'));
+    var pass=el('button',undefined,'console-check-pass');pass.type='button';pass.innerHTML='<svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-check-circle"></use></svg>';pass.setAttribute('aria-label',tr('check.kind.'+(check.scope||'quick'))+' · '+tr('check.state.passed'));
     pass.setAttribute('data-hint',tr('check.kind.'+(check.scope||'quick'))+' · '+tr('check.state.passed')+'\n'+date(check.checked_at)+'\n'+tr(check.scope==='manifest'?'check.tooltipManifest':'check.tooltipQuick',{metadata:tr(check.metadata_complete?'check.yes':'check.no'),manifest:tr(check.manifest_complete?'check.yes':'check.no'),records:check.records_checked||0,objects:check.objects_checked||0}));cell.appendChild(pass);
    }else{cell.appendChild(el('span',label('check',check.state),'console-amber'));cell.appendChild(el('small',date(check.checked_at),'console-subtle'));}
    if(checks.attempt)cell.appendChild(el('small',tr('check.reason.'+(checks.attempt.reason||'read_failed')),checks.attempt.reason==='cancelled'?'console-subtle':'console-amber'));

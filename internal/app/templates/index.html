@@ -59,6 +59,16 @@
   .backup-status-message.warning{border-color:#F0DBB6;background:#FBF1E2;color:#835623}.backup-status-message.warning .ui-icon{color:#B45309}.backup-status-message.warning strong{color:#714514}
   .backup-status-message.success{border-color:#B9E2DA;background:#F1FAF7;color:#52715F}.backup-status-message.success .ui-icon,.backup-status-message.success strong{color:#2E7D5B}
   .backup-status-message.error{border-color:#F1C9C5;background:#FFF7F6;color:#89514D}.backup-status-message.error .ui-icon,.backup-status-message.error strong{color:#9F231C}
+  .backup-progress-panel[data-progress-terminal="true"] .backup-progress-heading-copy strong,
+  .backup-progress-panel[data-progress-terminal="true"] .backup-progress-heading-copy span{min-height:0}
+  .backup-progress-panel[data-progress-terminal="true"] .backup-status-measure,
+  .backup-progress-panel[data-progress-terminal="true"] .backup-status-copy strong,
+  .backup-progress-panel[data-progress-terminal="true"] .backup-status-copy [data-i18n="progress.separator"],
+  .backup-progress-panel[data-progress-terminal="true"] .backup-overall-track.empty{display:none}
+  .backup-progress-panel[data-progress-terminal="true"] .backup-overall-fill{transition:none;background:#7B8798}
+  .backup-progress-panel[data-progress-terminal="true"] .backup-progress-value{color:#607181}
+  .backup-progress-panel[data-progress-mode="completed"] .backup-overall-fill{background:#2E7D5B}
+  .backup-progress-panel[data-progress-mode="completed"] .backup-progress-value{color:#2E7D5B}
   .empty-device-icon{width:60px;height:60px;margin:0 auto 16px;border-radius:var(--iosbk-radius);background:#EAF1FC;border:1px solid #C5DAF6;display:flex;align-items:center;justify-content:center;color:#2C62C6}
   .empty-device-icon img{width:54px;height:54px;display:block;object-fit:contain}
   .iosbk-range{-webkit-appearance:none;appearance:none;width:100%;height:5px;border-radius:var(--iosbk-radius);background:#D8E2EA;outline:none}
@@ -273,10 +283,7 @@
               {{else if eq $conn "wifi"}}<span class="connection-badge" style="gap:7px;padding:5px 11px;background:#E2F3EF;color:#0B7565;border:1px solid #B9E2DA;font-size:12.5px;font-weight:600;white-space:nowrap"><svg class="connection-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M3 7.6a10.7 10.7 0 0 1 14 0M5.7 10.5a6.7 6.7 0 0 1 8.6 0M8.4 13.3a2.7 2.7 0 0 1 3.2 0" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path><circle cx="10" cy="16" r="1.25" fill="currentColor"></circle></svg><span data-i18n="status.wifi">{{t $.Locale "status.wifi"}}</span></span>
               {{else}}<span class="connection-badge" style="gap:7px;padding:5px 11px;background:#F3F7FA;color:#718090;border:1px solid #D8E2EA;font-size:12.5px;font-weight:600;white-space:nowrap"><svg class="connection-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2.6v6.1M5.5 5.7a6.2 6.2 0 1 0 9 0" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path></svg><span data-i18n="status.offline">{{t $.Locale "status.offline"}}</span></span>{{end}}
             </div>
-            <div id="backupSplit-{{$d.UDID}}" class="backup-split">
             <button id="backupBtn-{{$d.UDID}}" class="backup-action" onclick="event.stopPropagation();backupAction('{{$d.UDID}}',this)" {{if or (eq $conn "offline") $backingUp}}disabled{{end}} style="gap:9px;padding:10px 17px;font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit;border:none;white-space:nowrap;min-width:132px;{{if or (eq $conn "offline") $backingUp}}background:#F3F7FA;color:#ADB9C2;cursor:not-allowed;{{else}}background:#2C62C6;color:#fff;{{end}}">{{if $backingUp}}<span data-i18n="{{$busyKey}}">{{t $.Locale $busyKey}}</span>{{else}}<span data-i18n="device.backupNow">{{t $.Locale "device.backupNow"}}</span>{{end}}</button>
-            <button id="backupAdvanced-{{$d.UDID}}" type="button" class="backup-control-button backup-advanced" {{if or (eq $conn "offline") $backingUp}}disabled{{end}} onclick="event.stopPropagation();IOSBKConsole.backup('{{$d.UDID}}')" data-i18n-title="console.advancedBackup" data-i18n-aria="console.advancedBackup" title="{{t $.Locale "console.advancedBackup"}}" aria-label="{{t $.Locale "console.advancedBackup"}}" aria-haspopup="dialog">⌄</button>
-            </div>
             <svg id="chev-{{$d.UDID}}" class="ui-icon" style="color:#ADB9C2;width:15px;height:15px" aria-hidden="true"><use href="/static/ui-icons.svg#icon-chevron-down"></use></svg>
           </div>
         </div>
@@ -329,7 +336,7 @@
           <!-- ===== BACKUP SETTINGS ===== -->
 <div data-sec-panel="settings" data-udid="{{$d.UDID}}" class="hidden console-content">
 <h3><span data-i18n="console.settings">{{t $.Locale "console.settings"}}</span></h3><p class="history-note"><span data-i18n="console.settingsHint">{{t $.Locale "console.settingsHint"}}</span></p>
-<div class="console-settings-list"><div class="console-setting-row"><div><h4><span data-i18n="console.setting.schedule">{{t $.Locale "console.setting.schedule"}}</span></h4><p id="scheduleSummary-{{$d.UDID}}" class="history-note"><span data-i18n="console.scheduleHint">{{t $.Locale "console.scheduleHint"}}</span></p></div><button type="button" class="history-button" data-console-action="settings" data-udid="{{$d.UDID}}" data-group="schedule"><span data-i18n="console.edit">{{t $.Locale "console.edit"}}</span></button></div><div class="console-setting-row"><div><h4><span data-i18n="console.setting.history">{{t $.Locale "console.setting.history"}}</span></h4><p id="historyPolicySummary-{{$d.UDID}}" class="history-note"><span data-i18n="history.cost">{{t $.Locale "history.cost"}}</span></p></div><button type="button" class="history-button" data-console-action="settings" data-udid="{{$d.UDID}}" data-group="history"><span data-i18n="console.edit">{{t $.Locale "console.edit"}}</span></button></div><div class="console-setting-row"><div><h4><span data-i18n="console.setting.encryption">{{t $.Locale "console.setting.encryption"}}</span></h4><p id="encryptionSummary-{{$d.UDID}}" class="history-note"><span data-i18n="enc.warn">{{t $.Locale "enc.warn"}}</span></p></div><button type="button" class="history-button" data-console-action="settings" data-udid="{{$d.UDID}}" data-group="encryption"><span data-i18n="console.edit">{{t $.Locale "console.edit"}}</span></button></div><div class="console-setting-row"><div><h4><span data-i18n="console.setting.connection">{{t $.Locale "console.setting.connection"}}</span></h4><p id="connectionSummary-{{$d.UDID}}" class="history-note"><span data-i18n="console.pathHint">{{t $.Locale "console.pathHint"}}</span></p></div><button type="button" class="history-button" data-console-action="settings" data-udid="{{$d.UDID}}" data-group="connection"><span data-i18n="console.edit">{{t $.Locale "console.edit"}}</span></button></div></div><details class="console-advanced"><summary><span data-i18n="console.advanced">{{t $.Locale "console.advanced"}}</span></summary><div class="history-actions">{{if $.ExperimentalOperationsEnabled}}<button type="button" class="history-button" data-console-action="settings" data-udid="{{$d.UDID}}" data-group="restore"><span data-i18n="sec.danger">{{t $.Locale "sec.danger"}}</span></button>{{end}}<button type="button" class="history-button" data-console-action="settings" data-udid="{{$d.UDID}}" data-group="remove"><span data-i18n="sec.remove">{{t $.Locale "sec.remove"}}</span></button></div></details></div>
+<div class="console-settings-list"><div class="console-setting-row"><div><h4><span data-i18n="console.setting.schedule">{{t $.Locale "console.setting.schedule"}}</span></h4><p id="scheduleSummary-{{$d.UDID}}" class="history-note"><span data-i18n="console.scheduleHint">{{t $.Locale "console.scheduleHint"}}</span></p></div><button type="button" class="history-button" data-console-action="settings" data-udid="{{$d.UDID}}" data-group="schedule"><span data-i18n="console.edit">{{t $.Locale "console.edit"}}</span></button></div><div class="console-setting-row"><div><h4><span data-i18n="console.setting.history">{{t $.Locale "console.setting.history"}}</span></h4><p id="historyPolicySummary-{{$d.UDID}}" class="history-note"><span data-i18n="history.cost">{{t $.Locale "history.cost"}}</span></p></div><button type="button" class="history-button" data-console-action="settings" data-udid="{{$d.UDID}}" data-group="history"><span data-i18n="console.edit">{{t $.Locale "console.edit"}}</span></button></div><div class="console-setting-row"><div><h4><span data-i18n="console.setting.encryption">{{t $.Locale "console.setting.encryption"}}</span></h4><p id="encryptionSummary-{{$d.UDID}}" class="history-note"><span data-i18n="enc.warn">{{t $.Locale "enc.warn"}}</span></p></div><button type="button" class="history-button" data-console-action="settings" data-udid="{{$d.UDID}}" data-group="encryption"><span data-i18n="console.edit">{{t $.Locale "console.edit"}}</span></button></div><div class="console-setting-row"><div><h4><span data-i18n="console.setting.connection">{{t $.Locale "console.setting.connection"}}</span></h4><p id="connectionSummary-{{$d.UDID}}" class="history-note"><span data-i18n="console.pathHint">{{t $.Locale "console.pathHint"}}</span></p></div><button type="button" class="history-button" data-console-action="settings" data-udid="{{$d.UDID}}" data-group="connection"><span data-i18n="console.edit">{{t $.Locale "console.edit"}}</span></button></div></div><details class="console-advanced"><summary><span data-i18n="console.advanced">{{t $.Locale "console.advanced"}}</span></summary><div class="history-actions"><button id="backupAdvanced-{{$d.UDID}}" type="button" class="history-button" {{if or (eq $conn "offline") $backingUp}}disabled{{end}} onclick="IOSBKConsole.backup('{{$d.UDID}}')" data-i18n="console.advancedBackup" aria-haspopup="dialog">{{t $.Locale "console.advancedBackup"}}</button>{{if $.ExperimentalOperationsEnabled}}<button type="button" class="history-button" data-console-action="settings" data-udid="{{$d.UDID}}" data-group="restore"><span data-i18n="sec.danger">{{t $.Locale "sec.danger"}}</span></button>{{end}}<button type="button" class="history-button" data-console-action="settings" data-udid="{{$d.UDID}}" data-group="remove"><span data-i18n="sec.remove">{{t $.Locale "sec.remove"}}</span></button></div></details></div>
 <section id="setting-schedule-{{$d.UDID}}" data-settings-group="schedule" data-udid="{{$d.UDID}}" class="hidden console-layer-body console-settings-form"><p class="history-note" data-i18n="header.tz">{{t $.Locale "header.tz" "timezone" $.Timezone}}</p>
               <div style="display:flex;flex-wrap:wrap;gap:6px 18px;align-items:center">
                 <div style="width:170px;min-width:140px"><div style="font-size:13.5px;font-weight:600" data-i18n="bset.window">{{t $.Locale "bset.window"}}</div><div style="font-size:11.5px;color:#718090;margin-top:2px;line-height:1.4" data-i18n="bset.windowHint">{{t $.Locale "bset.windowHint"}}</div></div>
@@ -1179,13 +1186,17 @@ function renderBackupProgress(d){
   var mode=d.backup_state==='stopping'?'stopping':(d.backup_state==='stopped'?'stopped':backupProgressMode(progress)), copy=backupProgressCopy(mode,d);
   var terminal=['completed','failed','stopped','interrupted'].indexOf(mode)>=0;
   panel.classList.toggle('hidden',!running && (d.backing_up || !terminal)); setLiveAttribute(panel,'data-progress-mode',mode);
+  setLiveAttribute(panel,'data-progress-terminal',terminal?'true':null);
   var title=document.getElementById('bkprogress-title-'+u), subtitle=document.getElementById('bkprogress-subtitle-'+u), value=document.getElementById('bkprogress-value-'+u);
   var track=document.getElementById('bkprogress-track-'+u), fill=document.getElementById('bkprogress-fill-'+u);
   var overall=isBackupProgressNumber(progress.overall_percent) && progress.overall_percent<=100 ? progress.overall_percent : null;
-  var local=mode.indexOf('local-')===0?progress.local:null;
+  // 本地准备结束后仍保留该阶段实测值；手机会话开始时服务端已清空 local。
+  var local=(mode.indexOf('local-')===0||mode==='stopping'||(terminal&&mode!=='completed'))?progress.local:null;
   if(local){overall=null;if(local.totals_known && local.phase==='copying' && local.total_bytes>0)overall=Math.min(100,100*local.bytes/local.total_bytes);else if(local.totals_known&&local.phase==='verifying'&&local.total_files>0)overall=Math.min(100,100*local.scanned_files/local.total_files);}
-  var indeterminate=(mode==='preparing'||!!local) && overall===null;
-  setLiveText(title,tr(copy.title)); setLiveText(subtitle,tr(copy.subtitle)); setLiveText(value,overall===null?'':formatBackupPercent(overall));
+  var indeterminate=!terminal&&mode!=='stopping'&&(mode==='preparing'||!!local) && overall===null;
+  var subtitleKey=terminal&&mode!=='completed'?(local?'progress.endedLocalSubtitle':'progress.endedOverallSubtitle'):(local?'progress.localSubtitle':copy.subtitle);
+  setLiveText(title,tr(copy.title)); setLiveText(subtitle,tr(subtitleKey)); setLiveText(value,overall===null?'':formatBackupPercent(overall));
+  subtitle.classList.toggle('hidden',terminal&&overall===null);
   setLiveAttribute(track,'aria-label',tr(local?'progress.localAria':'progress.overallAria'));
   track.classList.toggle('empty',overall===null && !indeterminate);
   setLiveAttribute(track,'aria-hidden',overall===null && !indeterminate?'true':null);
@@ -1199,7 +1210,7 @@ function renderBackupProgress(d){
   var task=d.backup_job_id||'';
   if(panel.fileProgressTask!==task){panel.fileProgressTask=task;panel.hadFileProgress=false;}
   if(hasCurrentFile)panel.hadFileProgress=true;
-  var showFile=hasCurrentFile||(!local&&panel.hadFileProgress);
+  var showFile=!terminal&&(hasCurrentFile||(!local&&panel.hadFileProgress));
   current.classList.toggle('hidden',!showFile);
   setLiveText(currentValue,hasCurrentFile?formatBackupBytes(progress.current_bytes)+' / '+formatBackupBytes(progress.current_total_bytes)+(isBackupProgressNumber(progress.current_file_percent)?' · '+formatBackupPercent(progress.current_file_percent):''):(showFile?tr(terminal?'progress.fileFinished':'progress.fileWaiting'):''));
 
@@ -1209,7 +1220,8 @@ function renderBackupProgress(d){
   var activity=document.getElementById('bkprogress-activity-'+u);
   var lastActivity=progress.last_activity_at ? new Date(progress.last_activity_at) : null;
   var activityText=lastActivity && !isNaN(lastActivity.getTime()) ? tr('progress.lastActivity')+IOSBKI18n.formatDate(progress.last_activity_at) : tr('progress.noActivity');
-  setLiveText(activity,local?localPreparationSummary(local):activityText);
+  setLiveText(activity,local&&!terminal?localPreparationSummary(local):activityText);
+  activity.classList.toggle('hidden',terminal&&(!lastActivity||isNaN(lastActivity.getTime())));
   setLiveAttribute(statusIcon,'href','/static/ui-icons.svg#icon-'+copy.icon);
 }
 function rerenderBackupProgress(){ Object.keys(latestDeviceStatuses).forEach(function(udid){ renderBackupProgress(latestDeviceStatuses[udid]); }); }
@@ -1425,9 +1437,8 @@ function renderBackupControl(d){
     button.disabled=disabled;setLiveText(button,tr(key));
     setLiveAttribute(button,'style','gap:9px;padding:10px 17px;font-size:13.5px;font-weight:600;font-family:inherit;border:none;white-space:nowrap;min-width:132px;'+(disabled?'background:#F3F7FA;color:#ADB9C2;cursor:not-allowed;':(canStop?'background:#FFF0ED;color:#B83A36;cursor:pointer;':'background:#2C62C6;color:#fff;cursor:pointer;')));
   }
-  var advanced=document.getElementById('backupAdvanced-'+u),single=starting||busy;
-  if(advanced){advanced.classList.toggle('hidden',single);advanced.disabled=disabled;}
-  var split=document.getElementById('backupSplit-'+u);if(split)split.classList.toggle('single',single);
+  var advanced=document.getElementById('backupAdvanced-'+u);
+  if(advanced)advanced.disabled=starting||busy||running||unavailable||pending;
   var banner=document.getElementById('backupHold-'+u);
   if(banner)banner.classList.toggle('hidden',!d.auto_backup_hold);
   var message=document.getElementById('backupHoldMessage-'+u);
