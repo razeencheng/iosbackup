@@ -42,7 +42,7 @@ func (m *backupStorage) finishHistoryPointDeletion(ctx context.Context, udid str
 				return st, err
 			}
 			for _, p := range c.Points {
-				if p.State != "normal" || p.EpochID != st.EpochID || p.Generation != intent.Generation {
+				if p.State != "normal" || p.EpochID != st.EpochID || !sameBackupGeneration(p.Generation, intent.Generation) {
 					continue
 				}
 				if selected.ID != "" && (p.CommittedAt.Before(selected.CommittedAt) || p.CommittedAt.Equal(selected.CommittedAt) && p.ID <= selected.ID) {

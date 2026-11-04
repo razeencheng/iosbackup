@@ -44,7 +44,7 @@ func NewID() (string, error) {
 func ValidID(id string) bool { return idPattern.MatchString(id) }
 
 type Generation struct {
-	// 仅在本应用成功备份后记录来源密钥包摘要，不代表密码已经验证。
+	// 来源原始密钥包摘要；同一保留代的各点可不同，不代表密码已经验证。
 	KeybagDigest       string    `json:"keybag_digest,omitempty"`
 	ID                 string    `json:"id"`
 	Kind               string    `json:"kind"` // unknown | encrypted | unencrypted

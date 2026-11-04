@@ -13,6 +13,7 @@ import (
 var errBackupCheckMetadataMissing = errors.New("required backup metadata missing")
 
 var backupCheckDigestPattern = regexp.MustCompile(`^[0-9a-f]{64}$`)
+var backupCheckSourceRefPattern = regexp.MustCompile(`^(point|work):[0-9a-f]{32}$`)
 
 const (
 	backupQuickCheckTimeout    = 30 * time.Second
@@ -31,6 +32,7 @@ type backupCheckResult struct {
 	SourceKey          string             `json:"source_key,omitempty"`
 	SourceIdentity     string             `json:"source_identity,omitempty"`
 	SourceFingerprint  string             `json:"source_fingerprint,omitempty"`
+	SourceRef          string             `json:"source_ref,omitempty"`
 	Freshness          string             `json:"freshness"`
 	MetadataComplete   bool               `json:"metadata_complete"`
 	ManifestComplete   bool               `json:"manifest_complete"`
@@ -253,6 +255,9 @@ func checkBackupObject(root *os.Root, id string) error {
 }
 
 func validBackupCheckResult(result backupCheckResult) bool {
+	if result.SourceRef != "" && !backupCheckSourceRefPattern.MatchString(result.SourceRef) {
+		return false
+	}
 	if previous := result.LastCompleted; previous != nil {
 		if previous.LastCompleted != nil || previous.State != "passed" && previous.State != "issues" || !validBackupCheckResult(*previous) {
 			return false

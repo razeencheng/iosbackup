@@ -18,6 +18,8 @@ Each new backup uses an independent work copy. Storage that passes the fast-clon
 
 **Pin** keeps an important point out of automatic cleanup. Unpinning makes it subject to its other retention rules; it is not an immediate deletion. Pins, the latest normal baseline, older encryption versions, manually retained points and active reads can keep more points than the configured backup count. The `?` controls explain these terms with mouse, keyboard or touch.
 
+Reordering entries in an encrypted keybag does not create a new retention generation. When a full backup creates a different keybag, the app tries the saved historical password locally against both keybags before continuing the same generation's count policy. Without a password, with an unsupported format, or when this cannot be verified, backups can still run but older generations stay protected and may exceed the count. An upgrade does not merge or collect existing older generations. This verification does not decrypt backup files or enable encrypted-manifest checks.
+
 Turning history off stops new points and automatic cleanup. Existing points become manually retained, while later ordinary backups use a separate writable current set. The Backups tab displays that current set separately and retains its check and file-list actions. Turning history back on only manages new points automatically.
 
 ## Inspect, check and delete a point

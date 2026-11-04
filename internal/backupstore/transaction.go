@@ -266,7 +266,7 @@ func (s *Store) publish(tx transaction) error {
 	if err := s.stage("catalog", func() error { return s.writeJSON("catalog.json", next) }); err != nil {
 		return err
 	}
-	s.catalog = next
+	s.setCatalog(next)
 	return s.stage("cleanup", func() error {
 		if err := s.root.Remove(filepath.Join("transactions", tx.ID+".json")); err != nil && !errors.Is(err, os.ErrNotExist) {
 			return err

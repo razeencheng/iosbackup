@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -27,6 +28,7 @@ type Store struct {
 	lock      *os.File
 	identity  Identity
 	catalog   Catalog
+	view      atomic.Pointer[Catalog]
 	uncertain bool
 	closed    bool
 	leases    map[string]int
@@ -98,6 +100,7 @@ func Create(path, udid, id string, now time.Time) (*Store, error) {
 		return nil, closeErr
 	}
 	ok = true
+	s.setCatalog(catalog)
 	return s, nil
 }
 func Open(path, udid, id string) (*Store, error) {
@@ -162,6 +165,7 @@ func (s *Store) Close() error {
 		return ErrBusy
 	}
 	s.closed = true
+	s.view.Store(nil)
 	var err error
 	if s.lock != nil {
 		err = errors.Join(syscall.Flock(int(s.lock.Fd()), syscall.LOCK_UN), s.lock.Close())
@@ -210,6 +214,26 @@ func (s *Store) Snapshot() (Catalog, error) {
 	return s.snapshotUnsafe(), nil
 }
 
+// CachedPoint 仅供显示已发布证据，不等待封存/回收锁、不探测磁盘。
+// 返回值不证明挂载可用，真实读写仍须使用租约或 ReadSnapshot。
+func (s *Store) CachedPoint(id string) (Point, bool) {
+	c := s.view.Load()
+	if c == nil {
+		return Point{}, false
+	}
+	p, ok := c.Points[id]
+	return p, ok
+}
+
+// 调用方持有 mu（或对象尚未发布）。发布后目录副本不再修改。
+func (s *Store) setCatalog(c Catalog) {
+	s.catalog = c
+	view := c
+	view.Points = maps.Clone(c.Points)
+	view.Baselines = nil
+	s.view.Store(&view)
+}
+
 // ReadSnapshot 在同一锁内验证存储可读取及挂载身份，再返回目录副本。
 // Snapshot 继续允许恢复流程观察缓存；对外读取不能据此推断存储在线。
 func (s *Store) ReadSnapshot() (Catalog, error) {
@@ -235,7 +259,7 @@ func (s *Store) loadCatalog() error {
 	if err := c.Validate(s.identity); err != nil {
 		return err
 	}
-	s.catalog = c
+	s.setCatalog(c)
 	return nil
 }
 func (s *Store) readJSON(name string, value any) error {

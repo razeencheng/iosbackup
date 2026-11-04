@@ -255,7 +255,35 @@ func (s *generationStore) cancelUnstarted(udid, id string) error {
 // 加密导入和旧记录没有成功备份的密钥包证据，首次仍请求全量。
 func (s backupGenerations) compatibleBaseline(p backupstore.Point, metadataKnown bool) bool {
 	g, ok := s.Generations[s.Current]
-	return s.Recovered && metadataKnown && ok && s.Pending == nil && g.Kind != "unknown" && p.State == "normal" && p.Generation == g && (g.Kind != "encrypted" || g.KeybagDigest != "")
+	return s.Recovered && metadataKnown && ok && s.Pending == nil && g.Kind != "unknown" && p.State == "normal" && sameBackupGeneration(p.Generation, g) && (g.Kind != "encrypted" || p.Generation.KeybagDigest != "")
+}
+
+// ID/凭据属于保留代，密钥包摘要属于各备份来源；旧点保留自己的摘要。
+func sameBackupGeneration(a, b backupstore.Generation) bool {
+	a.KeybagDigest, b.KeybagDigest = "", ""
+	return a == b
+}
+
+// 调用方已经在锁外核实两份来源等价。提交时再次核对完整前代快照，
+// 避免验证期间发生改密或未可靠保存的变化被错误地视为同一代。
+func (s *generationStore) continueHistoryGeneration(udid string, previous backupstore.Generation, keybag string) (backupstore.Generation, bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	state, err := s.loadLocked(udid)
+	if err != nil {
+		return backupstore.Generation{}, false, err
+	}
+	if !state.Recovered || state.Pending != nil || state.Current != previous.ID || state.Generations[state.Current] != previous || previous.Kind != "encrypted" || previous.KeybagDigest == "" || keybag == "" {
+		return backupstore.Generation{}, false, nil
+	}
+	next := previous
+	next.KeybagDigest = keybag
+	if err := next.Validate(); err != nil {
+		return backupstore.Generation{}, false, err
+	}
+	state.Generations[next.ID] = next
+	err = s.save(state)
+	return next, err == nil, err
 }
 
 // 只由成功备份且轻量检查通过的结果调用。摘要识别备份中的加密材料，

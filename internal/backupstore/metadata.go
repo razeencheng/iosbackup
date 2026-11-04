@@ -109,7 +109,7 @@ func (s *Store) finishMetadata(tx transaction) error {
 		if err := s.stage("metadata-catalog", func() error { return s.writeJSON("catalog.json", c) }); err != nil {
 			return err
 		}
-		s.catalog = c
+		s.setCatalog(c)
 	}
 	if err := s.stage("metadata-cleanup", func() error { return s.root.Remove(filepath.Join("transactions", tx.ID+".json")) }); err != nil && !errors.Is(err, os.ErrNotExist) {
 		return err

@@ -116,7 +116,7 @@ func (s *Store) finishRecycle(ctx context.Context, tx transaction) error {
 		if err := s.stage("recycle-catalog", func() error { return s.writeJSON("catalog.json", next) }); err != nil {
 			return err
 		}
-		s.catalog = next
+		s.setCatalog(next)
 	}
 	// 删除意图和目录更新已经持久化；新读者无法再获取此点。
 	// 调用者一直持有 opMu，因此其他事务、恢复与 Close 不能介入。

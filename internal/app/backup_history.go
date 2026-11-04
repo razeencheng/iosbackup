@@ -341,7 +341,7 @@ func (app *application) prepareBackupHistory(job *backupJob, root string) (*back
 			return nil, err
 		}
 		point, ok := catalog.Points[st.LatestPoint]
-		if ok && point.Generation == gen && point.State == "normal" && gen.Kind != "unknown" {
+		if ok && sameBackupGeneration(point.Generation, gen) && point.State == "normal" && gen.Kind != "unknown" {
 			state, err := app.generationRegistry().load(job.udid)
 			if err != nil {
 				return nil, err
@@ -365,6 +365,9 @@ func (app *application) historyBaselineMetadata(ctx context.Context, store *back
 }
 
 func historyBaselineMetadata(ctx context.Context, store *backupstore.Store, p backupstore.Point, g backupstore.Generation) bool {
+	if !sameBackupGeneration(p.Generation, g) {
+		return false
+	}
 	lease, err := store.Acquire(p.ID)
 	if err != nil {
 		return false
@@ -379,7 +382,7 @@ func historyBaselineMetadata(ctx context.Context, store *backupstore.Store, p ba
 		return false
 	}
 	if encrypted {
-		return g.KeybagDigest != "" && historyKeybagDigest(metadata) == g.KeybagDigest
+		return p.Generation.KeybagDigest != "" && historyKeybagDigest(metadata) == p.Generation.KeybagDigest
 	}
 	return true
 }
@@ -656,7 +659,74 @@ func (app *application) generationForHistoryResult(ctx context.Context, udid, di
 	if encrypted {
 		kind = "encrypted"
 	}
-	return app.generationRegistry().historyBackupGeneration(udid, kind, historyKeybagDigest(manifest))
+	digest := historyKeybagDigest(manifest)
+	if encrypted && digest != "" && digest != fallback.KeybagDigest && app.sameHistoryEncryption(ctx, udid, manifest, fallback) {
+		gen, continued, err := app.generationRegistry().continueHistoryGeneration(udid, fallback, digest)
+		if err != nil {
+			return fallback, err
+		}
+		if continued {
+			return gen, nil
+		}
+	}
+	return app.generationRegistry().historyBackupGeneration(udid, kind, digest)
+}
+
+// 原始摘要继续保护每点来源，规范化身份只消除条目排序差异。
+// 全量重建密钥包时，必须用同一历史密码分别验证前后来源，不能仅凭保存的密码猜测。
+func (app *application) sameHistoryEncryption(ctx context.Context, udid string, manifest map[string]any, previous backupstore.Generation) bool {
+	if previous.Kind != "encrypted" || previous.KeybagDigest == "" {
+		return false
+	}
+	newData, ok := manifest["BackupKeyBag"].([]byte)
+	if !ok {
+		return false
+	}
+	newBag, ok := parseBackupKeybag(newData)
+	if !ok {
+		return false
+	}
+	st, err := app.backupStorage.deviceState(udid)
+	if err != nil || st.Phase != "active" || st.CurrentDeleted || st.LatestPoint == "" {
+		return false
+	}
+	store, err := app.backupStorage.store(st.LatestStore)
+	if err != nil {
+		return false
+	}
+	catalog, err := store.Snapshot()
+	if err != nil {
+		return false
+	}
+	point, ok := catalog.Points[st.LatestPoint]
+	if !ok || point.State != "normal" || !sameBackupGeneration(point.Generation, previous) {
+		return false
+	}
+	lease, err := store.Acquire(point.ID)
+	if err != nil {
+		return false
+	}
+	defer lease.Close()
+	oldManifest, err := readBackupCheckPlist(ctx, lease.Root, "Manifest.plist", nil)
+	if err != nil || oldManifest["IsEncrypted"] != true || historyKeybagDigest(oldManifest) != point.Generation.KeybagDigest {
+		return false
+	}
+	oldData, ok := oldManifest["BackupKeyBag"].([]byte)
+	if !ok {
+		return false
+	}
+	oldBag, ok := parseBackupKeybag(oldData)
+	if !ok {
+		return false
+	}
+	if oldBag.identity() == newBag.identity() {
+		return ctx.Err() == nil
+	}
+	password, err := app.generationRegistry().password(udid, previous.CredentialRef)
+	if err != nil || password == "" {
+		return false
+	}
+	return backupKeybagPasswordMatches(ctx, oldData, password) && backupKeybagPasswordMatches(ctx, newData, password)
 }
 
 func historyKeybagDigest(manifest map[string]any) string {
@@ -742,6 +812,7 @@ func (app *application) finishBackupHistory(job *backupJob, run *backupHistoryRu
 	// The immutable point replaces the work source identity in the check result.
 	src, sourceErr := resolveBackupIndexSourceAt(ctx, job.udid, filepath.Join(filepath.Dir(filepath.Dir(run.work.Parent)), "objects", saved.ID))
 	if sourceErr == nil {
+		check.SourceRef = "point:" + saved.ID
 		check.SourceKey = indexDigest(filepath.Clean(run.state.Root) + "\x00" + job.udid)
 		check.SourceIdentity = src.Identity
 		check.SourceFingerprint = src.Fingerprint
@@ -974,6 +1045,11 @@ func (app *application) bindCurrentHistoryCheck(udid, actualRoot string, result 
 		if err == nil {
 			result.SourceKey = indexDigest(filepath.Clean(absolute) + "\x00" + udid)
 		}
+		app.mu.RLock()
+		if source := app.currentCheckSourceUnsafe(udid); source.managed {
+			result.SourceRef = source.ref
+		}
+		app.mu.RUnlock()
 	}
 }
 

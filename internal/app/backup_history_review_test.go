@@ -80,7 +80,7 @@ func TestHistoricalReviewDoesNotReplaceCurrentCheck(t *testing.T) {
 	delete(a.backupCheckResults, p.UDID)
 	current := a.backupCheckSnapshotUnsafe(p.UDID)
 	a.mu.Unlock()
-	if current != nil {
-		t.Fatal("history review presented as current backup check")
+	if current == nil || current.ID == seed.ID || current.Kind != p.Check.Scope || !current.CompletedAt.Equal(p.Check.CheckedAt) || current.Freshness != "unknown" {
+		t.Fatal("expected the point's original evidence, not the independent review", current)
 	}
 }

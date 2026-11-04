@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"iosbackup/internal/backupstore"
 	"iosbackup/internal/i18n"
 )
 
@@ -41,6 +42,7 @@ func (app *application) startBackupCheck(udid string) (string, error) {
 	ctx, cancel := context.WithTimeout(app.rootCtx, backupManifestCheckTimeout)
 	run := &backupCheckRun{id: newBackupSessionID(), cancel: cancel, done: make(chan struct{})}
 	result := backupCheckResult{ID: run.id, Kind: "manifest", State: "running", Freshness: "unknown", StartedAt: app.nowTime()}
+	app.bindCurrentHistoryCheck(udid, filepath.Dir(backupPath), &result)
 	manager.mu.Lock()
 	if manager.closed {
 		manager.mu.Unlock()
@@ -252,21 +254,141 @@ func (s *backupJobStore) staleChecks(udid string) {
 }
 
 func (app *application) backupCheckSnapshotUnsafe(udid string) *backupCheckResult {
-	if value, ok := app.backupCheckResults[udid]; ok {
-		copy := value
-		app.markCheckSourceUnsafe(udid, &copy)
-		return app.attachCompletedCheckUnsafe(udid, &copy)
-	}
+	source := app.currentCheckSourceUnsafe(udid)
+	var jobs []backupJobSummary
 	if app.backupJobRecords != nil {
-		for _, job := range app.backupJobRecords.list(udid) {
-			if job.Check != nil && job.PointID == "" {
-				copy := *job.Check
+		jobs = app.backupJobRecords.list(udid)
+	}
+	source.bindLegacyEvidence(jobs)
+	if value, ok := app.backupCheckResults[udid]; ok {
+		active := app.backupChecks[udid] != nil && app.backupChecks[udid].id == value.ID
+		ref := source.checkRef(value.SourceRef, &value)
+		if active || source.matches(ref) {
+			copy := value
+			if copy.SourceRef == "" && ref != "" {
 				copy.Freshness = "unknown"
-				return app.attachCompletedCheckUnsafe(udid, &copy)
 			}
+			copy.SourceRef = ref
+			app.markCheckSourceUnsafe(udid, &copy)
+			return app.attachCompletedCheckUnsafe(udid, &copy)
 		}
 	}
-	return nil
+	for _, job := range jobs {
+		if job.Check != nil && !(job.Operation == "check" && job.PointID != "") && source.matches(source.checkRef(backupJobCheckSourceRef(job), job.Check)) {
+			copy := *job.Check
+			copy.SourceRef = source.checkRef(backupJobCheckSourceRef(job), job.Check)
+			copy.Freshness = "unknown"
+			app.markCheckSourceUnsafe(udid, &copy)
+			return app.attachCompletedCheckUnsafe(udid, &copy)
+		}
+	}
+	return source.pointResult()
+}
+
+type currentBackupCheckSource struct {
+	managed        bool
+	ref            string
+	point          backupstore.Point
+	legacyEvidence *backupCheckResult
+}
+
+// 旧当前点手动检查没有 SourceRef，需要生成任务提供来源身份。
+// 内容变化不能抹去同一来源的异常；通过结果仍要求完整指纹一致。
+func (s *currentBackupCheckSource) bindLegacyEvidence(jobs []backupJobSummary) {
+	if s.point.ID == "" {
+		return
+	}
+	for _, job := range jobs {
+		if job.ID == s.point.JobID && job.PointID == s.point.ID && job.Operation != "check" && job.Check != nil {
+			s.legacyEvidence = job.Check
+			return
+		}
+	}
+}
+
+func (s currentBackupCheckSource) checkRef(ref string, check *backupCheckResult) string {
+	if ref != "" || check == nil || s.legacyEvidence == nil {
+		return ref
+	}
+	old := s.legacyEvidence
+	if old.SourceKey == "" || old.SourceIdentity == "" || old.SourceKey != check.SourceKey || old.SourceIdentity != check.SourceIdentity {
+		return ""
+	}
+	if old.SourceFingerprint != "" && old.SourceFingerprint == check.SourceFingerprint || check.State == "issues" || check.State == "unavailable" {
+		return s.ref
+	}
+	return ""
+}
+
+func (s currentBackupCheckSource) matches(ref string) bool {
+	if s.managed {
+		return s.ref != "" && ref == s.ref
+	}
+	return ref == ""
+}
+
+func backupJobCheckSourceRef(job backupJobSummary) string {
+	if job.Check.SourceRef != "" {
+		return job.Check.SourceRef
+	}
+	// 兼容已有记录：备份任务已持久化点 ID，独立历史检查仍由调用方排除。
+	if job.PointID != "" {
+		return "point:" + job.PointID
+	}
+	return ""
+}
+
+// 只读内存中的当前引用与目录快照，不在状态广播锁内访问磁盘。
+// 缓存不能证明存储在线，因此重启后仍显示 unknown 新鲜度。
+func (app *application) currentCheckSourceUnsafe(udid string) currentBackupCheckSource {
+	m := app.backupStorage
+	if m == nil {
+		return currentBackupCheckSource{}
+	}
+	st, err := m.deviceState(udid)
+	if err != nil {
+		return currentBackupCheckSource{managed: true}
+	}
+	root := app.paths.BackupsRoot
+	if cfg := app.configs[udid]; cfg != nil && cfg.BackupDirectory != "" {
+		root = cfg.BackupDirectory
+	}
+	if st.EpochID == "" || filepath.Clean(root) != st.Root {
+		return currentBackupCheckSource{}
+	}
+	source := currentBackupCheckSource{managed: true}
+	if st.CurrentDeleted {
+		return source
+	}
+	if st.Phase == "disabled" && st.WritableID != "" {
+		source.ref = "work:" + st.WritableID
+		return source
+	}
+	if st.Phase != "active" || st.LatestPoint == "" {
+		return source
+	}
+	store, err := m.store(st.LatestStore)
+	if err != nil {
+		return source
+	}
+	p, ok := store.CachedPoint(st.LatestPoint)
+	if !ok || p.State != "normal" {
+		return source
+	}
+	source.ref, source.point = "point:"+p.ID, p
+	return source
+}
+
+func (s currentBackupCheckSource) pointResult() *backupCheckResult {
+	if s.point.ID == "" {
+		return nil
+	}
+	p, c := s.point, s.point.Check
+	id := ""
+	if backupJobIDPattern.MatchString(p.JobID) {
+		id = p.JobID
+	}
+	return &backupCheckResult{ID: id, Kind: c.Scope, State: c.State, Reason: c.Reason, StartedAt: c.CheckedAt, CompletedAt: c.CheckedAt, SourceRef: s.ref, Freshness: "unknown", MetadataComplete: c.MetadataComplete, ManifestComplete: c.ManifestComplete, RecordsChecked: c.RecordsChecked, ObjectsChecked: c.ObjectsChecked, MissingObjects: c.MissingObjects, InvalidRecords: c.InvalidRecords, UnsupportedRecords: c.UnsupportedRecords}
 }
 
 func (app *application) backupTaskDeviceNameUnsafe(udid string) string {
@@ -301,7 +423,10 @@ func (app *application) attachCompletedCheckUnsafe(udid string, result *backupCh
 	if result.State == "passed" || result.State == "issues" || app.backupJobRecords == nil {
 		return result
 	}
-	for _, job := range app.backupJobRecords.list(udid) {
+	jobs := app.backupJobRecords.list(udid)
+	source := app.currentCheckSourceUnsafe(udid)
+	source.bindLegacyEvidence(jobs)
+	for _, job := range jobs {
 		previous := job.Check
 		if previous == nil || previous.ID == result.ID || previous.State != "passed" && previous.State != "issues" || previous.SourceKey != result.SourceKey {
 			continue
@@ -310,8 +435,16 @@ func (app *application) attachCompletedCheckUnsafe(udid string, result *backupCh
 		if job.Operation == "check" && job.PointID != "" {
 			continue
 		}
+		ref := source.checkRef(backupJobCheckSourceRef(job), previous)
+		if ref != result.SourceRef {
+			continue
+		}
 		copy := *previous
+		copy.SourceRef = ref
 		copy.LastCompleted = nil
+		if result.Freshness == "unknown" && copy.Freshness == "current" {
+			copy.Freshness = "unknown"
+		}
 		if result.SourceIdentity == "" || result.SourceFingerprint == "" {
 			copy.Freshness = "unknown"
 		} else if copy.SourceIdentity != result.SourceIdentity || copy.SourceFingerprint != result.SourceFingerprint {
@@ -320,6 +453,12 @@ func (app *application) attachCompletedCheckUnsafe(udid string, result *backupCh
 		app.markCheckSourceUnsafe(udid, &copy)
 		result.LastCompleted = &copy
 		break
+	}
+	if result.LastCompleted == nil {
+		previous := app.currentCheckSourceUnsafe(udid).pointResult()
+		if previous != nil && previous.SourceRef == result.SourceRef && previous.ID != result.ID {
+			result.LastCompleted = previous
+		}
 	}
 	return result
 }
