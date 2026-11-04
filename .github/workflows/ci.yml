@@ -58,6 +58,7 @@ jobs:
       - name: Backup task timeline checks
         run: |
           node internal/app/testdata/backup-jobs.test.js
+          node --test internal/app/testdata/backup-jobs-persistence.test.js
           node internal/app/testdata/backup-progress.test.js
           node internal/app/testdata/backup-control-ui.test.js
       - name: Backup check UI behavior

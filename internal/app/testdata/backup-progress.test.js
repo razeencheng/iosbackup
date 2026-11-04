@@ -31,6 +31,8 @@ app.api.setLocale('zh-CN');
 assert.equal(ui.get('bkprogress-status-title-A').textContent,catalogs['zh-CN']['progress.runningTitle']);
 assert.ok(!writes.some(w=>w.value===catalogs['zh-CN']['progress.preparingTitle']),'language switch must not flash the initial preparing copy');
 render({...receiving,phase:'waiting_device'});
+assert.equal(ui.get('bkprogress-value-A').textContent,'3%','device waits keep the reported overall percentage');
+assert.equal(ui.get('bkprogress-track-A').classList.contains('empty'),false,'device waits keep the measured progress bar');
 assert.equal(ui.get('bkprogress-current-A').classList.contains('hidden'),false,'short protocol waits must keep the file row in the layout');
 assert.doesNotMatch(ui.get('bkprogress-current-value-A').textContent,/5 B/,'waiting must not present stale file bytes as active transfer');
 render({...receiving,phase:'receiving',current_bytes:null,current_total_bytes:null});
@@ -41,6 +43,9 @@ for(const phase of ['preparing','waiting_authorization','waiting_device']) {
  render({state:'running',phase},{backup_job_id:'job-'+phase});
  assert.equal(ui.get('bkprogress-value-A').textContent,'','unknown progress must not show a dash or a made-up percent');
  assert.equal(ui.get('bkprogress-track-A').getAttribute('aria-valuenow'),null);
+ assert.equal(ui.get('bkprogress-track-A').classList.contains('empty'),false,'active waiting must retain a visible track even before the first percentage');
+ assert.equal(ui.get('bkprogress-track-A').getAttribute('aria-hidden'),null);
+ if(phase==='waiting_device')assert.equal(ui.get('bkprogress-track-A').classList.contains('indeterminate'),true,'waiting for the first measurement uses an indeterminate track');
  if(phase==='waiting_authorization')assert.equal(ui.get('bkprogress-track-A').classList.contains('indeterminate'),false);
 }
 for(const percent of [0,3]) {

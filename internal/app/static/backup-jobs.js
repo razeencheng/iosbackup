@@ -114,7 +114,8 @@
     if(view.missing)warnings.push(tr('console.jobMissing'));
     if(view.status!=='available')warnings.push(tr('jobs.recordsUnavailable'));
     if(view.job&&view.job.persistence==='error')warnings.push(tr('jobs.saveError'));
-    if(view.job&&view.job.persistence==='pending')warnings.push(tr('jobs.saving'));
+    // 运行中的日志持续异步保存；只提示最终结果尚未落盘，避免正常写入反复闪烁。
+    if(view.job&&view.job.persistence==='pending'&&view.job.completed_at&&!String(view.job.completed_at).startsWith('0001-'))warnings.push(tr('jobs.saving'));
     if(view.truncated)warnings.push(tr('jobs.truncated',{count:view.job&&view.job.dropped||0}));
     text('jobWarning-'+u,warnings.join(' '));show('jobWarning-'+u,!!warnings.length);text('jobDetailWarning-'+u,warnings.join(' '));show('jobDetailWarning-'+u,!!warnings.length);
     if(!view.job){var exportLink=document.getElementById('jobExport-'+u);if(exportLink)exportLink.removeAttribute('href');text('jobResult-'+u,tr(view.missing?'console.jobMissing':'history.loading'));['jobDevice-','jobMode-','jobSource-','jobActivity-','jobCheck-','jobEvents-','jobOutcomes-'].forEach(function(prefix){text(prefix+u,'');});var related=document.getElementById('jobPoint-'+u);if(related)related.replaceChildren();return;}

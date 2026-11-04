@@ -36,8 +36,8 @@
   .backup-progress-panel{padding:0 20px 18px;background:#FBFCFD;border-top:1px solid #E7EDF2}
   .backup-progress-heading{display:flex;align-items:flex-end;justify-content:space-between;gap:14px;padding-top:17px}
   .backup-progress-heading-copy{min-width:0}
-  .backup-progress-heading-copy strong{display:block;min-height:2.8em;font-size:13.5px;line-height:1.4;color:#213041}
-  .backup-progress-heading-copy span{display:block;min-height:3em;margin-top:3px;color:#718090;font-size:11.5px;line-height:1.5}
+  .backup-progress-heading-copy strong{display:block;font-size:13.5px;line-height:1.4;color:#213041}
+  .backup-progress-heading-copy span{display:block;margin-top:3px;color:#718090;font-size:11.5px;line-height:1.5}
   .backup-progress-value{flex:none;min-width:5ch;text-align:right;color:#2C62C6;font-size:20px;font-weight:750;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
   .backup-overall-track{height:8px;margin-top:12px;border-radius:var(--iosbk-radius);background:#E4EBF2;overflow:hidden;position:relative}
   .backup-overall-track.empty{visibility:hidden}
@@ -59,8 +59,6 @@
   .backup-status-message.warning{border-color:#F0DBB6;background:#FBF1E2;color:#835623}.backup-status-message.warning .ui-icon{color:#B45309}.backup-status-message.warning strong{color:#714514}
   .backup-status-message.success{border-color:#B9E2DA;background:#F1FAF7;color:#52715F}.backup-status-message.success .ui-icon,.backup-status-message.success strong{color:#2E7D5B}
   .backup-status-message.error{border-color:#F1C9C5;background:#FFF7F6;color:#89514D}.backup-status-message.error .ui-icon,.backup-status-message.error strong{color:#9F231C}
-  .backup-progress-panel[data-progress-terminal="true"] .backup-progress-heading-copy strong,
-  .backup-progress-panel[data-progress-terminal="true"] .backup-progress-heading-copy span{min-height:0}
   .backup-progress-panel[data-progress-terminal="true"] .backup-status-measure,
   .backup-progress-panel[data-progress-terminal="true"] .backup-status-copy strong,
   .backup-progress-panel[data-progress-terminal="true"] .backup-status-copy [data-i18n="progress.separator"],
@@ -1199,16 +1197,17 @@ function renderBackupProgress(d){
   var local=(mode.indexOf('local-')===0||mode==='stopping'||(terminal&&mode!=='completed'))?progress.local:null;
   if(local){overall=null;if(local.totals_known && local.phase==='copying' && local.total_bytes>0)overall=Math.min(100,100*local.bytes/local.total_bytes);else if(local.totals_known&&local.phase==='verifying'&&local.total_files>0)overall=Math.min(100,100*local.scanned_files/local.total_files);}
   if(mode==='stopped'&&d.auto_backup_hold&&overall===null)panel.classList.add('hidden');
-  var indeterminate=!terminal&&mode!=='stopping'&&(mode==='preparing'||!!local) && overall===null;
+  var indeterminate=!terminal&&mode!=='stopping'&&mode!=='waiting-authorization'&&mode!=='reconnecting'&&overall===null;
   var subtitleKey=terminal&&mode!=='completed'?(local?'progress.endedLocalSubtitle':'progress.endedOverallSubtitle'):(local?'progress.localSubtitle':copy.subtitle);
   setLiveText(title,tr(copy.title)); setLiveText(subtitle,tr(subtitleKey)); setLiveText(value,overall===null?'':formatBackupPercent(overall));
   subtitle.classList.toggle('hidden',terminal&&overall===null);
   setLiveAttribute(track,'aria-label',tr(local?'progress.localAria':'progress.overallAria'));
-  track.classList.toggle('empty',overall===null && !indeterminate);
-  setLiveAttribute(track,'aria-hidden',overall===null && !indeterminate?'true':null);
+  var hideTrack=terminal&&overall===null;
+  track.classList.toggle('empty',hideTrack);
+  setLiveAttribute(track,'aria-hidden',hideTrack?'true':null);
   track.classList.toggle('indeterminate',indeterminate);
   setLiveAttribute(track,'aria-valuenow',overall===null?null:String(overall));
-  var width=overall===null?'':overall+'%';if(fill.style.width!==width)fill.style.width=width;
+  var width=overall===null?(indeterminate?'':'0%'):overall+'%';if(fill.style.width!==width)fill.style.width=width;
 
   var current=document.getElementById('bkprogress-current-'+u), currentValue=document.getElementById('bkprogress-current-value-'+u);
   var hasCurrentFile=(mode==='transferring'||mode==='reconnecting') && isBackupProgressNumber(progress.current_bytes) && isBackupProgressNumber(progress.current_total_bytes) && progress.current_total_bytes>0;
