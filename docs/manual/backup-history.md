@@ -2,7 +2,7 @@
 
 [简体中文](backup-history.zh-CN.md) · [Restore overview](restore.md)
 
-Each device card has three tabs: **Backup list / Task records / Device settings**. Expanding a card shows saved backup dates directly. History retention is edited separately under Device settings and is disabled by default for each device.
+Each device card has three tabs: **Backup list / Task records / Device settings**. All cards start collapsed on your first visit. This browser remembers the expanded device and each device's selected tab, including an all-collapsed state, and restores them after a refresh. Without valid saved state, cards remain collapsed; new devices default to Backup list. History retention is edited separately under Device settings and is disabled by default for each device.
 
 The card's **Back up now** button uses automatic mode and becomes **Stop backup** while a task is running. To request a complete backup again, open **Device settings → Advanced actions → Force full backup** and confirm after reading the explanation. This affects only that manual backup, not the automatic schedule or retention policy. After a task stops or fails, any measured progress remains static and identifies its scope; a stop without progress data is summarized in the pause notice.
 

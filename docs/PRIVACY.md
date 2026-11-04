@@ -8,6 +8,8 @@ The project has no telemetry and does not automatically upload data to the maint
 
 Device identifiers/names, battery state, pairing records, backup contents, and application logs stay on the deployment host unless the administrator exports or sends them. The maintainer does not receive this data automatically.
 
+The administrator's browser stores language preferences and console navigation in local storage for this site. Navigation contains device identifiers, the expanded device and selected tabs; it does not contain passwords, backup contents or unsaved settings. Clearing this site's browser data resets these preferences. They are not sent to the maintainer.
+
 Notification configuration GET responses expose only configured status, not stored secret values. Notification secrets and stored backup passwords are encrypted in `/configs/secrets.enc` with the instance master key, automatically stored in `/configs/secret_key` by default or explicitly supplied through `IOSBK_SECRET_KEY` / `IOSBK_SECRET_KEY_FILE`; losing/changing that key makes them unreadable. Default key and ciphertext share a directory, so encryption does not protect against disclosure of the entire configuration directory. It does not replace host, volume, or backup access controls.
 
 The administrator is responsible for protecting `/backups`, `/configs`, `/var/lib/lockdown`, Compose configuration files in use, `admin_password`, `secret_key`, and external credentials; applying suitable retention/deletion rules; and complying with local law. Removing the container does not remove persistent data. The newly generated administrator password appears once in first-start logs; protect those logs. The master key is never logged.
@@ -19,3 +21,5 @@ iOS Backup 由一位管理员管理，在自己的主机上运行，Web UI、静
 项目没有遥测，也不会自动向维护者上传数据。只有管理员自行配置的 Telegram、SMTP、企业微信、Bark 或 Webhook 通知功能会按设计连接互联网第三方服务；测试通知也会真实发送。启用 Wi-Fi 功能时，netmuxd 仍会在局域网内发现设备（包括 mDNS）并连接可达的 iOS 设备；这类本地设备通信不是遥测，也不会上传给维护者。设备标识/名称、电量、配对记录、备份和日志默认留在主机上。
 
 保存的备份密码和通知秘密使用实例主密钥加密在 `/configs/secrets.enc`；默认密钥自动保存在 `/configs/secret_key`，也可由高级环境值或文件提供。密钥与密文默认同目录，不能防御整个配置目录泄露。管理员负责保护 `/backups`、整个 `/configs`、`/var/lib/lockdown`、所有使用的 Compose 配置文件和外部凭据，并制定符合所在地规则的保留/删除策略。首次生成的管理员密码会在初始化日志中显示一次，请保护该日志；主密钥永不写入日志。删除容器不会删除持久化数据。
+
+管理员的浏览器会在本站本地存储中保存语言偏好和控制台导航状态。导航状态包含设备标识、展开的设备和所选页签，不包含密码、备份内容或未提交的设置；清除本站浏览器数据会重置这些偏好。这些数据不会发送给维护者。

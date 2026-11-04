@@ -762,6 +762,7 @@ function toggleCard(udid){
   setSVGIcon(document.getElementById('chev-'+udid), willOpen ? 'chevron-up' : 'chevron-down');
   if(willOpen) { expandedCards.add(udid); var active=document.querySelector('.snav.active[data-udid="'+udid+'"]');switchSection(udid,active?active.dataset.sec:'backups'); }
   backupBrowser.visibilityChanged();
+  IOSBKConsole.rememberPage();
   if(!willOpen) maybeReload(); // 收起后若有挂起的设备增减刷新，此刻执行
 }
 function switchSection(udid, sec){
@@ -769,12 +770,12 @@ function switchSection(udid, sec){
   IOSBKConsole.closeLayers();
   if(window.IOSBKJobs) window.IOSBKJobs.hide();
   if(window.IOSBKHistory) window.IOSBKHistory.hide();
-  document.querySelectorAll('[data-sec-panel][data-udid="'+udid+'"]').forEach(function(p){p.classList.toggle('hidden',p.dataset.secPanel!==sec);});
-  document.querySelectorAll('.snav[data-udid="'+udid+'"]').forEach(function(b){var active=b.dataset.sec===sec;b.classList.toggle('active',active);b.setAttribute('aria-selected',String(active));});
+  IOSBKConsole.selectSection(udid,sec);
   if(sec==='jobs') IOSBKJobs.open(udid);
   else IOSBKHistory.section(udid,sec);
   if(sec==='settings')loadEncStatus(udid);
   backupBrowser.close(udid);
+  IOSBKConsole.rememberPage();
 }
 function openBackupFiles(udid){backupBrowser.open(udid);}
 function closeBackupFiles(udid){backupBrowser.close(udid);}

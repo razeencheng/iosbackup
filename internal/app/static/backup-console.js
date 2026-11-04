@@ -7,6 +7,7 @@
   };
   var fields = {start_time:'startTime',end_time:'endTime',backup_interval:'backupInterval',min_battery_level:'minBattery',only_when_charging:'chargingToggle',auto_backup_enabled:'autoBackupToggle',backup_directory:'backupDir',network_address:'networkAddress'};
   var saved = {}, history = {}, layers = [], sequence = 0, recent = {};
+  var pageStorageKey = 'iosbk.console.page.v1', pageStorageValue = '';
   function isBackupRunning(device) { return !!device.backing_up && (!device.active_operation || device.active_operation === 'backup'); }
   function busyLabel(device) { return device.active_operation === 'check' ? 'console.checkingBackup' : (device.active_operation === 'local' ? 'console.deviceBusy' : 'device.backingUp'); }
   function configPayload(group, config) {
@@ -228,13 +229,45 @@
     actions.append(button(tr('history.cancel'),function(){entry.close();}),button(tr('jobs.mode.full'),function(){entry.close();global.submitBackup(u,get('backupBtn-'+u),'full');},'history-button primary'));
     content.append(actions); entry=layer(content,tr('console.advancedBackup'));
   }
+  function selectSection(u, section) {
+    if (['backups','jobs','settings'].indexOf(section) < 0) section = 'backups';
+    doc.querySelectorAll('[data-sec-panel][data-udid="'+u+'"]').forEach(function (panel) { panel.classList.toggle('hidden', panel.dataset.secPanel !== section); });
+    doc.querySelectorAll('.snav[data-udid="'+u+'"]').forEach(function (tab) { var active = tab.dataset.sec === section; tab.classList.toggle('active', active); tab.setAttribute('aria-selected', String(active)); });
+  }
+  function readPageState() {
+    try {
+      var raw = global.localStorage.getItem(pageStorageKey);
+      if (!raw || raw.length > 65536) return null;
+      var state = JSON.parse(raw);
+      if (!state || state.version !== 1 || typeof state.sections !== 'object' || !state.sections || Array.isArray(state.sections)) return null;
+      pageStorageValue = raw;
+      return state;
+    } catch (_) { return null; }
+  }
+  // 仅持久化导航，不保存弹窗、表单草稿、密码或任务分页游标。
+  function rememberPage() {
+    var state = {version:1, expanded:'', sections:Object.create(null)};
+    doc.querySelectorAll('[data-udid-card]').forEach(function (card) {
+      var u = card.dataset.udidCard, panel = get('panel-'+u);
+      if (panel && !panel.classList.contains('hidden')) state.expanded = u;
+      var tab = doc.querySelector('.snav.active[data-udid="'+u+'"]');
+      state.sections[u] = tab ? tab.dataset.sec : 'backups';
+    });
+    var raw = JSON.stringify(state);
+    if (raw === pageStorageValue) return;
+    try { global.localStorage.setItem(pageStorageKey, raw); pageStorageValue = raw; } catch (_) { /* 存储被禁用或已满时仍可正常导航。 */ }
+  }
   function init() {
+    var state = readPageState(), expanded = '';
     doc.querySelectorAll('[data-udid-card]').forEach(function (card) {
       var u = card.dataset.udidCard; saved[u] = readConfig(u); settingsSummary(u);
       card.querySelectorAll('.tgl').forEach(function (toggle) { toggle.setAttribute('role','switch'); toggle.setAttribute('aria-checked',String(toggle.classList.contains('on'))); });
       var head=card.querySelector('[data-card-toggle]'); if(head)head.setAttribute('aria-expanded','false');
+      // 先恢复页签外观，只有实际展开的设备才发起数据请求。
+      selectSection(u, state && state.sections[u]);
+      if (state && state.expanded === u) expanded = u;
     });
-    var first = doc.querySelector('[data-udid-card]'); if (first) global.toggleCard(first.dataset.udidCard);
+    if (expanded) global.toggleCard(expanded);
   }
   doc.addEventListener('click',function(event){
     if(event.target.closest('.tgl'))changed(event.target);
@@ -261,5 +294,5 @@
     var dirty=Object.keys(saved).some(function(u){return Object.keys(groups).some(function(group){var content=get('setting-'+group+'-'+u);return content&&content.closest('dialog[open]')&&JSON.stringify(configPayload(group,readConfig(u)))!==JSON.stringify(configPayload(group,saved[u]));});});
     if(dirty){event.preventDefault();event.returnValue='';}
   });
-  global.IOSBKConsole={policyAccepted:policyAccepted,canDeleteCurrent:canDeleteCurrent,isBackupRunning:isBackupRunning,busyLabel:busyLabel,configPayload:configPayload,filterJobs:filterJobs,needsAttention:needsAttention,isCurrentPoint:isCurrentPoint,init:init,settings:settings,backup:backup,pointDrawer:pointDrawer,closePoint:closePoint,taskDrawer:taskDrawer,openJob:openJob,openPoint:openPoint,current:current,updateHistory:updateHistory,closeLayers:closeLayers,layer:layer};
+  global.IOSBKConsole={policyAccepted:policyAccepted,canDeleteCurrent:canDeleteCurrent,isBackupRunning:isBackupRunning,busyLabel:busyLabel,configPayload:configPayload,filterJobs:filterJobs,needsAttention:needsAttention,isCurrentPoint:isCurrentPoint,selectSection:selectSection,rememberPage:rememberPage,init:init,settings:settings,backup:backup,pointDrawer:pointDrawer,closePoint:closePoint,taskDrawer:taskDrawer,openJob:openJob,openPoint:openPoint,current:current,updateHistory:updateHistory,closeLayers:closeLayers,layer:layer};
 })(window);
