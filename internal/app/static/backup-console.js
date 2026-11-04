@@ -197,7 +197,7 @@
     if (state.pending || (state.at && Date.now() - state.at < 10000)) return;
     state.pending = true;
     try {
-      var response = await global.IOSBKI18n.fetch('/api/backup-jobs/' + encodeURIComponent(u));
+      var response = await global.IOSBKI18n.fetch('/api/backup-jobs/' + encodeURIComponent(u) + '?type=backup');
       if (!response.ok) return;
       var result = await response.json();
       state.job = (result.jobs || []).find(function (j) { return j.operation !== 'check'; });

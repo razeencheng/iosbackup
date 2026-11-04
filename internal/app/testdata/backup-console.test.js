@@ -61,10 +61,11 @@ console.log('console group saves, task filtering and current-source identity pas
     [{state:'failed',error_code:'unknown_vendor'},/failed/i]
   ]){
     const host={classList:{toggle(){}},replaceChildren(){this.children=[];},append(...children){this.children=children;}};
-    const page={document:{addEventListener(){},getElementById:id=>id==='consoleRecent-A'?host:null,createElement:()=>({})},addEventListener(){},formatBackupBytes:()=>'',IOSBKI18n:{t:(key,params={})=>(messages[key]||key).replace(/\{(\w+)\}/g,(_,key)=>params[key]),has:key=>key in messages,fetch:async()=>({ok:true,json:async()=>({jobs:[{id:'task',...job}]})})}};
+    const page={document:{addEventListener(){},getElementById:id=>id==='consoleRecent-A'?host:null,createElement:()=>({})},addEventListener(){},formatBackupBytes:()=>'',IOSBKI18n:{t:(key,params={})=>(messages[key]||key).replace(/\{(\w+)\}/g,(_,key)=>params[key]),has:key=>key in messages,fetch:async url=>({ok:true,json:async()=>({jobs:url.includes('type=backup')?[{id:'task',...job}]:Array.from({length:5},(_,i)=>({id:'check-'+i,operation:'check',state:'succeeded'}))})})}};
     vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../static/backup-console.js'),'utf8'),{window:page});
     page.IOSBKConsole.updateHistory({udid:'A',points:[],data:{policy:{enabled:false},current_source:{kind:'missing'},storage:{},total:0,logical_bytes:0,bytes_known:true}});
     await new Promise(setImmediate);
+    assert.ok(host.children?.length,'recent backup issues must remain visible after five newer checks');
     assert.match(host.children[0].textContent,expected,'the banner must show a concrete reason');
     assert.doesNotMatch(host.children[0].textContent,/needs attention: Needs attention/i);
   }

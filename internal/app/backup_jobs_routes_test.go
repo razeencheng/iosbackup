@@ -5,11 +5,102 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 )
+
+func TestBackupJobListPagination(t *testing.T) {
+	app, h := backupControlFixture(t)
+	s := openJobTestStore(t, t.TempDir(), defaultBackupJobLimits())
+	app.backupJobRecords = s
+	for i := 1; i <= 12; i++ {
+		job := jobFixture(i)
+		job.StartedAt = jobTestNow // 相同时间也必须稳定排序。
+		s.start(job)
+		s.finish(job.ID, "succeeded", "", jobTestNow)
+	}
+	type page struct {
+		Jobs   []backupJobSummary `json:"jobs"`
+		Cursor string             `json:"page_cursor"`
+		Next   string             `json:"next_cursor"`
+		More   bool               `json:"has_more"`
+		New    bool               `json:"has_new"`
+	}
+	get := func(query string) page {
+		t.Helper()
+		rr := httptest.NewRecorder()
+		h.ServeHTTP(rr, httptest.NewRequest("GET", "/api/backup-jobs/PHONE"+query, nil))
+		var p page
+		if rr.Code != 200 || json.Unmarshal(rr.Body.Bytes(), &p) != nil {
+			t.Fatalf("page: %d %s", rr.Code, rr.Body.String())
+		}
+		return p
+	}
+	first := get("")
+	if len(first.Jobs) != 5 || !first.More || first.Cursor == "" || first.Next == "" || first.Jobs[0].ID != jobFixture(12).ID {
+		t.Fatalf("first page: %+v", first)
+	}
+	// 新任务不会挤动正在浏览的页面，游标也不依赖边界记录仍然存在。
+	s.start(jobFixture(13))
+	s.mu.Lock()
+	delete(s.records, jobFixture(8).ID)
+	s.mu.Unlock()
+	refreshed := get("?cursor=" + url.QueryEscape(first.Cursor))
+	if !refreshed.New || refreshed.Jobs[0].ID != first.Jobs[0].ID {
+		t.Fatalf("new job shifted page: %+v", refreshed)
+	}
+	second := get("?cursor=" + url.QueryEscape(first.Next))
+	if len(second.Jobs) != 5 || !second.More || second.Jobs[0].ID != jobFixture(7).ID {
+		t.Fatalf("second page: %+v", second)
+	}
+	last := get("?cursor=" + url.QueryEscape(second.Next))
+	if len(last.Jobs) != 2 || last.More || last.Next != "" || last.Jobs[0].ID != jobFixture(2).ID {
+		t.Fatalf("last page: %+v", last)
+	}
+	if get("").Jobs[0].ID != jobFixture(13).ID {
+		t.Fatal("latest page did not include new task")
+	}
+	for _, query := range []string{"?cursor=bad", "?type=invalid", "?result=invalid", "?type=check&cursor=" + url.QueryEscape(first.Cursor)} {
+		rr := httptest.NewRecorder()
+		h.ServeHTTP(rr, httptest.NewRequest("GET", "/api/backup-jobs/PHONE"+query, nil))
+		if rr.Code != 400 {
+			t.Errorf("invalid query accepted: %s (%d)", query, rr.Code)
+		}
+	}
+}
+
+func TestBackupJobListFiltersBeforePagination(t *testing.T) {
+	app, h := backupControlFixture(t)
+	s := openJobTestStore(t, t.TempDir(), defaultBackupJobLimits())
+	app.backupJobRecords = s
+	for i := 1; i <= 12; i++ {
+		job := jobFixture(i)
+		s.start(job)
+		s.mu.Lock()
+		r := s.records[job.ID]
+		if i <= 6 {
+			r.Summary.Operation = "check"
+			r.Summary.Check = &backupCheckResult{State: "unavailable", Reason: "encrypted_manifest"}
+		}
+		if i == 6 {
+			r.Summary.Check.Reason = "cancelled"
+		}
+		s.mu.Unlock()
+		s.finish(job.ID, "succeeded", "", jobTestNow)
+	}
+	rr := httptest.NewRecorder()
+	h.ServeHTTP(rr, httptest.NewRequest("GET", "/api/backup-jobs/PHONE?type=check&result=attention", nil))
+	var p struct {
+		Jobs []backupJobSummary
+		More bool `json:"has_more"`
+	}
+	if rr.Code != 200 || json.Unmarshal(rr.Body.Bytes(), &p) != nil || len(p.Jobs) != 5 || p.More || p.Jobs[0].ID != jobFixture(5).ID {
+		t.Fatalf("filter applied after page: %d %s", rr.Code, rr.Body.String())
+	}
+}
 
 func TestBackupJobsEndpointEmptyAndProtected(t *testing.T) {
 	app, h := backupControlFixture(t)

@@ -23,13 +23,44 @@ console.log('backup task timeline is bounded and deduplicated');
 (async()=>{
  const views=[],existing='bkp-000000000004',missing='bkp-000000000005';
  const controller=api.createController({
-  get(url){if(url.startsWith('/api/backup-jobs/'))return Promise.resolve({jobs:[{id:existing,last_cursor:0}],recording_status:'available'});assert.ok(!url.includes(missing),'missing task must not be queried as a different task');return Promise.resolve({job:{id:existing},events:[]});},
-  render(view){views.push(view)},error(error){throw error},schedule(){return 1},cancel(){}
+  get(url){if(url.startsWith('/api/backup-jobs/'))return Promise.resolve({jobs:[{id:existing,last_cursor:0}],recording_status:'available'});if(url.includes(missing))return Promise.reject(Object.assign(new Error('expired'),{status:410}));return Promise.resolve({job:{id:existing},events:[]});},
+  render(view){views.push(view)},error(error){assert.equal(error.status,410)},schedule(){return 1},cancel(){}
  });
  await controller.open('PHONE');await controller.select(missing);
  assert.equal(views.at(-1).job,null,'following an expired link must not silently open the latest task');
  assert.equal(views.at(-1).missing,true);
  controller.close();console.log('expired task links do not open unrelated jobs');
+})().catch(error=>{console.error(error);process.exitCode=1;});
+
+(async()=>{
+ const views=[],requests=[],errors=[],ids=Array.from({length:12},(_,i)=>'bkp-'+String(12-i).padStart(12,'0'));
+ let fail=false,newRecord=false,release;
+ const controller=api.createController({
+  get(url){
+   requests.push(url);const u=new URL(url,'http://test');
+   if(u.pathname.startsWith('/api/backup-job/'))return Promise.resolve({job:{id:u.pathname.split('/')[3]},events:[]});
+   if(fail)return Promise.reject(new Error('offline'));
+   if(u.searchParams.get('result')==='failed')return new Promise(resolve=>{release=resolve});
+   const cursor=u.searchParams.get('cursor')||'p0',index=Number(cursor.slice(1));
+   return Promise.resolve({jobs:ids.slice(index,index+5).map(id=>({id})),page_cursor:cursor,next_cursor:index<10?'p'+(index+5):'',has_more:index<10,has_new:newRecord,recording_status:'available'});
+  },render(v){views.push(v)},error(e){errors.push(e)},schedule(){return 1},cancel(){}
+ });
+ await controller.open('PHONE');assert.equal(views.at(-1).jobs.length,5);
+ assert.equal(typeof controller.next,'function','task list needs real pagination');
+ await controller.next();assert.equal(views.at(-1).jobs[0].id,ids[5]);assert.equal(views.at(-1).hasPrevious,true);
+ await controller.select(ids[11]);assert.equal(views.at(-1).job.id,ids[11],'linked details remain available outside the page');assert.ok(!views.at(-1).missing);
+ assert.equal(views.at(-1).jobs[0].id,ids[5],'details must preserve the page');
+ fail=true;await controller.next();assert.equal(views.at(-1).jobs[0].id,ids[5],'failed navigation must keep the current page');fail=false;
+ await controller.next();assert.equal(views.at(-1).jobs.length,2);assert.equal(views.at(-1).hasMore,false);
+ await controller.previous();assert.equal(views.at(-1).jobs[0].id,ids[5]);
+ newRecord=true;await controller.select(ids[6]);assert.equal(views.at(-1).jobs[0].id,ids[5]);assert.equal(views.at(-1).hasNew,true);
+ await controller.latest();assert.equal(views.at(-1).hasPrevious,false);assert.equal(views.at(-1).jobs[0].id,ids[0]);
+ await controller.next();await controller.filter({type:'check',result:'attention'});
+ assert.equal(views.at(-1).hasPrevious,false);assert.ok(requests.some(url=>url.includes('type=check')&&url.includes('result=attention')&&!url.includes('cursor=')),'filters are applied server-side and reset the page');
+ const stale=controller.filter({type:'check',result:'failed'});
+ await controller.filter({type:'backup',result:'all'});release({jobs:[],page_cursor:'stale'});await stale;
+ assert.equal(views.at(-1).filter.type,'backup','slow filter response cannot overwrite a newer filter');assert.equal(views.at(-1).jobs.length,5);
+ assert.equal(errors.length,1);controller.close();console.log('task pagination preserves pages, filters, linked details and request ordering');
 })().catch(error=>{console.error(error);process.exitCode=1;});
 
 (async()=>{

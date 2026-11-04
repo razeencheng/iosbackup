@@ -10,18 +10,23 @@
   }
   function createController(options){
     var generation=0,timer=null,abort=null,busy=false,dirty=false;
-    var view={udid:'',selected:'',jobs:[],events:[],cursor:0,job:null,status:'available',truncated:false};
-    function publish(){options.render(Object.assign({},view,{events:view.events.slice(),jobs:view.jobs.slice()}));}
+    var page={cursor:'',previous:[],type:'all',result:'all'};
+    var view={udid:'',selected:'',jobs:[],events:[],cursor:0,job:null,status:'available',truncated:false,loading:false};
+    function publish(){options.render(Object.assign({},view,{events:view.events.slice(),jobs:view.jobs.slice(),filter:{type:page.type,result:page.result},hasPrevious:page.previous.length>0}));}
     function schedule(delay){if(timer!==null)options.cancel(timer);timer=options.schedule(function(){timer=null;poll();},delay);}
-    async function poll(){
+    async function poll(target){
       if(!view.udid||busy)return;
       busy=true;dirty=false;var epoch=generation;abort=new AbortController();
+      target=target||page;
+      var query=[];
+      ['type','result','cursor'].forEach(function(key){if(target[key]&&target[key]!=='all')query.push(key+'='+encodeURIComponent(target[key]));});
       try{
-        var list=await options.get('/api/backup-jobs/'+encodeURIComponent(view.udid),abort.signal);
+        var list=await options.get('/api/backup-jobs/'+encodeURIComponent(view.udid)+(query.length?'?'+query.join('&'):''),abort.signal);
         if(epoch!==generation)return;
-        view.jobs=list.jobs||[];view.status=list.recording_status;
-        if(view.selected&&!view.jobs.some(function(job){return job.id===view.selected;})){view.selected='';view.job=null;view.events=[];view.cursor=0;view.truncated=false;view.missing=true;}
-        if(!view.selected&&!view.missing&&view.jobs.length){view.selected=view.jobs[0].id;view.cursor=Math.max(0,view.jobs[0].last_cursor-1000);}
+        page={cursor:list.page_cursor||'',previous:target.previous,type:target.type,result:target.result};
+        view.jobs=list.jobs||[];view.status=list.recording_status;view.nextCursor=list.next_cursor||'';view.hasMore=!!list.has_more;view.hasNew=!!list.has_new;view.loading=false;view.error=null;
+        // 详情有独立生命周期，不在当前页不代表任务已过期。
+        if(!view.selected&&!view.missing&&view.jobs.length){view.selected=view.jobs[0].id;view.cursor=Math.max(0,(view.jobs[0].last_cursor||0)-1000);}
         publish();
         if(view.selected&&jobID.test(view.selected)){
           var result=await options.get('/api/backup-job/'+encodeURIComponent(view.selected)+'/events?after='+view.cursor+'&limit=500',abort.signal);
@@ -30,13 +35,18 @@
           view.cursor=Math.max(view.cursor,result.next_cursor||0);view.truncated=!!result.truncated;
           publish();if(result.has_more)dirty=true;
         }
-      }catch(error){if(epoch===generation&&error.name!=='AbortError'){if(error.status===410){view.selected='';view.job=null;view.events=[];view.cursor=0;view.truncated=false;view.missing=true;publish();}options.error(error);}}
-      finally{if(epoch===generation){busy=false;schedule(dirty?100:5000);}}
+      }catch(error){if(epoch===generation&&error.name!=='AbortError'){view.error=error;if(error.status===410){view.selected='';view.job=null;view.events=[];view.cursor=0;view.truncated=false;view.missing=true;}options.error(error);}}
+      finally{if(epoch===generation){busy=false;view.loading=false;publish();schedule(dirty?100:5000);}}
     }
     function reset(){generation++;if(abort)abort.abort();if(timer!==null)options.cancel(timer);timer=null;busy=false;}
+    function navigate(target){reset();view.loading=true;view.error=null;publish();return poll(target);}
     return {
-      open:function(udid){reset();view={udid:udid,selected:'',jobs:[],events:[],cursor:0,job:null,status:'available',truncated:false};publish();return poll();},
+      open:function(udid,filter){reset();filter=filter||{};page={cursor:'',previous:[],type:filter.type||'all',result:filter.result||'all'};view={udid:udid,selected:'',jobs:[],events:[],cursor:0,job:null,status:'available',truncated:false,loading:true};publish();return poll();},
       select:function(id){if(!jobID.test(id))return;reset();view.selected=id;view.missing=false;view.events=[];view.job=null;var job=view.jobs.find(function(j){return j.id===id;});view.cursor=Math.max(0,(job&&job.last_cursor||0)-1000);publish();return poll();},
+      next:function(){if(view.loading||!view.hasMore||!view.nextCursor)return;return navigate({cursor:view.nextCursor,previous:page.previous.concat(page.cursor),type:page.type,result:page.result});},
+      previous:function(){if(view.loading||!page.previous.length)return;return navigate({cursor:page.previous[page.previous.length-1],previous:page.previous.slice(0,-1),type:page.type,result:page.result});},
+      latest:function(){return navigate({cursor:'',previous:[],type:page.type,result:page.result});},
+      filter:function(filter){return navigate({cursor:'',previous:[],type:filter.type,result:filter.result});},
       close:function(){reset();view.udid='';},
       invalidate:function(){if(!view.udid)return;if(busy){dirty=true;return;}schedule(150);},
       repaint:publish
@@ -77,7 +87,8 @@
   function render(view){
     currentView=view;if(!view.udid)return;
     var u=view.udid,list=document.getElementById('jobList-'+u);if(!list)return;
-    var filter=filters[u]||{type:'all',result:'all'},jobs=global.IOSBKConsole.filterJobs(view.jobs,filter.type,filter.result);
+    var filter=view.filter,jobs=view.jobs;
+    if(!view.loading){filters[u]=filter;document.querySelectorAll('[data-job-filter][data-udid="'+u+'"]').forEach(function(select){select.value=filter[select.dataset.jobFilter];});}
     var signature=JSON.stringify([jobs,filter,global.IOSBKI18n.getLocale()]);
     if(list.dataset.signature!==signature){
       list.dataset.signature=signature;list.replaceChildren();
@@ -90,8 +101,16 @@
         var details=document.createElement('span');details.textContent=tr('console.details')+' →';details.className='console-task-link';row.append(details);list.append(row);
       });
     }
-    show('jobEmpty-'+u,!jobs.length);show('jobDetails-'+u,!!document.getElementById('jobDetails-'+u).closest('dialog[open]'));
+    list.setAttribute('aria-busy',String(view.loading));
+    text('jobPageStatus-'+u,view.loading?tr('history.loading'):tr('jobs.pageCount',{count:jobs.length}));
+    var previous=document.getElementById('jobPrevious-'+u),next=document.getElementById('jobNext-'+u);
+    if(previous)previous.disabled=view.loading||!view.hasPrevious;
+    if(next)next.disabled=view.loading||!view.hasMore;
+    show('jobLatest-'+u,view.hasNew);var latest=document.getElementById('jobLatest-'+u);if(latest)latest.disabled=view.loading;
+    var empty=document.getElementById('jobEmpty-'+u);if(empty){empty.removeAttribute('data-i18n');empty.textContent=tr(filter.type==='all'&&filter.result==='all'?'jobs.empty':'jobs.noMatches');}
+    show('jobEmpty-'+u,!jobs.length&&!view.loading);show('jobDetails-'+u,!!document.getElementById('jobDetails-'+u).closest('dialog[open]'));
     var warnings=[];
+    if(view.error)warnings.push(global.IOSBKI18n.message(view.error.payload,'common.operationFailed'));
     if(view.missing)warnings.push(tr('console.jobMissing'));
     if(view.status!=='available')warnings.push(tr('jobs.recordsUnavailable'));
     if(view.job&&view.job.persistence==='error')warnings.push(tr('jobs.saveError'));
@@ -116,7 +135,7 @@
   function open(udid){
     if(global.IOSBKHistory)global.IOSBKHistory.hide();
     if(visible&&visible!==udid)close(visible);
-    visible=udid;show('jobsPanel-'+udid,true);return controller.open(udid);
+    visible=udid;show('jobsPanel-'+udid,true);return controller.open(udid,filters[udid]);
   }
   function close(udid,returnFocus){if(visible!==udid)return;controller.close();show('jobsPanel-'+udid,false);visible='';}
   async function copy(){
@@ -138,9 +157,9 @@
   document.addEventListener('click',function(event){
     var button=event.target.closest('[data-job-action]');if(!button)return;
     var action=button.dataset.jobAction,u=button.dataset.udid;
-    if(action==='open')global.switchSection(u,'jobs');else if(action==='close')close(u);else if(action==='copy')copy();else if(action==='select'){controller.select(button.dataset.job);global.IOSBKConsole.taskDrawer(u);}
+    if(action==='open')global.switchSection(u,'jobs');else if(action==='close')close(u);else if(action==='copy')copy();else if(action==='next')controller.next();else if(action==='previous')controller.previous();else if(action==='latest')controller.latest();else if(action==='select'){controller.select(button.dataset.job);global.IOSBKConsole.taskDrawer(u);}
   });
-  document.addEventListener('change',function(event){var f=event.target.dataset.jobFilter,u=event.target.dataset.udid;if(!f)return;filters[u]=filters[u]||{type:'all',result:'all'};filters[u][f]=event.target.value;controller.repaint();});
+  document.addEventListener('change',function(event){var f=event.target.dataset.jobFilter,u=event.target.dataset.udid;if(!f)return;filters[u]=Object.assign({type:'all',result:'all'},filters[u]);filters[u][f]=event.target.value;controller.filter(filters[u]);});
   global.addEventListener('iosbk:localechange',function(){controller.repaint();});
   var lastRevision;
   global.IOSBKJobs={durationText:durationText,select:function(id){return controller.select(id);},mergeEvents:mergeEvents,createController:createController,formatEvent:formatEvent,open:open,close:close,hide:function(){if(visible)close(visible,false);},onStatus:function(snapshot){if(snapshot.backup_jobs_revision!==lastRevision){lastRevision=snapshot.backup_jobs_revision;controller.invalidate();}}};

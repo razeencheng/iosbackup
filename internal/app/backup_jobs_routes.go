@@ -18,15 +18,24 @@ func (app *application) handleBackupJobs(w http.ResponseWriter, r *http.Request)
 		writeError(w, 400, i18n.InvalidUDID)
 		return
 	}
-	summaries := make([]backupJobSummary, 0)
+	cursor, anchored, err := parseBackupJobPage(udid, r.URL.Query())
+	if err != nil {
+		writeError(w, 400, i18n.InvalidCursor)
+		return
+	}
+	page := backupJobPage{Jobs: make([]backupJobSummary, 0)}
 	status := "unavailable"
 	if app.backupJobRecords != nil {
-		summaries = app.backupJobRecords.list(udid)
-		app.linkHistoricalJobs(udid, summaries)
+		page = app.backupJobRecords.page(cursor, anchored)
+		app.linkHistoricalJobs(udid, page.Jobs)
 		status = app.backupJobRecords.recordingStatus()
 	}
 	w.Header().Set("Cache-Control", "no-store")
-	writeJSON(w, 200, map[string]any{"jobs": summaries, "recording_status": status, "retention_days": 30})
+	writeJSON(w, 200, struct {
+		backupJobPage
+		RecordingStatus string `json:"recording_status"`
+		RetentionDays   int    `json:"retention_days"`
+	}{page, status, 30})
 }
 
 func (app *application) handleBackupJob(w http.ResponseWriter, r *http.Request) {
