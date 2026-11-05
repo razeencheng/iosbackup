@@ -22,6 +22,7 @@ const (
 )
 
 type backupProgress struct {
+	Local              *backupLocalProgress
 	State              backupProgressState
 	Phase              string
 	OverallPercent     *float64
@@ -160,7 +161,7 @@ func (app *application) startBackupProgress(udid string, at time.Time) {
 	app.backupProgress[udid] = backupProgress{
 		State:     backupProgressPreparing,
 		Phase:     "preparing",
-		UpdatedAt: toBeijingTime(at),
+		UpdatedAt: app.inDeploymentTime(at),
 	}
 	app.backupProgressBroadcast[udid] = at
 }
@@ -183,7 +184,7 @@ func (app *application) applyBackupProgressUpdate(udid string, update backupProg
 
 	changed := false
 	if !update.LastActivityAt.IsZero() && update.LastActivityAt.After(progress.LastActivityAt) {
-		progress.LastActivityAt = toBeijingTime(update.LastActivityAt)
+		progress.LastActivityAt = app.inDeploymentTime(update.LastActivityAt)
 		changed = true
 	}
 	forceBroadcast := progress.State != backupProgressRunning || (update.Phase != "" && progress.Phase != update.Phase)
@@ -220,7 +221,7 @@ func (app *application) applyBackupProgressUpdate(udid string, update backupProg
 		progress.CurrentTotalBytes = cloneOptionalInt64(update.CurrentTotalBytes)
 	}
 	if changed {
-		progress.UpdatedAt = toBeijingTime(at)
+		progress.UpdatedAt = app.inDeploymentTime(at)
 		app.backupProgress[udid] = progress
 	}
 	lastBroadcast := app.backupProgressBroadcast[udid]
@@ -252,7 +253,7 @@ func (app *application) finishBackupProgressUnsafe(udid string, err error, at ti
 	progress.CurrentFilePercent = nil
 	progress.CurrentBytes = nil
 	progress.CurrentTotalBytes = nil
-	progress.UpdatedAt = toBeijingTime(at)
+	progress.UpdatedAt = app.inDeploymentTime(at)
 	app.backupProgressBroadcast[udid] = at
 	if err == nil {
 		complete := float64(100)
@@ -287,6 +288,6 @@ func (app *application) setBackupProgressConnectionUnsafe(udid string, online bo
 		}
 		progress.State = backupProgressReconnecting
 	}
-	progress.UpdatedAt = toBeijingTime(at)
+	progress.UpdatedAt = app.inDeploymentTime(at)
 	app.backupProgress[udid] = progress
 }

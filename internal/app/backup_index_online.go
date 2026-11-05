@@ -5,7 +5,6 @@ import (
 	"encoding/csv"
 	"errors"
 	"io"
-	"path/filepath"
 	"strings"
 )
 
@@ -22,8 +21,9 @@ type backupIndexOnlineCapture struct {
 // 捕获 worker 可独立取消；写入抢占或缓存失败不会中止原查询或把成功查询变成失败。
 func (app *application) captureOnlineBackupIndex(ctx context.Context, udid, root string, query func(func([]string) error) (int, error), onRow func([]string) error, cacheValid ...func() bool) (int, error) {
 	src, sourceErr := app.resolveBackupIndexSource(ctx, udid)
-	absolute, pathErr := filepath.Abs(root)
-	if sourceErr != nil || pathErr != nil || src.Key != indexDigest(filepath.Clean(absolute)+"\x00"+udid) {
+	// Key 始终来自逻辑配置；root 是调用方已占用的实际来源，二者在历史模式下不同。
+	actual, actualErr := resolveBackupIndexSourceAt(ctx, udid, root)
+	if sourceErr != nil || actualErr != nil || src.Identity != actual.Identity || src.Fingerprint != actual.Fingerprint {
 		return query(onRow)
 	}
 	manager := app.backupIndexManager()

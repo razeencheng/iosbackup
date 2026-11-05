@@ -93,7 +93,7 @@ func (app *application) reserveConnectionRecovery(targets []int, manual bool) er
 		return errDeviceBusy
 	}
 	if !manual {
-		now := nowBeijing()
+		now := app.nowTime()
 		for _, target := range targets {
 			s := &app.connectionServices[target]
 			if !s.configRestart && (s.failures < 3 || s.code == "tool_unavailable" || now.Before(s.graceUntil) || now.Before(s.nextAttempt) || len(trimConnectionAttempts(s.attempts, now)) >= 3) {
@@ -218,7 +218,7 @@ func (app *application) executeConnectionRecovery(ctx context.Context, targets [
 		minimumGeneration := s.generation + 1
 		s.configRestart = false
 		if !manual {
-			s.attempts = append(trimConnectionAttempts(s.attempts, nowBeijing()), nowBeijing())
+			s.attempts = append(trimConnectionAttempts(s.attempts, app.nowTime()), app.nowTime())
 		}
 		app.mu.Unlock()
 		app.addWarnLog("SYSTEM", fmt.Sprintf("event=connection.recovery_started backend=%d manual=%t", target, manual))
@@ -252,7 +252,7 @@ func (app *application) executeConnectionRecovery(ctx context.Context, targets [
 				delay = 2 * time.Minute
 			}
 			s.backoff++
-			s.nextAttempt = nowBeijing().Add(delay)
+			s.nextAttempt = app.nowTime().Add(delay)
 			if len(s.attempts) >= 3 || s.code == "tool_unavailable" {
 				s.phase = "manual_required"
 			}
@@ -296,7 +296,7 @@ func (app *application) connectionProcessStarted(target int) {
 	app.mu.Lock()
 	s := &app.connectionServices[target]
 	s.generation++
-	s.graceUntil = nowBeijing().Add(connectionStartupGrace)
+	s.graceUntil = app.nowTime().Add(connectionStartupGrace)
 	s.healthySince = time.Time{}
 	s.failures = 0
 	s.health = "unknown"
@@ -385,7 +385,7 @@ func (app *application) pairingPublisher(d *device, automatic bool) func(string,
 		}
 		var notification *notificationMessage
 		if automatic {
-			notification = app.pairingNotificationUnsafe(d, &state, nowBeijing())
+			notification = app.pairingNotificationUnsafe(d, &state, app.nowTime())
 		}
 		app.deviceOperationStates[udid] = state
 		app.mu.Unlock()

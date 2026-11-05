@@ -76,7 +76,7 @@ These limit consecutive inactivity, not the total duration of an active transfer
 | `backup_stalled` | The current phase exceeded its inactivity deadline | Inspect authorization, last activity and network; use USB after it ends |
 | `device_disconnected` | Sustained device disappearance interrupted the job | Reconnect and start a new backup |
 | `backup_cancelled` | Execution context was cancelled or reached a deadline | Check for restart/shutdown and retry after service recovery |
-| `backup_stopped_by_user` | The user stopped this job | Run a manual backup once or explicitly resume automatic scheduling when ready |
+| `backup_stopped_by_user` | The user stopped this job | Start another backup or use the resume-schedule link when ready |
 | `storage_unavailable` | Tool reported no space, read-only storage or denied permission | Check backup-mount capacity, inodes and write access |
 | `device_locked` | Tool reported a device lock/passcode condition | Enter the device passcode when prompted, or unlock the device and confirm Trust |
 | `backup_failed` | Other backup failure | Inspect logs around the same job, keeping the first error |

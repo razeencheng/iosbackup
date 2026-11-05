@@ -3,6 +3,7 @@ package app
 import (
 	"fmt"
 	"net/netip"
+	"time"
 
 	notificationpkg "iosbackup/internal/notification"
 )
@@ -49,16 +50,16 @@ func initNotificationManager() (*notificationManager, error) {
 	return newNotificationManagerFromConfig(config, nil)
 }
 
-func initNotificationManagerFromStore(store *notificationConfigStore, allowPrivate []netip.Prefix) (*notificationManager, error) {
+func initNotificationManagerFromStore(store *notificationConfigStore, allowPrivate []netip.Prefix, clocks ...func() time.Time) (*notificationManager, error) {
 	config, err := store.Load()
 	if err != nil {
 		return nil, fmt.Errorf("load notification configuration: %w", err)
 	}
-	return newNotificationManagerFromConfig(config, allowPrivate)
+	return newNotificationManagerFromConfig(config, allowPrivate, clocks...)
 }
 
-func newNotificationManagerFromConfig(config *notificationConfig, allowPrivate []netip.Prefix) (*notificationManager, error) {
-	return notificationpkg.NewManagerFromConfig(config, allowPrivate, notificationManagerOptions(4, 100))
+func newNotificationManagerFromConfig(config *notificationConfig, allowPrivate []netip.Prefix, clocks ...func() time.Time) (*notificationManager, error) {
+	return notificationpkg.NewManagerFromConfig(config, allowPrivate, notificationManagerOptions(4, 100, clocks...))
 }
 
 func validateNotificationRules(rules map[string][]string, notifiers []map[string]interface{}) error {

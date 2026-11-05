@@ -38,6 +38,14 @@ func (app *application) handleBackupControl(w http.ResponseWriter, r *http.Reque
 		writeError(w, http.StatusBadRequest, i18n.BackupControlIdentityRequired)
 		return
 	}
+	var target *backupJob
+	if action == "stop" {
+		app.mu.RLock()
+		if job := app.backupJobs[udid]; job != nil && job.id == request.JobID {
+			target = job
+		}
+		app.mu.RUnlock()
+	}
 	var err error
 	if action == "stop" {
 		err = app.stopBackup(udid, request.JobID)
@@ -68,12 +76,28 @@ func (app *application) handleBackupControl(w http.ResponseWriter, r *http.Reque
 	if c := app.configs[udid]; c != nil {
 		payload["auto_backup_enabled"] = c.AutoBackupEnabled
 	}
-	if job := app.backupJobs[udid]; job != nil {
-		payload["backup_job_id"] = job.id
-		if err == nil && action == "stop" && !job.finished {
-			status = http.StatusAccepted
+	if action == "stop" {
+		// 停止响应始终绑定请求的任务，持久化等待期间下一任务可能已入场。
+		payload["backup_job_id"] = request.JobID
+		payload["backing_up"] = target != nil && !target.finished
+		payload["backup_state"] = ""
+		if target != nil {
+			state := backupStateStopping
+			if target.resultSet {
+				state = backupStateSucceeded
+				if target.result != nil {
+					state, _ = backupFailureState(target.result)
+				}
+			}
+			payload["backup_state"] = state
+			if err == nil && !target.finished {
+				status = http.StatusAccepted
+			}
 		}
+	} else if job := app.backupJobs[udid]; job != nil {
+		payload["backup_job_id"] = job.id
 	}
+
 	app.mu.RUnlock()
 	if err != nil {
 		payload["error_code"] = code

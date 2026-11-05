@@ -1,7 +1,7 @@
 // 只收录公开用户文档；新页面必须显式登记，不能递归导入 docs/。
 export const groups = [
   {en:'Get started', zh:'开始使用', ids:['getting-started','overview','synology','installation','quickstart']},
-  {en:'Back up devices', zh:'备份设备', ids:['usb-backup','wifi','scheduling','encryption','backup-browser','notifications','states']},
+  {en:'Back up devices', zh:'备份设备', ids:['usb-backup','wifi','scheduling','encryption','backup-browser','backup-history','notifications','states']},
   {en:'Restore data', zh:'恢复数据', ids:['restore','restore-finder','restore-apple-devices','experimental','inspection']},
   {en:'Maintain your deployment', zh:'维护部署', ids:['device-storage','upgrade','instance-recovery','troubleshooting','wifi-nat']},
   {en:'Reference', zh:'参考', ids:['configuration','feature-status','operations']},
@@ -12,6 +12,7 @@ const labels = {
   quickstart:['Quick start with screenshots','图解快速开始'], 'usb-backup':['Your first USB backup','首次 USB 备份'],
   wifi:['Wi-Fi backups','Wi-Fi 备份'], scheduling:['Automatic schedules','自动计划'],
   encryption:['Encryption and passwords','加密与密码'], 'backup-browser':['Browse local backups','查看本地备份'], notifications:['Notifications','通知'],
+  'backup-history':['Historical restore points','历史恢复点'],
   states:['States and progress','状态与进度'], restore:['Restore overview','恢复总览'],
   'restore-finder':['Finder on Mac','Mac Finder 恢复'], 'restore-apple-devices':['Apple Devices on Windows','Windows Apple Devices 恢复'],
   experimental:['Experimental operations','站内实验操作'], inspection:['Inspect backups','查看备份与文件清单'],

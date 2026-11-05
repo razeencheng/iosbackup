@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-// 备份设置：改了未保存时应有「未保存」提示 + 可标脏的保存按钮 + 标脏/清除逻辑。
+// 设备设置按组保存；每组保留取消与未保存提示。
 func TestIndexTemplateUnsavedIndicator(t *testing.T) {
 	dev := &device{UDID: "U-DIRTY", Name: "iPad", Connection: connectionTypeDesc(connectTypeUSB), IsOnline: true}
 	cfg := &backupConfig{UDID: "U-DIRTY", StartTime: "22:00", EndTime: "06:00", BackupInterval: 24, MinBatteryLevel: 20, BackupDirectory: "/backups"}
@@ -14,11 +14,13 @@ func TestIndexTemplateUnsavedIndicator(t *testing.T) {
 		BackupStatuses: map[string]bool{"U-DIRTY": false},
 	})
 	for _, want := range []string{
-		`id="dirty-U-DIRTY"`,       // 未保存提示元素（每设备）
-		`id="saveBtn-U-DIRTY"`,     // 保存按钮可被标脏高亮
-		`data-i18n="bset.unsaved"`, // 提示文案走 i18n
-		"function markDirty",       // 改动 -> 标脏
-		"function clearDirty",      // 保存/重载 -> 清除
+		`id="setting-schedule-U-DIRTY"`,
+		`id="setting-connection-U-DIRTY"`,
+		`data-group-save`,
+		`data-group-cancel`,
+		`data-group-dirty`,
+		`data-i18n="bset.unsaved"`,
+		`/static/backup-console.js`,
 	} {
 		if !strings.Contains(html, want) {
 			t.Errorf("index.html 应包含 %q", want)

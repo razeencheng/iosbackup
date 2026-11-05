@@ -18,6 +18,7 @@
 | [启用并验证 Wi-Fi 备份](manual/wifi.zh-CN.md) | 用电脑准备手机、与 NAS 配对、测试无线备份，失败时改用 USB |
 | [管理备份加密与密码](manual/encryption.zh-CN.md) | 区分四类密码，处理已有加密备份和接管限制 |
 | [查看本地备份和导出清单](manual/backup-browser.zh-CN.md) | 手机离线时读取，区分读取时间，搜索有限预览并下载已保存的完整 CSV |
+| [历史恢复点与完整导出](manual/backup-history.zh-CN.md) | 开启三日保留、固定重要日期、检查、导出、关闭/重开及容量说明（开发分支） |
 | [设置并验证通知](manual/notifications.zh-CN.md) | 保存规则、检查测试送达、观察真实事件 |
 | [管理设备和存储](manual/device-storage.zh-CN.md) | 移除设备、重新添加、检查空间和保留副本 |
 | [恢复手机数据：总览与准备](manual/restore.zh-CN.md) | 先保护现有备份，查看 Finder / Apple Devices 的前提与待验证范围 |

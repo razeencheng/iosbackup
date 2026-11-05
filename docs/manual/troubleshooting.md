@@ -85,7 +85,7 @@ The **Restart connection** button also checks whether any device operation is ru
 ![Sending backup data to the device](images/16-iosbk-s.png)
 
 4. After `backup_stalled`, wait for the old process to exit and release the resources held by the job. Check that the last-success time was not updated by this failure. Retaining the directory does not prove that pre-failure contents are unchanged: an incremental run may already have written data. Protect important copies independently.
-5. Once prompts and connectivity are resolved, start one new job. The current interface has no cancel-backup or checkpoint-resume feature. A failed job does not reconnect at its previous offset, and a new attempt can require another phone passcode authorization. Do not replace diagnosis with larger timeouts, repeated refreshes, or restarting every component.
+5. Once prompts and connectivity are resolved, start one new job. For a still-running job, **Stop backup** also holds automatic scheduling. There is no checkpoint-resume feature: a failed job does not reconnect at its previous offset, and a new attempt can require another phone passcode authorization. Do not replace diagnosis with larger timeouts, repeated refreshes, or restarting every component.
 6. After a Wi-Fi job ends, compare USB with the same version and backup path. USB success directs attention toward the Wi-Fi session; `mobilebackup2 (-4)` alone does not identify one cause. Use the [advanced NAT topic](wifi-nat.md) only for cross-subnet connections with supporting RST/idle-reuse evidence.
 
 **Expected result:** a record of the failing phase, first error, and one comparison test. Stop repeated retries when the same failure returns; keep the logs and test results before asking for help.

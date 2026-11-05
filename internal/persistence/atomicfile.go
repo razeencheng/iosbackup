@@ -25,6 +25,7 @@ type atomicOps struct {
 	createTemp func(string, string) (atomicTempFile, error)
 	rename     func(string, string) error
 	openDir    func(string) (atomicDir, error)
+	remove     func(string) error
 }
 
 func defaultAtomicOps() atomicOps {
@@ -63,7 +64,11 @@ func writeFileAtomic(path string, data []byte, mode os.FileMode, ops atomicOps) 
 				retErr = fmt.Errorf("close temporary file: %w", closeErr)
 			}
 		}
-		_ = os.Remove(tmpPath)
+		if ops.remove != nil {
+			_ = ops.remove(tmpPath)
+		} else {
+			_ = os.Remove(tmpPath)
+		}
 	}()
 
 	if _, err := tmp.Write(data); err != nil {

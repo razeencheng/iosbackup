@@ -254,7 +254,7 @@ func TestHomePageOnlyRendersExperimentalControlsWhenEnabled(t *testing.T) {
 		`src="/static/backup-browser.js`,
 		`onclick="loadBackups('` + experimentalTestUDID + `')"`,
 		`openRestoreModal('` + experimentalTestUDID + `'`,
-		`data-sec="remove"`,
+		`data-group="remove"`,
 	} {
 		if !strings.Contains(disabled, retained) {
 			t.Fatalf("default UI hid retained non-experimental control %q", retained)

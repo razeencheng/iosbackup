@@ -92,14 +92,14 @@ func (app *application) addLogWithLevel(udid, message string, level logLevel) {
 
 	logEntry := backupLogEntry{
 		UDID:      udid,
-		Timestamp: nowBeijing(),
+		Timestamp: app.nowTime(),
 		Status:    logLevelNames[level],
 		Message:   message,
 	}
 
 	// 输出到标准输出（log包本身是线程安全的）
 	log.Printf("[%s] %s %s: %s",
-		logEntry.Timestamp.Format("2006-01-02 15:04:05"),
+		logEntry.Timestamp.Format("2006-01-02T15:04:05Z07:00"),
 		logLevelNames[level],
 		udid,
 		message)

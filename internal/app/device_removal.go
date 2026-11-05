@@ -100,7 +100,7 @@ func (app *application) removeDevice(udid string) (time.Time, error) {
 	}
 	app.mu.Unlock()
 
-	removedAt := nowBeijing()
+	removedAt := app.nowTime()
 	candidate.RemovedAt = &removedAt
 	if err := app.configStore.Put(candidate); err != nil {
 		app.mu.Lock()

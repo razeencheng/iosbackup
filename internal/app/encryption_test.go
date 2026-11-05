@@ -8,6 +8,7 @@ import (
 
 func newEncTestApp(t *testing.T, udid string) (*application, *mockRunner) {
 	app := newApplication()
+	app.paths.ConfigsRoot = t.TempDir()
 	runner := &mockRunner{}
 	app.cmdRunner = runner.run
 	store, err := newAESSecretStore(testKey32(), tempSecretsPath(t))

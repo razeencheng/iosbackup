@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	_ "time/tzdata"
 )
 
 const (
@@ -33,6 +34,8 @@ const (
 // Runtime 是进程启动时一次性解析并校验的运行配置。
 // 运行期间不得重新读取环境变量；后续模块只接收该不可变值。
 type Runtime struct {
+	Timezone                     string
+	Location                     *time.Location
 	ListenAddr                   string
 	Port                         int
 	ConfigsRoot                  string
@@ -59,7 +62,10 @@ type Runtime struct {
 
 // Default 返回一份独立的默认运行配置。
 func Default() Runtime {
+	location, _ := time.LoadLocation("Asia/Shanghai")
 	return Runtime{
+		Timezone:                     "Asia/Shanghai",
+		Location:                     location,
 		ListenAddr:                   defaultListenAddr,
 		Port:                         defaultPort,
 		ConfigsRoot:                  defaultConfigsRoot,
@@ -83,6 +89,18 @@ func Default() Runtime {
 func Load(getenv func(string) string) (Runtime, error) {
 	cfg := Default()
 	var err error
+
+	if value := strings.TrimSpace(getenv("TZ")); value != "" {
+		// 只接受明确的 IANA 名称，避免 Local 或文件路径依赖宿主机配置。
+		if value == "Local" || strings.Contains(value, "..") || strings.HasPrefix(value, "/") || strings.Contains(value, "\\") {
+			return Runtime{}, fmt.Errorf("TZ: expected an IANA timezone name, got %q", value)
+		}
+		cfg.Location, err = time.LoadLocation(value)
+		if err != nil {
+			return Runtime{}, fmt.Errorf("TZ: %w", err)
+		}
+		cfg.Timezone = value
+	}
 
 	if value := strings.TrimSpace(getenv("IOSBK_LISTEN_ADDR")); value != "" {
 		addr, parseErr := netip.ParseAddr(value)

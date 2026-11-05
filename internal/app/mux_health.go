@@ -83,10 +83,10 @@ func (app *application) connectionServicesUnsafe() []connectionServiceDTO {
 			dto.Recovery = "idle"
 		}
 		if !s.lastSuccess.IsZero() {
-			dto.LastSuccess = toBeijingTime(s.lastSuccess).Format(time.RFC3339)
+			dto.LastSuccess = app.inDeploymentTime(s.lastSuccess).Format(time.RFC3339)
 		}
 		if !s.nextAttempt.IsZero() {
-			dto.NextAttempt = toBeijingTime(s.nextAttempt).Format(time.RFC3339)
+			dto.NextAttempt = app.inDeploymentTime(s.nextAttempt).Format(time.RFC3339)
 		}
 		if dto.Recovery == "waiting_busy" {
 			dto.Reason = "device_tasks"
@@ -197,7 +197,7 @@ func (app *application) scanConnection(parent context.Context, backend int, reco
 	if result.code == "" {
 		result.code = connectionErrorCode(err)
 	}
-	result.completed = nowBeijing()
+	result.completed = app.nowTime()
 	if parent.Err() == nil && app.rootCtx.Err() == nil && !errors.Is(err, context.Canceled) {
 		app.publishConnectionScan(backend, result)
 	}

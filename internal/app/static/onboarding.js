@@ -219,7 +219,7 @@
       badge.className = 'connection-badge online'; renderConnectionCopy();
     };
     eventSource.onmessage = function (event) {
-      try { snapshot = JSON.parse(event.data); render(); } catch (_) { showToast('guide.invalidStatus'); }
+      try { snapshot = JSON.parse(event.data); IOSBKI18n.setTimezone(snapshot.timezone); render(); } catch (_) { showToast('guide.invalidStatus'); }
     };
     eventSource.onerror = function () {
       var badge = document.getElementById('connectionBadge');

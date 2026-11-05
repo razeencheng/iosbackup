@@ -273,6 +273,7 @@ func TestNewPathsDerivesAllWritablePaths(t *testing.T) {
 		BackupsRoot: "/srv/backup",
 	})
 	want := config.Paths{
+		BackupJobsDir:          "/srv/config/backup-jobs/v1",
 		ConfigsRoot:            "/srv/config",
 		BackupsRoot:            "/srv/backup",
 		BackupBase:             "/srv/backup",

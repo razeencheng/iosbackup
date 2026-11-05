@@ -17,18 +17,18 @@ These are the defaults for a new device. For an existing device, use the values 
 | Setting | Default | Meaning |
 |---|---|---|
 | Automatic backup | Off | After you enable and save this setting, the app checks the schedule and starts eligible backups |
-| Backup window | 18:00 to 06:00 | Beijing time, across midnight; includes 18:00, excludes 06:00 |
+| Backup window | 18:00 to 06:00 | Deployment time, across midnight; includes 18:00, excludes 06:00 |
 | Backup interval | 24 hours | At least 24 hours since the last successful backup |
 | Minimum battery | 20% | A backup should not start below this level |
 | Only back up while charging | On | The device must report that it is charging |
 
-Windows use Beijing time (UTC+8), regardless of your browser's timezone. For example, 18:00 in the interface is 10:00 in a UTC+0 location. The window controls when new jobs start; a running job is not stopped merely because the window ends. Set different start and end times to avoid configuring the wrong backup window.
+Windows use the deployment `TZ` (default `Asia/Shanghai`), regardless of browser timezone or language. Changing `TZ` keeps the entered clock values and runs them in the new zone; review your windows after a change. Backup intervals measure actual elapsed hours, including across daylight-saving changes. A repeated local hour is eligible for the window in both occurrences, but the elapsed interval and active-job guard still apply. The window controls when new jobs start; a running job is not stopped merely because the window ends. Set different start and end times to avoid configuring the wrong backup window.
 
 **Battery and charging conditions also apply to “Back up now.”** Turning automatic backup off does not bypass them.
 
 ## Set an overnight schedule
 
-1. **In the Web UI** , find the target device and open **Backup settings** . Check its name and connection type so that you do not change another device.
+1. **In the Web UI** , find the target device and open **Device settings → Automatic backup schedule** . Check its name and connection type so that you do not change another device.
 2. Set **Backup window** to `18:00`–`06:00` and **Backup interval** to **Every 24 hours** . This is an overnight example; adjust the window to a time when you can respond to phone authorization prompts.
 3. Set **Minimum battery** to `20%` and leave **Only back up while charging** on. **On the phone** , connect power, then check the charging state reported on its device card.
 4. Keep **Save location** at the container path you have already validated, such as the default `/backups`. Do not move the backup directory as part of this schedule change.
@@ -51,25 +51,25 @@ Windows use Beijing time (UTC+8), regardless of your browser's timezone. For exa
 
 | Symptom | Check and next action |
 |---|---|
-| No job at the expected time | Check the Beijing-time window, last success, interval, and whether the enabled switch was saved |
+| No job at the expected time | Check the deployment-time window, last success, interval, and whether the enabled switch was saved |
 | Device is offline or removed | Reconnect it; removed devices are not scheduled. See [Device management](device-storage.md) |
 | Charging or battery conditions fail | Connect power and wait for the reported state to update; “Back up now” does not bypass these settings |
 | Another operation is running | The default permits one backup job at a time. This check can be skipped and a later check can try again if eligible; there is no guaranteed queue order |
 | Authorization wait ends in failure | Check the phone and [State reference](states.md), address the cause, then retry when the device is available |
 | Repeated failures | Turn automatic backup off and save, preserve the evidence, and follow [Troubleshooting](troubleshooting.md). Failure does not replace the last successful backup timestamp |
 
-To disable future automatic jobs, turn **Automatic backup** off in **Backup settings** and save. This does not stop an active backup; closing the browser does not stop it either.
+To disable future automatic jobs, turn **Automatic backup** off in **Device settings → Automatic backup schedule** and save. This does not stop an active backup; closing the browser does not stop it either.
 
 ## Stop a backup and hold automatic scheduling
 
-1. Select **Stop backup** on the active device card. Confirm once after reading the warning: interrupting this incremental backup may affect the recoverability of the previous backup.
-2. Wait through **Stopping…** until **Stopped · backup incomplete**. The device remains occupied until the process and output finish. The last-success timestamp remains a historical record, not proof that the current files can be restored.
-3. **Automatic backups on hold** persists after a normal restart or upgrade if saving succeeded. Original schedule settings are retained. **Back up once** runs one manual job without clearing the hold and still checks battery and charging requirements.
-4. Select **Resume automatic backups** when ready. This clears the hold without turning on a previously disabled schedule. A due backup may start at the next check if the original conditions are satisfied.
+1. Select **Stop backup** on the active device card and read the warning for this task's storage mode. History mode protects saved points; stopping an in-place update may leave the current backup set incomplete.
+2. Wait through **Stopping…** while the process and output finish. The primary action returns to **Back up now**, with one automatic-backup pause notice. Measured progress remains static; details stay in Task records.
+3. A saved pause survives normal restarts and upgrades. **Back up now** clears it after the new task passes battery, charging and other startup checks. Failed startup checks or a failed resume save leave automatic backups paused.
+4. Alternatively, select the **Resume automatic backups** text link in the notice to restore only the original schedule. Neither action enables a previously disabled schedule. A due backup may start at the next check if the original conditions are satisfied.
 
 If saving the hold fails, stopping still takes effect and automatic jobs are blocked in the current process. Persistence after restart is uncertain. Resolve the storage problem and select **Retry saving**. A failed resume also retains the hold in memory.
 
-Stopping retains existing files but does not roll back incremental updates or guarantee that the previous backup remains recoverable. Retrying starts a new protocol session. A stop just after completion preserves that result and holds future scheduling; an older request cannot stop a newer job. User stops update the page and logs without a failure notification. Actual failures still follow notification rules.
+Stopping leaves saved historical points unchanged and cleans up incomplete temporary history data after exit. In-place updates to the current set are not rolled back, and its restorability is not guaranteed. Retrying starts a new protocol session. A stop just after completion preserves that result and holds future scheduling; older requests cannot stop a newer job or clear a newer pause. User stops update the page and logs without a failure notification. Actual failures still follow notification rules.
 
 Re-adding a removed device preserves its settings. If automatic backup was on, a later scheduler check can start another job. To keep it disabled, turn it off and save before removing the device.
 

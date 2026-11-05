@@ -22,6 +22,12 @@
     return 'en';
   }
   var locale = resolveLocale(), observedCookie = '', observedStorage = null;
+  var timezone = 'Asia/Shanghai';
+  function setTimezone(value) {
+    if (!value) return;
+    try { new Intl.DateTimeFormat('en', {timeZone: value}); timezone = value; } catch (_) {}
+  }
+  setTimezone((global.document.documentElement.dataset || {}).timezone);
   function persist(writePreference) {
     if (writePreference !== false && readStorage('iosbk_lang') !== locale) writeStorage('iosbk_lang', locale);
     global.document.documentElement.lang = locale;
@@ -39,6 +45,7 @@
   }
   function has(key) { return Object.prototype.hasOwnProperty.call(catalogs[locale] || {}, key) || Object.prototype.hasOwnProperty.call(catalogs.en, key); }
   function t(key, params) {
+    params = Object.assign({timezone: timezone}, params || {});
     var value = (catalogs[locale] || {})[key];
     if (value == null) value = catalogs.en[key];
     if (value == null) return key;
@@ -110,17 +117,17 @@
   global.addEventListener('focus', syncPreferences);
   function formatDate(value) {
     if (!value) return '';
-    // Older API snapshots used a Beijing wall clock without an offset.
+    // 旧接口的无偏移时间仍按北京时间解析，显示时再转换到部署时区。
     var input = /^\d{4}-\d\d-\d\d \d\d:\d\d(?::\d\d)?$/.test(value) ? value.replace(' ', 'T') + '+08:00' : value;
     var date = new Date(input);
     if (Number.isNaN(date.getTime())) return String(value);
-    return new Intl.DateTimeFormat(locale, { timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }).format(date);
+    return new Intl.DateTimeFormat(locale, { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }).format(date);
   }
   function localeFetch(url, options) {
     options = Object.assign({}, options || {});
     var headers = new Headers(options.headers || {}); headers.set('Accept-Language', locale); options.headers = headers;
     return global.fetch(url, options);
   }
-  global.IOSBKI18n = { register: register, t: t, has: has, message: message, tree: tree, apply: apply, getLocale: function () { return locale; }, setLocale: setLocale, formatDate: formatDate, fetch: localeFetch, readStorage: readStorage, writeStorage: writeStorage };
+  global.IOSBKI18n = { register: register, t: t, has: has, message: message, tree: tree, apply: apply, getLocale: function () { return locale; }, setLocale: setLocale, formatDate: formatDate, setTimezone: setTimezone, getTimezone: function () { return timezone; }, fetch: localeFetch, readStorage: readStorage, writeStorage: writeStorage };
   persist();
 })(window);

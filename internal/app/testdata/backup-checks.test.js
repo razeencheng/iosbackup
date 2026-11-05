@@ -1,0 +1,31 @@
+'use strict';
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
+const catalogs=JSON.parse(fs.readFileSync(path.join(__dirname,'../static/ui-messages.json'),'utf8'));
+let locale='en';const listeners={},calls=[];
+function walk(n){return [n,...n.children.flatMap(walk)]}
+function node(tag='div'){const n={tagName:tag.toUpperCase(),textContent:'',children:[],dataset:{},className:'',attrs:{},open:false};n.appendChild=c=>{n.children.push(c);return c};n.replaceChildren=()=>n.children=[];n.setAttribute=(k,v)=>n.attrs[k]=v;n.addEventListener=()=>{};n.querySelector=s=>walk(n).find(c=>c!==n&&c.tagName===s.toUpperCase());n.classList={toggle(){}};return n}
+const host=node(),document={createElement:node,getElementById:id=>id==='currentCheck-PHONE'?host:null,addEventListener:(name,fn)=>listeners[name]=fn};
+const window={document,addEventListener(name,fn){listeners[name]=fn;},IOSBKI18n:{getLocale:()=>locale,t(key,params={}){return (catalogs[locale][key]||key).replace(/\{(\w+)\}/g,(_,key)=>String(params[key]));},has(key){return key in catalogs[locale];},formatDate(value){return value;}},csrfFetch(url,options){calls.push({url,body:JSON.parse(options.body)});return Promise.resolve({ok:true,json:()=>Promise.resolve({id:'bkp-000000000001'})});},refreshBackupControlStatus(){return Promise.resolve();}};
+vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../static/backup-checks.js'),'utf8'),{window});
+const api=window.IOSBKChecks,text=()=>walk(host).map(n=>n.textContent).join('\n'),actions=()=>walk(host).filter(n=>n.dataset.checkAction);
+const check={id:'bkp-000000000001',kind:'manifest',state:'unavailable',reason:'encrypted_manifest',metadata_complete:true,manifest_complete:false,records_checked:0,objects_checked:0,freshness:'current'};
+const prior={...check,kind:'quick',state:'passed',reason:'',completed_at:'2026-11-02T15:26:00Z'};
+api.render({udid:'PHONE',backup_check:{...check,last_completed:prior}});
+assert.match(text(),/Status check passed/);assert.match(text(),/not yet supported for encrypted backups/);assert.equal(actions().length,0);
+listeners.click({target:{closest:()=>({dataset:{udid:'PHONE',checkAction:'start'}})}});assert.equal(calls.length,0,'unsupported checks cannot be triggered through an old button');
+api.render({udid:'PHONE',backup_index:{source_key:'one'},backup_check:prior});
+api.source('PHONE',{source_key:'one',overview:{status:'available',freshness:'current',encrypted:true}});assert.equal(actions().length,0,'fresh local backup metadata hides file checks before an unsupported attempt');
+api.render({udid:'PHONE',backup_index:{source_key:'two'},backup_check:{...prior,freshness:'stale'}});assert.equal(actions().length,1,'encryption from another backup source cannot control this source');assert.match(text(),/out of date/);
+api.source('PHONE',{source_key:'two',overview:{status:'available',freshness:'stale',encrypted:true}});assert.equal(actions().length,0,'same-source encrypted metadata constrains capability even when cached');assert.match(text(),/out of date/,'cached metadata cannot make the previous check current');
+api.source('PHONE',{source_key:'two',overview:{status:'available',freshness:'current',encrypted:false}});assert.equal(actions().length,1);
+api.render({udid:'PHONE',backup_index:{source_key:'two',revision:'new'},backup_check:prior});
+api.source('PHONE',{source_key:'two',revision:'old',overview:{status:'available',freshness:'unknown',encrypted:true}});assert.equal(actions().length,0,'restarting does not expose unsupported checks for the displayed encrypted backup');
+api.source('PHONE',{source_key:'two',revision:'new',overview:{status:'available',freshness:'current',encrypted:true}});assert.equal(actions().length,0);
+api.render({udid:'PHONE',backup_index:{source_key:'two'},backup_check:{...prior,kind:'manifest'}});assert.equal(actions().length,1,'a current successful file check supersedes cached encryption');
+const quick=api.summary({...check,kind:'quick',state:'passed',reason:''});assert.match(quick,/metadata/i);assert.doesNotMatch(quick,/manifest scan complete: No|records read: 0|missing objects: 0/);
+const cancelled=api.summary({...check,reason:'cancelled',last_completed:{...check,state:'passed',reason:'',completed_at:'2026-10-30T12:00:00Z'}});assert.match(cancelled,/cancelled/i);assert.match(cancelled,/Previous completed check/);
+locale='zh-CN';listeners['iosbk:localechange']();assert.match(api.summary({...check,state:'passed',reason:'',freshness:'stale'}),/已过期/);
+api.render({udid:'PHONE',backing_up:true,backup_check_active:true,backup_check:check});assert.equal(actions()[0].dataset.checkAction,'cancel');
+listeners.click({target:{closest:()=>actions()[0]}});assert.equal(calls.length,1);assert.equal(calls[0].body.id,check.id);
+listeners.click({target:{closest:()=>actions()[0]}});assert.equal(calls.length,1,'in-flight cancellation is deduplicated');
+console.log('backup checks preserve source-specific encryption, stale evidence, language and cancellation identity');

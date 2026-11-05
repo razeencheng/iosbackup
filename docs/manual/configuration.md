@@ -36,6 +36,7 @@ Only the password and master key are credentials themselves, but paths and netwo
 |---|---|---|---|
 | `IOSBK_LISTEN_ADDR` | `127.0.0.1` | `0.0.0.0` | Listening IP literal; hostnames are not accepted. |
 | `PORT` | `8080` | `9000` | Integer 1–65535; edit PORT directly under environment. |
+| `TZ` | `Asia/Shanghai` | Not set (program default) | IANA timezone, e.g. `UTC`, `Asia/Kolkata`, `America/New_York`; invalid explicit values prevent startup. |
 | `LOG_LEVEL` | `INFO` | `INFO` | DEBUG / INFO / WARN / ERROR; unknown values fall back to INFO. Edit LOG_LEVEL directly under environment. |
 | `IOSBK_CONFIGS_DIR` | `/configs` | `/configs` | Absolute directory other than /; must be writable and persistent. |
 | `IOSBK_BACKUPS_DIR` | `/backups` | `/backups` | Absolute directory other than /; per-device save locations must stay within it. |
@@ -60,7 +61,7 @@ Only the password and master key are credentials themselves, but paths and netwo
 
 With authentication enabled, the rules below determine whether to use an existing password or generate one for a new instance. See [installation and login](installation.md) for retrieval. Web sessions last 12 hours and live in memory; a restart requires login again.
 
-Set the image directly in `services.iosbackup.image` in [compose.yaml](../../compose.yaml), defaulting to `ghcr.io/razeencheng/iosbackup:latest`. To pin a version, replace that value with an official version tag or digest; change it back to `latest` to follow updates. See the [installation guide](installation.md) for deployment and automatic initialization. Changing `TZ` does not change device schedules; schedules and user-visible timestamps use Beijing time (UTC+8).
+Set the image directly in `services.iosbackup.image` in [compose.yaml](../../compose.yaml), defaulting to `ghcr.io/razeencheng/iosbackup:latest`. To pin a version, replace that value with an official version tag or digest; change it back to `latest` to follow updates. See the [installation guide](installation.md) for deployment and automatic initialization. Set `TZ` under `environment` to control backup windows, UI times, notifications and application logs. Existing windows keep their clock values after a timezone change: `22:00–06:00` runs in the new zone, so review device schedules after changing it. Backup intervals still measure elapsed hours, and historical timestamps keep the same instant. The binary includes timezone data; the container does not need a separate timezone package.
 
 ## Advanced credential configuration
 
@@ -123,7 +124,7 @@ Edit these through Backup settings; see [automatic backups](scheduling.md) for a
 
 | Field | New-device default | Meaning |
 |---|---|---|
-| `start_time / end_time` | `18:00 / 06:00` | Beijing time in HH:mm; may cross midnight. |
+| `start_time / end_time` | `18:00 / 06:00` | Deployment time in HH:mm; may cross midnight. |
 | `backup_interval` | `24` | Minimum interval in hours, 1–720. UI offers 6/12/24/48 hours. |
 | `min_battery_level` | `20` | 0–100; manual backups also check battery/charging conditions. |
 | `only_when_charging` | `true` | Start backups only while charging. |

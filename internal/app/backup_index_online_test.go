@@ -47,6 +47,38 @@ func TestBackupIndexOnlineCapture(t *testing.T) {
 		t.Fatal("cache failure changed query result", n, err, calls)
 	}
 }
+
+func TestBackupIndexOnlineCaptureUsesLogicalKeyForHistorySource(t *testing.T) {
+	app := historyTestApp(t)
+	historyCommand(t, app, "finished", "payload", 0, nil)
+	if err := app.PerformBackup("CONTROL"); err != nil {
+		t.Fatal(err)
+	}
+	app.backupIndexManager().close()
+	app.mu.Lock()
+	app.backupIndex = nil
+	app.mu.Unlock()
+	root, release, err := app.acquireHistoryRead("CONTROL", app.paths.BackupsRoot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer release()
+	_, err = app.captureOnlineBackupIndex(context.Background(), "CONTROL", root, func(emit func([]string) error) (int, error) { return 1, emit([]string{"history", "captured"}) }, func([]string) error { return nil })
+	if err != nil {
+		t.Fatal(err)
+	}
+	source, err := app.resolveBackupIndexSource(context.Background(), "CONTROL")
+	if err != nil {
+		t.Fatal(err)
+	}
+	snapshot, err := app.backupIndexManager().store.load(source)
+	if err != nil || snapshot.FileList.Format != "online-v1" || !snapshot.FileList.Complete {
+		t.Fatal("history query did not populate logical cache", snapshot.FileList, err)
+	}
+	if source.Key != indexDigest(filepath.Clean(app.paths.BackupsRoot)+"\x00CONTROL") {
+		t.Fatal("actual point path became the cache key")
+	}
+}
 func TestBackupIndexOnlineCaptureRejectsChangedSource(t *testing.T) {
 	app, m, src := indexCoordinatorTestApp(t)
 	_, err := app.captureOnlineBackupIndex(context.Background(), src.UDID, app.paths.BackupsRoot, func(emit func([]string) error) (int, error) {

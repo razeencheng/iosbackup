@@ -4,6 +4,7 @@ import "path/filepath"
 
 // Paths 是从已校验 Runtime 派生的全部可写路径。
 type Paths struct {
+	BackupJobsDir          string
 	ConfigsRoot            string
 	BackupsRoot            string
 	BackupBase             string
@@ -19,6 +20,7 @@ type Paths struct {
 // NewPaths 从运行配置派生全部可写路径。
 func NewPaths(cfg Runtime) Paths {
 	return Paths{
+		BackupJobsDir:          filepath.Join(cfg.ConfigsRoot, "backup-jobs", "v1"),
 		ConfigsRoot:            cfg.ConfigsRoot,
 		BackupsRoot:            cfg.BackupsRoot,
 		BackupBase:             cfg.BackupsRoot,

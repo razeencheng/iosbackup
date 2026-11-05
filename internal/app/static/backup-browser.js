@@ -98,12 +98,16 @@
     function size(value) { if (value === null) return '—'; var units = ['B', 'KB', 'MB', 'GB', 'TB'], n = 0; while (value >= 1024 && n < units.length - 1) { value /= 1024; n++; } return new Intl.NumberFormat(options.locale(), {maximumFractionDigits: n ? 1 : 0}).format(value) + ' ' + units[n]; }
     return function (id, state) {
       var vm = view(state), data = state.snapshot || {}, o = data.overview || {}, l = data.file_list || {};
+      var encryptedUnavailable=vm.encrypted===true&&l.status==='unsupported',check=node(id,'currentCheck'),checkExplains=!!(check&&check.classList.contains&&!check.classList.contains('hidden'));
+      ['bkCountMetric','bkFileSection'].forEach(function(name){var n=node(id,name);if(n)n.classList.toggle('hidden',encryptedUnavailable);});
+      var metrics=node(id,'bkMetrics');if(metrics)metrics.classList.toggle('no-file-count',encryptedUnavailable);
       set(id, 'bkSize', size(vm.size)); set(id, 'bkCount', vm.count === null ? '—' : number(vm.count));
       set(id, 'bkEnc', vm.encrypted === null ? '—' : tr(vm.encrypted ? 'bindex.encryptedYes' : 'bindex.encryptedNo'));
       set(id, 'bkLatest', validDate(data.last_backup_at) ? options.formatDate(data.last_backup_at) : tr('bindex.noRecord'));
       set(id, 'bkStatusTitle', tr('bindex.' + vm.scenario + 'Title'));
-      set(id, 'bkStatusBody', tr('bindex.' + vm.scenario + 'Body'));
-      var status = node(id, 'bkStatus'); if (status) { status.dataset.state = vm.scenario; status.setAttribute('aria-busy', String(vm.busy)); }
+      var conciseEncrypted=encryptedUnavailable&&checkExplains&&vm.scenario==='encrypted';
+      set(id, 'bkStatusBody', conciseEncrypted?(vm.stale?tr('bindex.previousRead'):''):tr('bindex.' + vm.scenario + 'Body'));
+      var status = node(id, 'bkStatus'); if (status) { status.dataset.state = vm.scenario; status.setAttribute('aria-busy', String(vm.busy));status.classList.toggle('hidden',conciseEncrypted&&!vm.stale); }
       var times = [];
       if (validDate(o.read_at)) times.push(tr('bindex.overviewRead', {time: date(o.read_at)}));
       if (validDate(l.read_at)) times.push(tr('bindex.listRead', {time: date(l.read_at)}));
@@ -111,9 +115,9 @@
       var detail = node(id, 'bkReadDetail');
       if (detail) {
         var messages = [];
-        if (vm.stale) messages.push(tr('bindex.previousRead'));
+        if (vm.stale&&!conciseEncrypted) messages.push(tr('bindex.previousRead'));
         if (options.message && o.message_code && o.status !== 'missing') messages.push(tr('bindex.overviewDetail', {message: options.message({message_code: o.message_code}, 'common.operationFailed')}));
-        if (options.message && l.message_code && l.status !== 'missing') messages.push(tr('bindex.listDetail', {message: options.message({message_code: l.message_code}, 'common.operationFailed')}));
+        if (options.message && l.message_code && l.status !== 'missing'&&!(conciseEncrypted&&l.message_code==='api.backup_index_encrypted')) messages.push(tr('bindex.listDetail', {message: options.message({message_code: l.message_code}, 'common.operationFailed')}));
         detail.textContent = messages.join(' '); detail.classList.toggle('hidden', !messages.length);
       }
       var refresh = node(id, 'bkRefresh'); if (refresh) refresh.disabled = vm.busy;

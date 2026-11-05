@@ -7,9 +7,9 @@ import (
 	"testing"
 )
 
-func TestDeviceRemovalUIAddsConfirmedFifthTabAndImpactPanel(t *testing.T) {
+func TestDeviceRemovalUIRemainsReachableFromDeviceSettings(t *testing.T) {
 	markup := readEmbeddedPage(t, "index.html")
-	sections := []string{`data-sec="backup"`, `data-sec="backups"`, `data-sec="enc"`, `data-sec="danger"`, `data-sec="remove"`}
+	sections := []string{`data-sec="backups"`, `data-sec="jobs"`, `data-sec="settings"`}
 	last := -1
 	for _, section := range sections {
 		pos := strings.Index(markup, section)
@@ -22,7 +22,9 @@ func TestDeviceRemovalUIAddsConfirmedFifthTabAndImpactPanel(t *testing.T) {
 		last = pos
 	}
 	for _, want := range []string{
-		`data-sec-panel="remove"`,
+		`id="setting-remove-`,
+		`data-console-action="settings"`,
+		`data-group="remove"`,
 		`data-i18n="sec.remove"`,
 		`data-i18n="remove.reversible"`,
 		`data-i18n="remove.stopTitle"`,
@@ -110,7 +112,7 @@ func TestHomePageRendersDeviceRemovalControlsForActiveDevice(t *testing.T) {
 		t.Fatalf("首页应正常渲染，得到 %d: %s", rr.Code, rr.Body.String())
 	}
 	body := rr.Body.String()
-	for _, want := range []string{`data-sec="remove"`, `data-sec-panel="remove"`, udid, `data-name="家庭 iPhone"`, `data-model="iPhone14,4"`} {
+	for _, want := range []string{`data-group="remove"`, `id="setting-remove-` + udid + `"`, udid, `data-name="家庭 iPhone"`, `data-model="iPhone14,4"`} {
 		if !strings.Contains(body, want) {
 			t.Errorf("活动设备页面缺少移除控件数据 %q", want)
 		}

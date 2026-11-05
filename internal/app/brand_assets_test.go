@@ -135,7 +135,7 @@ func TestPrimaryInterfaceIconsUseReadableVisualScale(t *testing.T) {
 func TestPrimaryPagesUseSemanticSVGIconSprite(t *testing.T) {
 	wants := map[string][]string{
 		"index.html": {
-			`#icon-guide`, `#icon-bell`, `#icon-settings`, `#icon-backup-settings`,
+			`#icon-guide`, `#icon-bell`, `#icon-settings`, `#icon-settings`,
 			`#icon-backup-library`, `#icon-lock`, `#icon-restore`, `#icon-folder-check`,
 			`#icon-network-check`, `#icon-pair`, `#icon-unpack`, `['lock-open','enc.stateOff'`,
 			`#icon-shield-unlock`,
@@ -216,7 +216,7 @@ func TestDeviceSummaryControlsStayAlignedAndUnambiguous(t *testing.T) {
 		`function batteryIconHTML(color)`,
 		`function connectionIconHTML(conn)`,
 		`var battery=document.getElementById('battery-'+u)`,
-		`box.innerHTML = badgeHTML(d.conn);`,
+		`setTranslatedHTML(box,badgeHTML(d.conn));`,
 	} {
 		if !strings.Contains(markup, want) {
 			t.Errorf("设备摘要区缺少布局约束 %q", want)

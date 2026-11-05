@@ -11,6 +11,7 @@ import (
 
 func p4App(t *testing.T, udid, devName string) (*application, *mockRunner, chan struct{}) {
 	app := newApplication()
+	app.paths.ConfigsRoot = t.TempDir()
 	runner := &mockRunner{}
 	app.cmdRunner = runner.run
 	store, err := newAESSecretStore(testKey32(), tempSecretsPath(t))
@@ -83,6 +84,7 @@ func TestHandleEncryptionOK(t *testing.T) {
 
 func TestHandleEncryptionBoundedContext(t *testing.T) {
 	app := newApplication()
+	app.paths.ConfigsRoot = t.TempDir()
 	store, err := newAESSecretStore(testKey32(), tempSecretsPath(t))
 	if err != nil {
 		t.Fatal(err)

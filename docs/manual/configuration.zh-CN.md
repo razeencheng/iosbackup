@@ -36,6 +36,7 @@ curl -fsS --retry 12 --retry-connrefused --retry-delay 5 --retry-max-time 90 htt
 |---|---|---|---|
 | `IOSBK_LISTEN_ADDR` | `127.0.0.1` | `0.0.0.0` | 监听 IP 字面量，不接受主机名。 |
 | `PORT` | `8080` | `9000` | 整数 1–65535；直接修改 environment 中的 PORT。 |
+| `TZ` | `Asia/Shanghai` | 未设置（采用程序默认值） | IANA 时区，如 `UTC`、`Asia/Kolkata`、`America/New_York`；显式值无效时阻止启动。 |
 | `LOG_LEVEL` | `INFO` | `INFO` | DEBUG / INFO / WARN / ERROR；未知值回落 INFO。直接修改 environment 中的 LOG_LEVEL。 |
 | `IOSBK_CONFIGS_DIR` | `/configs` | `/configs` | 绝对目录且不能为 /；需可写、持久化。 |
 | `IOSBK_BACKUPS_DIR` | `/backups` | `/backups` | 绝对目录且不能为 /；设备保存位置必须在此目录内。 |
@@ -60,7 +61,7 @@ curl -fsS --retry 12 --retry-connrefused --retry-delay 5 --retry-max-time 90 htt
 
 认证启用时按下文规则使用已有密码，或为新实例生成密码；找回方法见[安装与登录](installation.zh-CN.md)。Web 会话有效期为 12 小时且保存在内存中，重启后需要重新登录。
 
-镜像直接在 [compose.yaml](../../compose.yaml) 的 `services.iosbackup.image` 中设置，默认为 `ghcr.io/razeencheng/iosbackup:latest`。需要固定版本时，将该值改为官方版本标签或 digest；改回 `latest` 即可继续跟随更新。首次部署和自动初始化步骤见[安装指南](installation.zh-CN.md)。不要通过修改 `TZ` 来调整设备计划；计划和用户可见时间使用北京时间（UTC+8）。
+镜像直接在 [compose.yaml](../../compose.yaml) 的 `services.iosbackup.image` 中设置，默认为 `ghcr.io/razeencheng/iosbackup:latest`。需要固定版本时，将该值改为官方版本标签或 digest；改回 `latest` 即可继续跟随更新。首次部署和自动初始化步骤见[安装指南](installation.zh-CN.md)。在 `environment` 中设置 `TZ`，统一控制备份时间窗、页面、通知及应用日志。修改时区后保留已填钟点，例如 `22:00–06:00` 改在新时区执行，请重新核对设备计划。备份间隔仍表示实际经过的小时数，历史时间的实际发生时刻不变。程序已嵌入时区数据，容器无需额外安装时区包。
 
 ## 高级凭据配置
 
@@ -123,7 +124,7 @@ services:
 
 | 字段 | 新设备默认值 | 含义 |
 |---|---|---|
-| `start_time / end_time` | `18:00 / 06:00` | 北京时间 HH:mm；可跨午夜。 |
+| `start_time / end_time` | `18:00 / 06:00` | 部署时区 HH:mm；可跨午夜。 |
 | `backup_interval` | `24` | 最小间隔，单位小时；1–720。UI 提供 6/12/24/48 小时。 |
 | `min_battery_level` | `20` | 0–100；手动备份也会检查电量/充电条件。 |
 | `only_when_charging` | `true` | 仅在充电时开始备份。 |

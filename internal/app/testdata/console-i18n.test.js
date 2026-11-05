@@ -98,6 +98,43 @@ test('old toast timer cannot hide a newer message',()=>{
   assert.equal(app.get('toast').classList.contains('hidden'),false);
   assert.equal(app.get('toastMsg').textContent,app.api.message({message_code:'api.low_battery',params:{battery:9,min_battery:20}}));
 });
+test('drawer toast relocalizes and expires without reviving the page toast',()=>{
+  const app=page(),dialog=app.nodes.node(),clones=[];
+  const query=app.document.querySelectorAll;
+  app.document.querySelectorAll=selector=>selector==='dialog[open]'?[dialog]:query(selector);
+  app.get('toast').cloneNode=()=>{
+    const node=app.nodes.node();node.remove=()=>{node.removed=true;};
+    node.querySelector('[data-toast-message]').textContent=app.get('toastMsg').textContent;
+    clones.push(node);return node;
+  };
+  app.run("toast('bset.saved')");app.advance(1000);app.api.setLocale('zh-CN');
+  assert.equal(clones[0].querySelector('[data-toast-message]').textContent,catalogs['zh-CN']['bset.saved']);
+  assert.equal(app.get('toast').classList.contains('hidden'),true);
+  app.advance(1601);assert.equal(clones[0].removed,true);
+  app.api.setLocale('en');assert.equal(app.get('toast').classList.contains('hidden'),true);
+});
+test('new console task feedback keeps its message across language changes',()=>{
+  const app=page();app.window.toast=app.context.toast;
+  app.run("IOSBKConsole.openJob('PHONE','expired')");
+  assert.equal(app.get('toastMsg').textContent,catalogs.en['console.jobMissing']);
+  app.api.setLocale('zh-CN');
+  assert.equal(app.get('toastMsg').textContent,catalogs['zh-CN']['console.jobMissing']);
+});
+test('force-full submission retains the request mode and localized failure',async()=>{
+  const app=page(),request=deferred();let sent;
+  app.window.fetch=(url,options)=>{sent={url,options};return request.promise;};
+  app.run("submitBackup('PHONE',document.getElementById('backupBtn-PHONE'),'full')");
+  assert.equal(sent.url,'/api/backup/PHONE');
+  assert.equal(JSON.parse(sent.options.body).mode,'full');
+  assert.equal(app.get('backupBtn-PHONE').disabled,true);
+  app.api.setLocale('zh-CN');
+  request.resolve(response({error:'raw',message_code:'api.low_battery',params:{battery:9,min_battery:20}},false));
+  await tick();
+  assert.equal(app.get('backupBtn-PHONE').disabled,false);
+  assert.equal(app.get('toastMsg').textContent,app.api.message({message_code:'api.low_battery',params:{battery:9,min_battery:20}}));
+  app.api.setLocale('en');
+  assert.equal(app.get('toastMsg').textContent,app.api.message({message_code:'api.low_battery',params:{battery:9,min_battery:20}}));
+});
 test('pair rejection preserves its message without changing actual pairing state',async()=>{
   const app=page();app.run("renderPairingResult({udid:'PHONE',pairing_state:'paired'})");
   app.window.fetch=()=>Promise.resolve(response({error:'raw diagnostic',code:'busy',message_code:'api.busy'},false));
@@ -174,6 +211,32 @@ test('backup terminal metadata relocalizes and unknown codes retain legacy fallb
   assert.equal(app.get('bkprogress-status-hint-PHONE').textContent,app.api.message({message_code:'api.low_battery',params:{battery:9,min_battery:20}}));
   app.run("patchDevice({udid:'PHONE',last_backup_error_code:'backup_stalled',last_backup_message_code:'vendor.unknown',backup_progress:{state:'failed'}})");
   assert.equal(app.get('bkprogress-status-hint-PHONE').textContent,apiCatalog['zh-CN']['api.backup_stalled']);
+});
+test('backup terminal results remain visible and local operations cannot appear as a phone backup',()=>{
+  const app=page();
+  for(const state of ['failed','interrupted','stopped','completed']){
+    app.context.fixture={udid:'PHONE',backing_up:false,backup_progress:{state}};
+    app.run('patchDevice(fixture)');
+    assert.equal(app.get('bkbar-PHONE').classList.contains('hidden'),false,state+' must remain visible');
+  }
+  for(const operation of ['check','local']){
+    app.context.fixture={udid:'PHONE',backing_up:true,active_operation:operation,backup_progress:{state:'completed'}};
+    app.run('patchDevice(fixture)');
+    assert.equal(app.get('bkbar-PHONE').classList.contains('hidden'),true,operation+' must not use the backup panel');
+  }
+  app.run("patchDevice({udid:'PHONE',backing_up:false})");
+  assert.equal(app.get('bkbar-PHONE').classList.contains('hidden'),true,'no invented result');
+});
+test('primary backup starts automatic mode without a mode dialog',async()=>{
+  const app=page();let request,dialogs=0;
+  app.window.IOSBKConsole.backup=()=>{dialogs++;};
+  app.window.fetch=(url,options)=>{request={url,body:JSON.parse(options.body)};return Promise.resolve(response({}));};
+  app.run("startBackup('PHONE',document.getElementById('backupBtn-PHONE'))");
+  await tick();
+  assert.equal(dialogs,0,'ordinary backup must not require a mode selection');
+  assert.ok(request,'ordinary backup must submit immediately');
+  assert.equal(request.url,'/api/backup/PHONE');
+  assert.equal(request.body.mode,'auto');
 });
 test('onboarding toast and backup terminal use live language without raw diagnostics',()=>{
   const app=page('en',true);
