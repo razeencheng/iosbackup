@@ -63,6 +63,8 @@ See [Operations](docs/OPERATIONS.md) for detailed troubleshooting.
 
 ## Version history
 
+v1.5.5 adds backup history, complete exports, offline browsing and checks, with improved backup controls, localization, notifications, and deployment timezone support. See the [release notes](CHANGELOG.md#v155).
+
 See the [Changelog](CHANGELOG.md) for the latest changes, historical releases, and compatibility notes.
 
 ## Development and contributions
