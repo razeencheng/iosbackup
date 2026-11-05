@@ -2,6 +2,62 @@
 
 This project follows Semantic Versioning. Release dates and source metadata are frozen in [`release/manifest.env`](release/manifest.env); this file does not duplicate the current release date.
 
+## v1.5.5
+
+### 中文
+
+**v1.5.5 — 历史备份、离线浏览与更完善的备份管理**
+
+本次更新新增历史备份保留、完整导出和离线检查，让备份更容易查看、管理和排查问题，同时完善中英文支持、通知和自动备份控制。
+
+- **保留多个历史备份**：支持按设备开启历史保留，保存最近 N 份正常备份，并固定重要版本。开启后，每次备份使用独立工作副本，失败或停止不会改写已保存的历史备份；空间不足时优先保护已有历史。
+- **完整导出备份**：可将选中的历史备份下载为完整 `.tar` 归档，保留原始目录结构和加密状态。补充通过 Finder、Apple Devices 恢复备份的中英文指南。
+- **手机离线也能查看备份**：直接读取服务器或 NAS 上的备份概况及未加密文件清单，支持搜索、分页和完整 CSV 清单下载，已保存的索引可跨重启保留。
+- **停止备份与暂缓自动计划**：运行中的备份可直接停止，并暂缓该设备的自动备份，避免立即重新启动。暂缓状态跨重启保留，可主动恢复，或在下一次手动备份通过启动检查后解除。
+- **备份检查与任务记录**：备份执行成功后自动进行轻量状态检查；未加密备份支持离线文件存在性检查。任务记录支持筛选、分页、详情和日志导出，分别展示执行、检查及历史保存结果。
+- **更清晰的控制台**：设备卡片统一为“备份列表 / 任务记录 / 设备设置”，记住展开状态和页签。优化备份进度、等待提示与停止确认，并提供单次强制全量备份入口。
+- **完善中英文体验**：统一登录、控制台、引导页及通知设置的翻译。切换语言时保留未保存输入和进行中的操作；通知语言可独立设置，保留已有自定义模板。
+- **减少通知干扰**：短暂离线和偶发配对检查失败不再反复推送告警，持续影响自动备份的问题才触发提醒。最终备份通知合并执行、检查和历史保存结果，避免重复通知。
+- **支持部署时区**：自动备份窗口、页面时间、通知和应用日志统一使用 `TZ`，默认仍为 `Asia/Shanghai`。界面语言不影响调度。
+- **文档与基础维护**：新增双语官网和恢复指南，更新 Go 工具链及构建依赖，完善多架构构建和回归检查。
+
+### 升级须知
+
+- 历史备份默认关闭，开启时默认预填保留 **2 份**，可设置 **1–365 份**。固定备份、旧加密版本等受保护数据另计，实际数量可能超过设置值；独立副本也需要额外存储空间。已有旧加密代不会因升级被自动合并或删除。
+- 未开启历史时仍会原地更新当前备份，停止任务可能使当前备份集不完整。
+- 修改 `TZ` 后，原有备份窗口的钟点保持不变，按新时区解释，请核对计划。
+- 旧通知配置继续默认使用中文。需要英文通知时，请单独设置通知语言；已有自定义模板不会自动翻译。清空相应模板并保存后，可使用所选语言的默认正文。
+- 新增的检查和历史异常通知规则，仅在缺失时继承原备份失败规则的渠道；明确关闭的规则保持关闭。
+- 加密备份暂不支持离线解密文件清单或逐项文件检查。检查通过不代表已验证整机恢复成功，Finder / Apple Devices 的识别、解密和实际恢复仍需单独验证。
+
+### English
+
+**v1.5.5 — Backup history, offline browsing, and improved backup management**
+
+This release adds backup history, complete exports, and offline checks to make backups easier to inspect, manage, and troubleshoot. It also improves English and Chinese support, notifications, and automatic backup controls.
+
+- **Keep multiple historical backups**: Enable history per device, retain the latest N normal backups, and pin important versions. Each history-enabled backup uses an independent working copy, so a failed or stopped attempt does not overwrite saved history. When space is insufficient, existing protected backups are preserved.
+- **Export complete backups**: Download a selected historical backup as a complete `.tar` archive, preserving its original directory structure and encryption state. New English and Chinese guides explain the recovery workflow with Finder and Apple Devices.
+- **Inspect backups while the phone is offline**: Read backup summaries and unencrypted file lists directly from your server or NAS. Search and paginate the preview, download the complete saved file list as CSV, and retain saved indexes across restarts.
+- **Stop backups and hold automatic scheduling**: Stop an active backup and place automatic backups for that device on hold to prevent an immediate restart. The hold survives application restarts and can be cleared explicitly or when the next manual backup passes its startup checks.
+- **Backup checks and task records**: Run a lightweight status check after successful backup execution, with offline file-existence checks available for unencrypted backups. Filter and paginate task records, inspect details, and export logs. Execution, check, and history-saving results are shown separately.
+- **A clearer console**: Device cards now organize controls into Backup list, Task records, and Device settings, remembering expanded cards and selected tabs. Progress, waiting states, and stop confirmations are clearer, with an advanced option to request a full backup for a single run.
+- **More complete English and Chinese support**: Consistent translations across login, the console, onboarding, and notification settings. Language changes preserve unsaved inputs and ongoing operations. Notification language is configured independently, and existing custom templates are retained.
+- **Less notification noise**: Transient disconnections and occasional pairing-check failures no longer produce repeated alerts. Persistent pairing problems that block automatic backups trigger actionable warnings. Final backup notifications combine execution, check, and history-saving results to avoid duplicate messages.
+- **Deployment timezone support**: Backup windows, displayed times, notifications, and application logs use the deployment's `TZ`, defaulting to `Asia/Shanghai`. Interface language does not affect scheduling.
+- **Documentation and maintenance**: Added a bilingual website and recovery guides, updated the Go toolchain and build dependencies, and expanded multi-architecture build and regression checks.
+
+### Upgrade notes
+
+- Backup history is **off by default**. The retention field starts at **2 backups** and accepts **1–365**. Pinned backups, older encryption generations, and other protected data are retained separately, so the total may exceed the configured count. Independent copies also require additional storage. Existing older encryption generations are not automatically merged or deleted on upgrade.
+- With history disabled, backups continue to update the current set in place. Stopping a backup can leave that set incomplete.
+- Changing `TZ` preserves the configured clock times and interprets them in the new timezone. Review your backup window after changing it.
+- Existing notification configurations continue to default to Chinese. Select the notification language separately to receive English notifications. Existing custom templates are not translated automatically; clear and save the relevant template to use the default text in the selected language.
+- New check-attention and history-attention notification rules inherit the existing backup-failure channels only when those rules are missing. Explicitly disabled rules stay disabled.
+- Offline decryption of encrypted file lists and per-file checks of encrypted backups are not supported. A passed check does not establish successful whole-device recovery. Finder / Apple Devices recognition, decryption, and actual recovery still require separate validation.
+
+**Full changelog / 完整变更**: https://github.com/razeencheng/iosbackup/compare/v1.5.4...v1.5.5
+
 ## v1.5.4
 
 ### Fixed
