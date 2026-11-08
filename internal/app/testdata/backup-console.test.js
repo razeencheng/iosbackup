@@ -132,6 +132,7 @@ function pageStateFixture({values={},devices=['A','B'],readFails=false,writeFail
   ]){
     const host={classList:{toggle(){}},replaceChildren(){this.children=[];},append(...children){this.children=children;}};
     const page={document:{addEventListener(){},getElementById:id=>id==='consoleRecent-A'?host:null,createElement:()=>({})},addEventListener(){},formatBackupBytes:()=>'',IOSBKI18n:{t:(key,params={})=>(messages[key]||key).replace(/\{(\w+)\}/g,(_,key)=>params[key]),has:key=>key in messages,fetch:async url=>({ok:true,json:async()=>({jobs:url.includes('type=backup')?[{id:'task',...job}]:Array.from({length:5},(_,i)=>({id:'check-'+i,operation:'check',state:'succeeded'}))})})}};
+    vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../static/backup-checks.js'),'utf8'),{window:page});
     vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../static/backup-console.js'),'utf8'),{window:page});
     page.IOSBKConsole.updateHistory({udid:'A',points:[],data:{policy:{enabled:false},current_source:{kind:'missing'},storage:{},total:0,logical_bytes:0,bytes_known:true}});
     await new Promise(setImmediate);

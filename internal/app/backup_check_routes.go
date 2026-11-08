@@ -32,7 +32,7 @@ func (app *application) startBackupCheck(udid string) (string, error) {
 	// 已知不支持的加密清单在建立任务前拒绝，避免重复留下失败任务。
 	// 持有来源占用，只读所选备份的元数据，不使用手机当前的加密设置。
 	probeCtx, probeCancel := context.WithTimeout(app.rootCtx, backupQuickCheckTimeout)
-	encrypted := backupSourceIsEncrypted(probeCtx, udid, filepath.Dir(backupPath))
+	encrypted := app.backupSourceIsEncrypted(probeCtx, udid, filepath.Dir(backupPath))
 	probeCancel()
 	if encrypted {
 		release()
@@ -99,8 +99,8 @@ func (app *application) startBackupCheck(udid string) (string, error) {
 }
 
 // 无法确定加密状态时仍走原检查流程，保留元数据缺失、损坏等真实诊断。
-func backupSourceIsEncrypted(ctx context.Context, udid, root string) bool {
-	src, err := resolveBackupIndexSourceAt(ctx, udid, root)
+func (app *application) backupSourceIsEncrypted(ctx context.Context, udid, root string) bool {
+	src, err := locateBackupIndexSourceAt(ctx, udid, root)
 	if err != nil {
 		return false
 	}
@@ -109,18 +109,18 @@ func backupSourceIsEncrypted(ctx context.Context, udid, root string) bool {
 		return false
 	}
 	defer dir.Close()
-	manifest, err := readBackupCheckPlist(ctx, dir, "Manifest.plist", nil)
+	manifest, err := app.plistLimit().readPlist(ctx, dir, "Manifest.plist", nil)
 	return err == nil && manifest["IsEncrypted"] == true
 }
 
 func (app *application) checkBackupSourceAt(ctx context.Context, udid, root, kind string) backupCheckResult {
-	src, err := resolveBackupIndexSourceAt(ctx, udid, root)
+	src, err := locateBackupIndexSourceAt(ctx, udid, root)
 	var result backupCheckResult
 	if err != nil {
 		state, reason := backupCheckError(err)
 		result = backupCheckResult{Kind: kind, State: state, Reason: reason, StartedAt: app.nowTime(), CompletedAt: app.nowTime(), Freshness: "unknown", SourceKey: src.Key}
 	} else {
-		result = runBackupCheck(ctx, src, kind, nil, app.manifestRows)
+		result = app.plistLimit().runBackupCheck(ctx, src, kind, nil, app.manifestRows)
 	}
 	result.StartedAt = app.inDeploymentTime(result.StartedAt)
 	result.CompletedAt = app.inDeploymentTime(result.CompletedAt)
@@ -388,7 +388,7 @@ func (s currentBackupCheckSource) pointResult() *backupCheckResult {
 	if backupJobIDPattern.MatchString(p.JobID) {
 		id = p.JobID
 	}
-	return &backupCheckResult{ID: id, Kind: c.Scope, State: c.State, Reason: c.Reason, StartedAt: c.CheckedAt, CompletedAt: c.CheckedAt, SourceRef: s.ref, Freshness: "unknown", MetadataComplete: c.MetadataComplete, ManifestComplete: c.ManifestComplete, RecordsChecked: c.RecordsChecked, ObjectsChecked: c.ObjectsChecked, MissingObjects: c.MissingObjects, InvalidRecords: c.InvalidRecords, UnsupportedRecords: c.UnsupportedRecords}
+	return &backupCheckResult{ID: id, Kind: c.Scope, State: c.State, Reason: c.Reason, PlistFile: c.PlistFile, PlistLimitMiB: c.PlistLimitMiB, StartedAt: c.CheckedAt, CompletedAt: c.CheckedAt, SourceRef: s.ref, Freshness: "unknown", MetadataComplete: c.MetadataComplete, ManifestComplete: c.ManifestComplete, RecordsChecked: c.RecordsChecked, ObjectsChecked: c.ObjectsChecked, MissingObjects: c.MissingObjects, InvalidRecords: c.InvalidRecords, UnsupportedRecords: c.UnsupportedRecords}
 }
 
 func (app *application) backupTaskDeviceNameUnsafe(udid string) string {

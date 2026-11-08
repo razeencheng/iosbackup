@@ -72,7 +72,7 @@
   policyFields(v);if(!v.data)return;
   var data=v.data;if(global.IOSBKConsole)global.IOSBKConsole.updateHistory(v);set('historySummaryText-'+u,tr(data.policy.enabled?'history.policySummary':'history.policySummaryOff',{limit:data.policy.count})+(policyNotice(data)?'\n'+policyNotice(data):''));
   set('historyStorage-'+u,tr('history.storage',{size:bytes(data.logical_bytes||0)})+(data.bytes_known?'':' · '+tr('history.sizePartial')));
-  var warning=[];if(data.unavailable_stores.length)warning.push(tr('history.unavailable'));if(data.busy)warning.push(tr('history.busy'));if(data.phase==='enabling'||data.phase==='disabling')warning.push(tr('history.transition'));if(data.phase==='disabled'&&data.total)warning.push(tr('history.manualHint'));
+  var warning=[];if(data.unavailable_stores.length)warning.push(tr('history.unavailable'));if(data.busy)warning.push(tr('history.busy'));if((!data.policy_operation||data.policy_operation.state==='running')&&(data.phase==='enabling'||data.phase==='disabling'))warning.push(tr('history.transition'));if(data.phase==='disabled'&&data.total)warning.push(tr('history.manualHint'));
   set('historyWarning-'+u,warning.join(' '));show('historyWarning-'+u,warning.length>0);
   var moreButton=doc.getElementById('historyMore-'+u);if(moreButton)moreButton.disabled=v.loading;var list=doc.getElementById('historyList-'+u);if(!list)return;var signature=JSON.stringify([v.points,v.selected,pending,data.current_source,global.IOSBKI18n.getLocale()]);if(list.dataset.signature===signature){renderSessions();return;}list.dataset.signature=signature;list.replaceChildren();
   if(!v.points.length)list.appendChild(el('p',tr(data.policy.enabled?'history.empty':'history.off'),'history-empty'));
@@ -89,7 +89,7 @@
     var pass=el('button',undefined,'console-check-pass');pass.type='button';pass.innerHTML='<svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-check-circle"></use></svg>';pass.setAttribute('aria-label',tr('check.kind.'+(check.scope||'quick'))+' · '+tr('check.state.passed'));
     pass.setAttribute('data-hint',tr('check.kind.'+(check.scope||'quick'))+' · '+tr('check.state.passed')+'\n'+date(check.checked_at)+'\n'+tr(check.scope==='manifest'?'check.tooltipManifest':'check.tooltipQuick',{metadata:tr(check.metadata_complete?'check.yes':'check.no'),manifest:tr(check.manifest_complete?'check.yes':'check.no'),records:check.records_checked||0,objects:check.objects_checked||0}));cell.appendChild(pass);
    }else{cell.appendChild(el('span',label('check',check.state),'console-amber'));cell.appendChild(el('small',date(check.checked_at),'console-subtle'));}
-   if(checks.attempt)cell.appendChild(el('small',tr('check.reason.'+(checks.attempt.reason||'read_failed')),checks.attempt.reason==='cancelled'?'console-subtle':'console-amber'));
+   if(checks.attempt)cell.appendChild(el('small',global.IOSBKChecks.reason(checks.attempt),checks.attempt.reason==='cancelled'?'console-subtle':'console-amber'));
    if(p.review_save_failed)cell.appendChild(el('small',tr('history.reviewSaveFailed'),'console-amber'));row.appendChild(cell);
    cell=el('div',undefined,'console-retention');var term=p.pinned?'pinned':p.manual?'manual':p.state==='pending'?'pending':'';
    if(term){cell.appendChild(el('span',tr('term.'+term+'.title'),'history-badge'));cell.appendChild(hint(term));}else cell.appendChild(el('span',tr('console.byPolicy')));

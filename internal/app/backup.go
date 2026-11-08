@@ -74,6 +74,13 @@ func backupFailureState(err error) (stateCode, errorCode string) {
 	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 		return backupStateInterrupted, "backup_cancelled"
 	}
+	var translated *i18n.Error
+	if errors.As(err, &translated) {
+		switch translated.Code {
+		case i18n.HistoryImportFailed, i18n.HistoryCapacity, i18n.StorageUnavailable:
+			return backupStateFailed, strings.TrimPrefix(translated.Code, "api.")
+		}
+	}
 	message := strings.ToLower(err.Error())
 	switch {
 	case errors.Is(err, backupstore.ErrCapacity), strings.Contains(message, "no space"), strings.Contains(message, "read-only file system"), strings.Contains(message, "permission denied"):

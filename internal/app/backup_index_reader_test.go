@@ -18,6 +18,9 @@ func writeIndexFixture(t *testing.T, dir, name, data string) {
 		t.Fatal(err)
 	}
 }
+
+const testPlistLimit plistReadLimit = 1 << 20
+
 func TestBackupIndexPlistTypedValuesAndBinaryAdapter(t *testing.T) {
 	xml := `<?xml version="1.0"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>IsEncrypted</key><false/><key>Device Name</key><string>A &amp; B</string><key>Nested</key><array><integer>2</integer><data>YQ==</data></array></dict></plist>`
 	for _, binary := range []bool{false, true} {
@@ -33,7 +36,7 @@ func TestBackupIndexPlistTypedValuesAndBinaryAdapter(t *testing.T) {
 		if binary {
 			input = []byte("bplist00synthetic")
 		}
-		values, err := parseBackupPlist(context.Background(), input, converter)
+		values, err := testPlistLimit.parseBackupPlist(context.Background(), input, converter)
 		if err != nil || values["IsEncrypted"] != false || values["Device Name"] != "A & B" {
 			t.Fatalf("values=%v err=%v", values, err)
 		}
@@ -43,17 +46,17 @@ func TestBackupIndexPlistTypedValuesAndBinaryAdapter(t *testing.T) {
 	}
 }
 func TestBackupIndexPlistRejectsMalformedLimitsAndCancellation(t *testing.T) {
-	for _, input := range []string{`<plist><dict><key>x</key></dict></plist>`, `<plist><dict><key>x</key><true/><key>x</key><false/></dict></plist>`, `<plist><dict><key>x</key><string>unterminated`, `<plist><dict></dict></plist><other/>`, strings.Repeat("x", backupIndexMaxPlistBytes+1), `<plist>` + strings.Repeat("<array>", 40) + strings.Repeat("</array>", 40) + `</plist>`} {
-		if _, err := parseBackupPlist(context.Background(), []byte(input), nil); err == nil {
+	for _, input := range []string{`<plist><dict><key>x</key></dict></plist>`, `<plist><dict><key>x</key><true/><key>x</key><false/></dict></plist>`, `<plist><dict><key>x</key><string>unterminated`, `<plist><dict></dict></plist><other/>`, strings.Repeat("x", int(testPlistLimit)+1), `<plist>` + strings.Repeat("<array>", 40) + strings.Repeat("</array>", 40) + `</plist>`} {
+		if _, err := testPlistLimit.parseBackupPlist(context.Background(), []byte(input), nil); err == nil {
 			t.Fatalf("accepted malformed/oversized input length=%d", len(input))
 		}
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	if _, err := parseBackupPlist(ctx, []byte(`<plist><dict/></plist>`), nil); !errors.Is(err, context.Canceled) {
+	if _, err := testPlistLimit.parseBackupPlist(ctx, []byte(`<plist><dict/></plist>`), nil); !errors.Is(err, context.Canceled) {
 		t.Fatalf("cancel=%v", err)
 	}
-	_, err := parseBackupPlist(context.Background(), []byte("bplist00synthetic"), func(context.Context, []byte) ([]byte, error) { return make([]byte, backupIndexMaxPlistBytes+1), nil })
+	_, err := testPlistLimit.parseBackupPlist(context.Background(), []byte("bplist00synthetic"), func(context.Context, []byte) ([]byte, error) { return make([]byte, int(testPlistLimit)+1), nil })
 	if !errors.Is(err, errBackupIndexLimit) {
 		t.Fatalf("converted size limit: %v", err)
 	}
@@ -66,17 +69,17 @@ func TestBackupIndexOverviewOfflineUnknownAndExplicitFalse(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	got, err := readBackupIndexOverview(context.Background(), src, nil)
+	got, err := testPlistLimit.readBackupIndexOverview(context.Background(), src, nil)
 	if err != nil || got.Encrypted == nil || *got.Encrypted || got.SizeBytes == nil || *got.SizeBytes == 0 || got.DeviceName != "Phone" || got.BackupDate == nil || got.ReadAt.IsZero() {
 		t.Fatalf("overview=%+v err=%v", got, err)
 	}
 	writeIndexFixture(t, dir, "Manifest.plist", `<plist><dict/></plist>`)
-	got, err = readBackupIndexOverview(context.Background(), src, nil)
+	got, err = testPlistLimit.readBackupIndexOverview(context.Background(), src, nil)
 	if err != nil || got.Encrypted != nil {
 		t.Fatalf("absence is unknown: %+v %v", got, err)
 	}
 	writeIndexFixture(t, dir, "Manifest.plist", `<plist><dict><key>IsEncrypted</key><string>false</string></dict></plist>`)
-	if _, err := readBackupIndexOverview(context.Background(), src, nil); !errors.Is(err, errBackupIndexCorrupt) {
+	if _, err := testPlistLimit.readBackupIndexOverview(context.Background(), src, nil); !errors.Is(err, errBackupIndexCorrupt) {
 		t.Fatalf("wrong type: %v", err)
 	}
 }
@@ -86,7 +89,7 @@ func TestBackupIndexOverviewNoMetadataIsNotEmptyBackup(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := readBackupIndexOverview(context.Background(), src, nil); !errors.Is(err, errBackupIndexCorrupt) {
+	if _, err := testPlistLimit.readBackupIndexOverview(context.Background(), src, nil); !errors.Is(err, errBackupIndexCorrupt) {
 		t.Fatalf("partial backup: %v", err)
 	}
 }
@@ -161,7 +164,7 @@ func TestBackupIndexOverviewUsesPublishedStateNames(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	result, err := readBackupIndexOverview(context.Background(), source, nil)
+	result, err := testPlistLimit.readBackupIndexOverview(context.Background(), source, nil)
 	if err != nil || result.Status != "available" || result.Freshness != "current" {
 		t.Fatalf("overview state=%+v err=%v", result, err)
 	}
@@ -177,7 +180,7 @@ func TestBackupIndexOverviewFailureCannotClaimCurrent(t *testing.T) {
 	if err := os.Symlink(t.TempDir(), filepath.Join(dir, "outside")); err != nil {
 		t.Fatal(err)
 	}
-	result, err := readBackupIndexOverview(context.Background(), source, nil)
+	result, err := testPlistLimit.readBackupIndexOverview(context.Background(), source, nil)
 	if err == nil || result.Status != "unavailable" || result.Freshness != "unknown" || result.ReadAt.IsZero() == false || result.MessageCode == "" {
 		t.Fatalf("failed overview=%+v err=%v", result, err)
 	}
@@ -199,7 +202,7 @@ func TestBackupIndexReaderRejectsReplacedSourceSymlinkBeforeReading(t *testing.T
 	if err := os.Symlink(dir+"-old", dir); err != nil {
 		t.Fatal(err)
 	}
-	result, err := readBackupIndexOverview(context.Background(), source, nil)
+	result, err := testPlistLimit.readBackupIndexOverview(context.Background(), source, nil)
 	if !errors.Is(err, errBackupIndexUnsafeSource) || result.Encrypted != nil {
 		t.Fatalf("must not read through replaced source: %+v %v", result, err)
 	}
@@ -210,7 +213,7 @@ func TestBackupIndexReaderRejectsReplacedSourceSymlinkBeforeReading(t *testing.T
 }
 
 func TestBackupIndexMissingPlistToolIsUnavailable(t *testing.T) {
-	_, err := convertBackupBinaryPlistCommand(context.Background(), filepath.Join(t.TempDir(), "absent-tool"), []byte("bplist00synthetic"))
+	_, err := testPlistLimit.convertBackupBinaryPlistCommand(context.Background(), filepath.Join(t.TempDir(), "absent-tool"), []byte("bplist00synthetic"))
 	if !errors.Is(err, errBackupIndexUnavailable) || errors.Is(err, errBackupIndexCorrupt) {
 		t.Fatalf("missing dependency is not corrupt backup: %v", err)
 	}
@@ -235,7 +238,7 @@ func TestBackupIndexOverviewAnchorsDirectoryDuringConversion(t *testing.T) {
 		}
 		return []byte(`<plist><dict><key>IsEncrypted</key><false/></dict></plist>`), nil
 	}
-	result, err := readBackupIndexOverview(context.Background(), source, converter)
+	result, err := testPlistLimit.readBackupIndexOverview(context.Background(), source, converter)
 	if err != nil || result.DeviceName != "original" {
 		t.Fatalf("scan followed replaced ancestor: %+v %v", result, err)
 	}
@@ -246,8 +249,8 @@ func TestBackupIndexOverviewAnchorsDirectoryDuringConversion(t *testing.T) {
 
 func TestBackupIndexPlistOutputLimitCancelsWithoutTruncation(t *testing.T) {
 	cancelled := false
-	output := &backupPlistOutput{cancel: func() { cancelled = true }}
-	if n, err := output.Write(make([]byte, backupIndexMaxPlistBytes)); err != nil || n != backupIndexMaxPlistBytes {
+	output := &backupPlistOutput{limit: testPlistLimit, cancel: func() { cancelled = true }}
+	if n, err := output.Write(make([]byte, int(testPlistLimit))); err != nil || n != int(testPlistLimit) {
 		t.Fatalf("valid output boundary: %d %v", n, err)
 	}
 	if n, err := output.Write([]byte("x")); !errors.Is(err, errBackupIndexLimit) || n != 0 || !cancelled || !output.exceeded {
@@ -264,17 +267,17 @@ func TestBackupIndexPlistCommandDeadlineAndOutputBudget(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Millisecond)
 		defer cancel()
 		started := time.Now()
-		_, err := convertBackupBinaryPlistCommand(ctx, script, []byte("bplist00synthetic"))
+		_, err := testPlistLimit.convertBackupBinaryPlistCommand(ctx, script, []byte("bplist00synthetic"))
 		if !errors.Is(err, context.DeadlineExceeded) || time.Since(started) > 3*time.Second {
 			t.Fatalf("deadline not honored promptly: %v", err)
 		}
 	})
 	t.Run("output budget", func(t *testing.T) {
 		script := filepath.Join(t.TempDir(), "plistutil")
-		if err := os.WriteFile(script, []byte("#!/bin/sh\nexec /bin/cat \"$0\"\n"+strings.Repeat("#", backupIndexMaxPlistBytes+1)), 0700); err != nil {
+		if err := os.WriteFile(script, []byte("#!/bin/sh\nexec /bin/cat \"$0\"\n"+strings.Repeat("#", int(testPlistLimit)+1)), 0700); err != nil {
 			t.Fatal(err)
 		}
-		_, err := convertBackupBinaryPlistCommand(context.Background(), script, []byte("bplist00synthetic"))
+		_, err := testPlistLimit.convertBackupBinaryPlistCommand(context.Background(), script, []byte("bplist00synthetic"))
 		if !errors.Is(err, errBackupIndexLimit) {
 			t.Fatalf("tool output must fail rather than truncate: %v", err)
 		}
@@ -309,7 +312,7 @@ func TestBackupIndexManifestRejectsPendingJournal(t *testing.T) {
 
 func TestBackupIndexPlistNestingLimit(t *testing.T) {
 	input := `<plist><dict><key>nested</key>` + strings.Repeat("<array>", 40) + strings.Repeat("</array>", 40) + `</dict></plist>`
-	if _, err := parseBackupPlist(context.Background(), []byte(input), nil); !errors.Is(err, errBackupIndexLimit) {
+	if _, err := testPlistLimit.parseBackupPlist(context.Background(), []byte(input), nil); !errors.Is(err, errBackupIndexLimit) {
 		t.Fatalf("valid dict root must reach nesting limit: %v", err)
 	}
 }

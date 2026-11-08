@@ -6,10 +6,12 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"iosbackup/internal/backupstore"
 	"os"
 	"path/filepath"
 	"time"
+
+	"iosbackup/internal/backupstore"
+	"iosbackup/internal/i18n"
 )
 
 const historyIOTimeout = 6 * time.Hour
@@ -298,7 +300,7 @@ func (app *application) prepareBackupHistory(job *backupJob, root string) (*back
 	if !st.MigrationDone {
 		st, err = app.migrateHistorySource(ctx, job, st, gen)
 		if err != nil {
-			return nil, err
+			return nil, operationError(historyPolicyErrorCode(err, i18n.HistoryImportFailed), err, "")
 		}
 	}
 	st.Phase = "active"
@@ -347,7 +349,7 @@ func (app *application) prepareBackupHistory(job *backupJob, root string) (*back
 				return nil, err
 			}
 			if state.compatibleBaseline(point, true) {
-				metadataOK := app.historyBaselineMetadata(ctx, source, point, gen)
+				metadataOK := app.plistLimit().historyBaselineMetadata(ctx, source, point, gen)
 				if metadataOK {
 					baseline, sourceStore = point.ID, point.StoreID
 				}
@@ -360,11 +362,7 @@ func (app *application) prepareBackupHistory(job *backupJob, root string) (*back
 	}
 	return &backupHistoryRun{state: st, store: store, work: work, generation: gen, active: true, forceFull: baseline == ""}, nil
 }
-func (app *application) historyBaselineMetadata(ctx context.Context, store *backupstore.Store, p backupstore.Point, g backupstore.Generation) bool {
-	return historyBaselineMetadata(ctx, store, p, g)
-}
-
-func historyBaselineMetadata(ctx context.Context, store *backupstore.Store, p backupstore.Point, g backupstore.Generation) bool {
+func (limit plistReadLimit) historyBaselineMetadata(ctx context.Context, store *backupstore.Store, p backupstore.Point, g backupstore.Generation) bool {
 	if !sameBackupGeneration(p.Generation, g) {
 		return false
 	}
@@ -373,7 +371,7 @@ func historyBaselineMetadata(ctx context.Context, store *backupstore.Store, p ba
 		return false
 	}
 	defer lease.Close()
-	metadata, err := readBackupCheckPlist(ctx, lease.Root, "Manifest.plist", nil)
+	metadata, err := limit.readPlist(ctx, lease.Root, "Manifest.plist", nil)
 	if err != nil {
 		return false
 	}
@@ -611,7 +609,9 @@ func (app *application) migrateHistorySource(ctx context.Context, job *backupJob
 	if unknownTime {
 		at = app.nowTime()
 		result.State = "unavailable"
-		result.Reason = "unknown_source_time"
+		if result.PlistFile == "" {
+			result.Reason = "unknown_source_time"
+		}
 	}
 	st.LegacyState = result.State
 	point := app.historyPoint(st, gen, at, result)
@@ -647,7 +647,7 @@ func (app *application) generationForHistoryResult(ctx context.Context, udid, di
 		return fallback, err
 	}
 	defer root.Close()
-	manifest, err := readBackupCheckPlist(ctx, root, "Manifest.plist", nil)
+	manifest, err := app.plistLimit().readPlist(ctx, root, "Manifest.plist", nil)
 	if err != nil {
 		return fallback, err
 	}
@@ -707,7 +707,7 @@ func (app *application) sameHistoryEncryption(ctx context.Context, udid string, 
 		return false
 	}
 	defer lease.Close()
-	oldManifest, err := readBackupCheckPlist(ctx, lease.Root, "Manifest.plist", nil)
+	oldManifest, err := app.plistLimit().readPlist(ctx, lease.Root, "Manifest.plist", nil)
 	if err != nil || oldManifest["IsEncrypted"] != true || historyKeybagDigest(oldManifest) != point.Generation.KeybagDigest {
 		return false
 	}
@@ -1176,7 +1176,7 @@ func (app *application) historyImportCompletion(ctx context.Context, dir string,
 		if ctx.Err() != nil {
 			return time.Time{}
 		}
-		values, err := readBackupCheckPlist(ctx, root, field[0], nil)
+		values, err := app.plistLimit().readPlist(ctx, root, field[0], nil)
 		if err != nil {
 			continue
 		}
@@ -1193,7 +1193,7 @@ func (app *application) importHistoryGeneration(ctx context.Context, udid, dir s
 	keybag := ""
 	root, err := os.OpenRoot(dir)
 	if err == nil {
-		values, e := readBackupCheckPlist(ctx, root, "Manifest.plist", nil)
+		values, e := app.plistLimit().readPlist(ctx, root, "Manifest.plist", nil)
 		root.Close()
 		if e == nil {
 			keybag = historyKeybagDigest(values)
@@ -1230,5 +1230,5 @@ func (app *application) startHistoryCurrentWrite(job *backupJob, run *backupHist
 }
 
 func historyCheckEvidence(r backupCheckResult) backupstore.Check {
-	return backupstore.Check{State: r.State, Scope: r.Kind, CheckedAt: r.CompletedAt, Reason: r.Reason, MetadataComplete: r.MetadataComplete, ManifestComplete: r.ManifestComplete, RecordsChecked: r.RecordsChecked, ObjectsChecked: r.ObjectsChecked, MissingObjects: r.MissingObjects, InvalidRecords: r.InvalidRecords, UnsupportedRecords: r.UnsupportedRecords}
+	return backupstore.Check{State: r.State, Scope: r.Kind, CheckedAt: r.CompletedAt, PlistFile: r.PlistFile, PlistLimitMiB: r.PlistLimitMiB, Reason: r.Reason, MetadataComplete: r.MetadataComplete, ManifestComplete: r.ManifestComplete, RecordsChecked: r.RecordsChecked, ObjectsChecked: r.ObjectsChecked, MissingObjects: r.MissingObjects, InvalidRecords: r.InvalidRecords, UnsupportedRecords: r.UnsupportedRecords}
 }

@@ -24,6 +24,7 @@ type historyLocations struct {
 	Stores  []historyLocation             `json:"stores"`
 }
 type backupStorage struct {
+	plistLimit  plistReadLimit
 	recovery    map[string]backupstore.RecoveryReport
 	mu          sync.Mutex
 	uncertain   bool
@@ -35,8 +36,8 @@ type backupStorage struct {
 	write       func(string, []byte, os.FileMode) error
 }
 
-func newBackupStorage(registry string) *backupStorage {
-	return &backupStorage{recovery: map[string]backupstore.RecoveryReport{}, registry: registry, slot: make(chan struct{}, 1), stores: map[string]*backupstore.Store{}, unavailable: map[string]error{}, locations: historyLocations{Schema: 1}}
+func newBackupStorage(registry string, limit plistReadLimit) *backupStorage {
+	return &backupStorage{plistLimit: limit, recovery: map[string]backupstore.RecoveryReport{}, registry: registry, slot: make(chan struct{}, 1), stores: map[string]*backupstore.Store{}, unavailable: map[string]error{}, locations: historyLocations{Schema: 1}}
 }
 func (m *backupStorage) load(ctx context.Context) error {
 	m.mu.Lock()
@@ -338,7 +339,7 @@ func (m *backupStorage) close() error {
 }
 
 func (app *application) recoverBackupStorage(ctx context.Context) error {
-	storage := newBackupStorage(filepath.Join(app.paths.ConfigsRoot, "history-stores.json"))
+	storage := newBackupStorage(filepath.Join(app.paths.ConfigsRoot, "history-stores.json"), app.plistLimit())
 	if err := storage.load(ctx); err != nil {
 		_ = storage.close()
 		return err

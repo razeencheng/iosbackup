@@ -3,6 +3,10 @@ package app
 import (
 	"context"
 	"errors"
+	"fmt"
+	"os"
+	"syscall"
+
 	"iosbackup/internal/backupstore"
 	"iosbackup/internal/i18n"
 )
@@ -36,6 +40,20 @@ func (app *application) historyPolicyStatus(udid string, cfg *backupConfig) hist
 	return view
 }
 
+func historyPolicyErrorCode(err error, fallback string) string {
+	var translated *i18n.Error
+	switch {
+	case errors.As(err, &translated):
+		return translated.Code
+	case errors.Is(err, backupstore.ErrCapacity), errors.Is(err, syscall.ENOSPC), errors.Is(err, syscall.EDQUOT):
+		return i18n.HistoryCapacity
+	case errors.Is(err, os.ErrPermission), errors.Is(err, syscall.EROFS):
+		return i18n.StorageUnavailable
+	default:
+		return fallback
+	}
+}
+
 func (app *application) startHistoryPolicy(requestCtx context.Context, udid string, policy backupstore.Policy, confirmed *historyPolicyPreview) (historyPolicyRun, error) {
 	service := app.historyService()
 	ctx, cancel := context.WithCancel(app.rootCtx)
@@ -65,6 +83,9 @@ func (app *application) startHistoryPolicy(requestCtx context.Context, udid stri
 	go func() {
 		defer cancel()
 		err := app.runHistoryPolicy(work)
+		if err != nil {
+			app.addWarnLog(udid, fmt.Sprintf("event=backup.history_policy_failed job_id=%s error=%v", run.ID, err))
+		}
 		service.mu.Lock()
 		run.CleanupState = work.job.historyCleanup
 		if run.CleanupState == "" {
@@ -72,12 +93,9 @@ func (app *application) startHistoryPolicy(requestCtx context.Context, udid stri
 		}
 		run.State = "succeeded"
 		if err != nil {
-			run.State, run.ErrorCode = "failed", i18n.HistoryUnavailable
+			run.State, run.ErrorCode = "failed", historyPolicyErrorCode(err, i18n.HistoryUnavailable)
 			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 				run.State = "interrupted"
-			}
-			if errors.Is(err, backupstore.ErrCapacity) {
-				run.ErrorCode = i18n.HistoryCapacity
 			}
 		}
 		close(run.done)

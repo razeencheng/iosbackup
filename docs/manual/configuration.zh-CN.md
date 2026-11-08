@@ -40,6 +40,7 @@ curl -fsS --retry 12 --retry-connrefused --retry-delay 5 --retry-max-time 90 htt
 | `LOG_LEVEL` | `INFO` | `INFO` | DEBUG / INFO / WARN / ERROR；未知值回落 INFO。直接修改 environment 中的 LOG_LEVEL。 |
 | `IOSBK_CONFIGS_DIR` | `/configs` | `/configs` | 绝对目录且不能为 /；需可写、持久化。 |
 | `IOSBK_BACKUPS_DIR` | `/backups` | `/backups` | 绝对目录且不能为 /；设备保存位置必须在此目录内。 |
+| `IOSBK_PLIST_MAX_MIB` | `64` | `64` | 检查和浏览时单个 plist 输入及转换输出的解析上限，单位 MiB，整数 1–256。超限文件仍可保存、导入、导出。 |
 | `IOSBK_AUTH_ENABLED` | `false` | `true` | true / false。推荐部署始终开启认证。 |
 | `IOSBK_ADMIN_PASSWORD_FILE` | `未设置` | `未设置` | 可选自定义密码文件的绝对路径，至少 24 字节；默认自动管理密码和摘要，见下文。读取时去掉末尾一组 CR/LF。 |
 | `IOSBK_SECRET_KEY` | `未设置` | `未设置` | 可选环境主密钥：标准 Base64 编码的恰 32 字节；与密钥文件覆盖互斥。 |

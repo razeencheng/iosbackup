@@ -87,6 +87,7 @@ const (
 	HistoryCheckUnknown                   = "api.history_check_unknown"
 	HistoryConflict                       = "api.history_conflict"
 	HistoryExportNoResume                 = "api.history_export_no_resume"
+	HistoryImportFailed                   = "api.history_import_failed"
 	HistorySessionExpired                 = "api.history_session_expired"
 	HistoryUnavailable                    = "api.history_unavailable"
 	InvalidBackupMode                     = "api.invalid_backup_mode"

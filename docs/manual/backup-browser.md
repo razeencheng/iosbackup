@@ -49,13 +49,13 @@ Current built-in limits are:
 |---|---|
 | Concurrent local index scans | One per application instance; repeated requests for the same source are coalesced |
 | Local scan duration | 15 minutes |
-| Each plist input and converted output | 8 MiB |
+| Each plist input and converted output | 64 MiB by default, configurable with `IOSBK_PLIST_MAX_MIB` |
 | One CSV record | 1 MiB |
 | Preview | 5,000 entries and 16 MiB |
 | One complete CSV | 512 MiB |
 | Total index storage | 2 GiB across sources, including temporary and metadata storage |
 
-These limits protect NAS memory, CPU and disk use; they are not additional environment settings. Allow free space for the index as well as the original backup. A budget or storage failure does not publish a partial list as complete. Compatible previous data is kept when possible, while the page reports the failed update. The index can be regenerated from a readable unencrypted backup; an encrypted historical list may not be reproducible without another successful compatible online query.
+Raising the plist limit can increase peak memory usage during parsing. Copies and TAR exports stream the original bytes independently of this setting. Allow free space for the index as well as the original backup. A budget or storage failure does not publish a partial list as complete. Compatible previous data is kept when possible, while the page reports the failed update. The index can be regenerated from a readable unencrypted backup; an encrypted historical list may not be reproducible without another successful compatible online query.
 
 See [Encryption and credentials](encryption.md), [Devices and storage](device-storage.md), and [Instance backup and recovery](instance-recovery.md) for protecting the actual backup and its credentials. Local unpacking remains a separate [experimental operation](experimental.md).
 

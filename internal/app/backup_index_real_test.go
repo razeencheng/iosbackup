@@ -29,10 +29,10 @@ func TestBackupIndexRealReadOnlySample(t *testing.T) {
 	converter := backupPlistConverter(nil)
 	if tool := os.Getenv("IOSBK_TEST_PLISTUTIL"); tool != "" {
 		converter = func(ctx context.Context, data []byte) ([]byte, error) {
-			return convertBackupBinaryPlistCommand(ctx, tool, data)
+			return testPlistLimit.convertBackupBinaryPlistCommand(ctx, tool, data)
 		}
 	}
-	overview, err := readBackupIndexOverview(ctx, src, converter)
+	overview, err := testPlistLimit.readBackupIndexOverview(ctx, src, converter)
 	if err != nil {
 		t.Fatal(backupIndexErrorCode(err))
 	}

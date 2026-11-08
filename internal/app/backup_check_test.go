@@ -104,7 +104,7 @@ func checkRows(rows ...backupManifestRow) backupManifestRowStreamer {
 }
 func TestBackupCheckQuickAndDetailedCoverage(t *testing.T) {
 	_, src, dir := checkFixture(t)
-	quick := runBackupCheck(context.Background(), src, "quick", nil, nil)
+	quick := testPlistLimit.runBackupCheck(context.Background(), src, "quick", nil, nil)
 	if quick.State != "passed" || !quick.MetadataComplete || quick.ManifestComplete {
 		t.Fatalf("quick=%+v", quick)
 	}
@@ -115,14 +115,14 @@ func TestBackupCheckQuickAndDetailedCoverage(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "aa", id), []byte("bytes"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	full := runBackupCheck(context.Background(), src, "manifest", nil, checkRows(backupManifestRow{FileID: id, Flags: 1}, backupManifestRow{FileID: strings.Repeat("b", 40), Flags: 2}, backupManifestRow{FileID: strings.Repeat("c", 40), Flags: 4}))
+	full := testPlistLimit.runBackupCheck(context.Background(), src, "manifest", nil, checkRows(backupManifestRow{FileID: id, Flags: 1}, backupManifestRow{FileID: strings.Repeat("b", 40), Flags: 2}, backupManifestRow{FileID: strings.Repeat("c", 40), Flags: 4}))
 	if full.State != "passed" || !full.ManifestComplete || full.RecordsChecked != 3 || full.ObjectsChecked != 1 {
 		t.Fatalf("full=%+v", full)
 	}
 	if err := os.Remove(filepath.Join(dir, "aa", id)); err != nil {
 		t.Fatal(err)
 	}
-	missing := runBackupCheck(context.Background(), src, "manifest", nil, checkRows(backupManifestRow{FileID: id, Flags: 1}))
+	missing := testPlistLimit.runBackupCheck(context.Background(), src, "manifest", nil, checkRows(backupManifestRow{FileID: id, Flags: 1}))
 	if missing.State != "issues" || missing.MissingObjects != 1 || !missing.ManifestComplete {
 		t.Fatalf("missing=%+v", missing)
 	}
@@ -140,7 +140,7 @@ func TestBackupCheckMetadataDistinguishesMissingFalseAndIncomplete(t *testing.T)
 			if err := os.WriteFile(filepath.Join(dir, tc.file), []byte(tc.body), 0600); err != nil {
 				t.Fatal(err)
 			}
-			got := runBackupCheck(context.Background(), src, "quick", nil, nil)
+			got := testPlistLimit.runBackupCheck(context.Background(), src, "quick", nil, nil)
 			if got.State != tc.state {
 				t.Fatalf("result=%+v", got)
 			}
@@ -152,18 +152,18 @@ func TestBackupCheckEncryptedAndUnsupportedRecords(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "Manifest.plist"), []byte(`<plist><dict><key>IsEncrypted</key><true/></dict></plist>`), 0600); err != nil {
 		t.Fatal(err)
 	}
-	if got := runBackupCheck(context.Background(), src, "quick", nil, nil); got.State != "passed" {
+	if got := testPlistLimit.runBackupCheck(context.Background(), src, "quick", nil, nil); got.State != "passed" {
 		t.Fatalf("encrypted quick=%+v", got)
 	}
-	if got := runBackupCheck(context.Background(), src, "manifest", nil, nil); got.State != "unavailable" || got.Reason != "encrypted_manifest" || !got.MetadataComplete {
+	if got := testPlistLimit.runBackupCheck(context.Background(), src, "manifest", nil, nil); got.State != "unavailable" || got.Reason != "encrypted_manifest" || !got.MetadataComplete {
 		t.Fatalf("encrypted scan=%+v", got)
 	}
 	_, src, _ = checkFixture(t)
-	got := runBackupCheck(context.Background(), src, "manifest", nil, checkRows(backupManifestRow{FileID: strings.Repeat("a", 40), Flags: 8}))
+	got := testPlistLimit.runBackupCheck(context.Background(), src, "manifest", nil, checkRows(backupManifestRow{FileID: strings.Repeat("a", 40), Flags: 8}))
 	if got.State != "unavailable" || got.UnsupportedRecords != 1 || got.ManifestComplete {
 		t.Fatalf("unknown flags=%+v", got)
 	}
-	got = runBackupCheck(context.Background(), src, "manifest", nil, checkRows(backupManifestRow{FileID: "../escape", Flags: 1}))
+	got = testPlistLimit.runBackupCheck(context.Background(), src, "manifest", nil, checkRows(backupManifestRow{FileID: "../escape", Flags: 1}))
 	if got.State != "issues" || got.InvalidRecords != 1 {
 		t.Fatalf("invalid fileID=%+v", got)
 	}
@@ -172,7 +172,7 @@ func TestBackupCheckCancellationAndSourceSafety(t *testing.T) {
 	_, src, dir := checkFixture(t)
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	if got := runBackupCheck(ctx, src, "manifest", nil, nil); got.State != "unavailable" || got.Reason != "cancelled" || got.ManifestComplete {
+	if got := testPlistLimit.runBackupCheck(ctx, src, "manifest", nil, nil); got.State != "unavailable" || got.Reason != "cancelled" || got.ManifestComplete {
 		t.Fatalf("cancel=%+v", got)
 	}
 	if err := os.Remove(filepath.Join(dir, "Info.plist")); err != nil {
@@ -181,7 +181,7 @@ func TestBackupCheckCancellationAndSourceSafety(t *testing.T) {
 	if err := os.Symlink(filepath.Join(t.TempDir(), "outside"), filepath.Join(dir, "Info.plist")); err != nil {
 		t.Fatal(err)
 	}
-	if got := runBackupCheck(context.Background(), src, "quick", nil, nil); got.State == "passed" {
+	if got := testPlistLimit.runBackupCheck(context.Background(), src, "quick", nil, nil); got.State == "passed" {
 		t.Fatalf("unsafe=%+v", got)
 	}
 }
@@ -197,13 +197,13 @@ func TestBackupCheckBinaryMetadataAndBoundedRead(t *testing.T) {
 	}
 	converted := 0
 	converter := func(ctx context.Context, data []byte) ([]byte, error) { converted++; return xml, nil }
-	if got := runBackupCheck(context.Background(), src, "quick", converter, nil); got.State != "passed" || converted != 1 {
+	if got := testPlistLimit.runBackupCheck(context.Background(), src, "quick", converter, nil); got.State != "passed" || converted != 1 {
 		t.Fatalf("binary=%+v conversions=%d", got, converted)
 	}
 	converter = func(ctx context.Context, data []byte) ([]byte, error) {
-		return make([]byte, backupIndexMaxPlistBytes+1), nil
+		return make([]byte, int(testPlistLimit)+1), nil
 	}
-	if got := runBackupCheck(context.Background(), src, "quick", converter, nil); got.State != "unavailable" || got.Reason != "resource_limit" {
+	if got := testPlistLimit.runBackupCheck(context.Background(), src, "quick", converter, nil); got.State != "unavailable" || got.Reason != "resource_limit" {
 		t.Fatalf("oversize=%+v", got)
 	}
 }
@@ -216,14 +216,14 @@ func TestBackupCheckPartialScanAndChangedSource(t *testing.T) {
 		}
 		return context.DeadlineExceeded
 	}
-	got := runBackupCheck(context.Background(), src, "manifest", nil, streamer)
+	got := testPlistLimit.runBackupCheck(context.Background(), src, "manifest", nil, streamer)
 	if got.State != "unavailable" || got.Reason != "timeout" || got.RecordsChecked != 1 || got.ManifestComplete {
 		t.Fatalf("partial=%+v", got)
 	}
 	streamer = func(ctx context.Context, _ string, emit func(backupManifestRow) error) error {
 		return os.WriteFile(filepath.Join(dir, "Status.plist"), []byte(`<plist><dict><key>SnapshotState</key><string>unfinished</string></dict></plist>`), 0600)
 	}
-	got = runBackupCheck(context.Background(), src, "manifest", nil, streamer)
+	got = testPlistLimit.runBackupCheck(context.Background(), src, "manifest", nil, streamer)
 	if got.State != "unavailable" || got.Reason != "source_changed" || got.Freshness != "stale" {
 		t.Fatalf("changed=%+v", got)
 	}
@@ -292,14 +292,14 @@ func TestBackupCheckShutdownCancelsManualScan(t *testing.T) {
 func TestBackupCheckMissingToolsAreUnavailable(t *testing.T) {
 	_, src, dir := checkFixture(t)
 	missing := &os.PathError{Op: "exec", Path: "missing-tool", Err: os.ErrNotExist}
-	got := runBackupCheck(context.Background(), src, "manifest", nil, func(context.Context, string, func(backupManifestRow) error) error { return missing })
+	got := testPlistLimit.runBackupCheck(context.Background(), src, "manifest", nil, func(context.Context, string, func(backupManifestRow) error) error { return missing })
 	if got.State != "unavailable" || got.Reason != "read_failed" {
 		t.Fatalf("sqlite missing=%+v", got)
 	}
 	if err := os.WriteFile(filepath.Join(dir, "Status.plist"), []byte("bplist00fixture"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	got = runBackupCheck(context.Background(), src, "quick", func(context.Context, []byte) ([]byte, error) { return nil, missing }, nil)
+	got = testPlistLimit.runBackupCheck(context.Background(), src, "quick", func(context.Context, []byte) ([]byte, error) { return nil, missing }, nil)
 	if got.State != "unavailable" || got.Reason != "read_failed" {
 		t.Fatalf("plistutil missing=%+v", got)
 	}
@@ -351,7 +351,7 @@ func TestBackupCheckSubprocessCancellationPreservesReason(t *testing.T) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 	defer cancel()
-	result := runBackupCheck(ctx, src, "manifest", nil, func(ctx context.Context, _ string, emit func(backupManifestRow) error) error {
+	result := testPlistLimit.runBackupCheck(ctx, src, "manifest", nil, func(ctx context.Context, _ string, emit func(backupManifestRow) error) error {
 		return streamBackupManifestRowsCommand(ctx, tool, filepath.Join(dir, "Manifest.db"), emit)
 	})
 	if result.State != "unavailable" || result.Reason != "timeout" {
@@ -391,7 +391,7 @@ func TestBackupCheckCorruptSQLiteIsAnIssue(t *testing.T) {
 	if err := os.WriteFile(tool, []byte("#!/bin/sh\nprintf 'Error: database disk image is malformed\\n' >&2\nexit 1\n"), 0700); err != nil {
 		t.Fatal(err)
 	}
-	result := runBackupCheck(context.Background(), src, "manifest", nil, func(ctx context.Context, _ string, emit func(backupManifestRow) error) error {
+	result := testPlistLimit.runBackupCheck(context.Background(), src, "manifest", nil, func(ctx context.Context, _ string, emit func(backupManifestRow) error) error {
 		return streamBackupManifestRowsCommand(ctx, tool, filepath.Join(dir, "Manifest.db"), emit)
 	})
 	if result.State != "issues" || result.Reason != "metadata_invalid" || result.ManifestComplete {

@@ -40,6 +40,7 @@ Only the password and master key are credentials themselves, but paths and netwo
 | `LOG_LEVEL` | `INFO` | `INFO` | DEBUG / INFO / WARN / ERROR; unknown values fall back to INFO. Edit LOG_LEVEL directly under environment. |
 | `IOSBK_CONFIGS_DIR` | `/configs` | `/configs` | Absolute directory other than /; must be writable and persistent. |
 | `IOSBK_BACKUPS_DIR` | `/backups` | `/backups` | Absolute directory other than /; per-device save locations must stay within it. |
+| `IOSBK_PLIST_MAX_MIB` | `64` | `64` | Maximum MiB per plist input or converted output for checks and browsing. Integer 1–256. Larger files can still be saved, imported and exported. |
 | `IOSBK_AUTH_ENABLED` | `false` | `true` | true / false. Keep authentication enabled in the recommended deployment. |
 | `IOSBK_ADMIN_PASSWORD_FILE` | `unset` | `unset` | Optional absolute custom-password file path, at least 24 bytes; default password and digest are automatically managed below. Reading removes one trailing CR/LF sequence. |
 | `IOSBK_SECRET_KEY` | `unset` | `unset` | Optional environment master key: exactly 32 bytes in standard Base64; mutually exclusive with the key-file override. |
