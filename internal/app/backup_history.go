@@ -16,6 +16,8 @@ import (
 
 const historyIOTimeout = 6 * time.Hour
 
+var errHistoryImport = errors.New("importing existing backup")
+
 type historyDeviceState struct {
 	PointDeletion       *historyPointDeletion  `json:"point_deletion,omitempty"`
 	RetiredStore        string                 `json:"retired_store,omitempty"`
@@ -300,7 +302,7 @@ func (app *application) prepareBackupHistory(job *backupJob, root string) (*back
 	if !st.MigrationDone {
 		st, err = app.migrateHistorySource(ctx, job, st, gen)
 		if err != nil {
-			return nil, operationError(historyPolicyErrorCode(err, i18n.HistoryImportFailed), err, "")
+			return nil, operationError(historyPolicyErrorCode(err, i18n.HistoryImportFailed), fmt.Errorf("%w: %w", errHistoryImport, err), "")
 		}
 	}
 	st.Phase = "active"

@@ -158,10 +158,13 @@ func historyError(w http.ResponseWriter, err error) {
 		writeError(w, 409, i18n.HistoryConflict)
 	case errors.Is(err, backupstore.ErrBusy), errors.Is(err, errDeviceBusy):
 		writeError(w, 409, i18n.Busy)
-	case errors.Is(err, backupstore.ErrCapacity):
-		writeError(w, 507, i18n.HistoryCapacity)
 	default:
-		writeError(w, 503, i18n.HistoryUnavailable)
+		code := historyPolicyErrorCode(err, i18n.HistoryUnavailable)
+		status := http.StatusServiceUnavailable
+		if code == i18n.HistoryCapacity {
+			status = http.StatusInsufficientStorage
+		}
+		writeError(w, status, code)
 	}
 }
 func historyBody(w http.ResponseWriter, r *http.Request, target any) bool {

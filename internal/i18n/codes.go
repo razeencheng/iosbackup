@@ -90,6 +90,7 @@ const (
 	HistoryExportNoResume                 = "api.history_export_no_resume"
 	HistoryImportFailed                   = "api.history_import_failed"
 	HistorySessionExpired                 = "api.history_session_expired"
+	HistoryStoragePermission              = "api.history_storage_permission"
 	HistoryUnavailable                    = "api.history_unavailable"
 	InvalidBackupMode                     = "api.invalid_backup_mode"
 	InvalidClock                          = "api.invalid_clock"

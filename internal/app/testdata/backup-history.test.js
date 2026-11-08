@@ -3,6 +3,8 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('n
 const window={document:{addEventListener(){}},addEventListener(){}};
 vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../static/backup-history.js'),'utf8'),{window,AbortController,console});
 const api=window.IOSBKHistory;
+window.IOSBKI18n={t:key=>key,has:()=>true};
+assert.match(api.policyNotice({policy_operation:{state:'failed',phase:'import',error_code:'api.history_storage_permission'}}),/console\.historyPhase\.import.*api\.history_storage_permission/);
 assert.equal(typeof api.policyNeedsConfirmation,'function');
 assert.equal(api.policyNeedsConfirmation({preview:{previous:{enabled:true},policy:{enabled:true}},affected_count:0}),false);
 assert.equal(api.policyNeedsConfirmation({preview:{previous:{enabled:false},policy:{enabled:true}},affected_count:0}),true);

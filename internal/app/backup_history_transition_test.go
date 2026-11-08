@@ -5,10 +5,12 @@ import (
 	"encoding/json"
 	"errors"
 	"iosbackup/internal/backupstore"
+	"iosbackup/internal/i18n"
 	"iosbackup/internal/persistence"
 	"net/http"
 	"os"
 	"path/filepath"
+	"syscall"
 	"testing"
 	"time"
 )
@@ -332,5 +334,46 @@ func TestHistoryPolicyRecoversUncertainStoreOnlyWithoutReaders(t *testing.T) {
 	}
 	if err := store.AbortWork(context.Background(), work.ID); err != nil {
 		t.Fatal("uncommitted work not retained", err)
+	}
+}
+
+func TestHistoryImportReportsStageAndStorageCause(t *testing.T) {
+	ctx := context.Background()
+	app := historyTestApp(t)
+	app.configs["CONTROL"].History.Enabled = false
+	writeHistoryBackup(t, filepath.Join(app.paths.BackupsRoot, "CONTROL"), "finished", "original")
+	registry := app.generationRegistry()
+	if _, err := registry.historyGeneration("CONTROL", ""); err != nil {
+		t.Fatal(err)
+	}
+	// 初始化已完成；下一次写入发生在导入旧备份的加密代际信息时。
+	registry.write = func(string, []byte, os.FileMode) error { return syscall.EROFS }
+	_, err := app.startHistoryPolicy(ctx, "CONTROL", backupstore.Policy{Enabled: true, Count: 3}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	service := app.historyService()
+	service.mu.Lock()
+	done := service.policies["CONTROL"].done
+	service.mu.Unlock()
+	<-done
+	status := app.historyPolicyStatus("CONTROL", app.configs["CONTROL"])
+	if status.State != "failed" || status.Phase != "import" || status.ErrorCode != i18n.HistoryStoragePermission {
+		t.Fatalf("policy=%+v", status)
+	}
+	// 备份任务重试同一策略，阶段与新失败原因应进入任务记录。
+	registry.write = func(string, []byte, os.FileMode) error { return syscall.ENOSPC }
+	app.backupJobRecords = openJobTestStore(t, t.TempDir(), defaultBackupJobLimits())
+	defer app.backupJobRecords.close(ctx)
+	job, err := app.beginBackupJob("CONTROL", "", "", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = app.runBackupJob(job); !errors.Is(err, syscall.ENOSPC) {
+		t.Fatalf("backup error=%v", err)
+	}
+	records := app.backupJobRecords.list("CONTROL")
+	if len(records) != 1 || records[0].HistoryPhase != "import" || records[0].ErrorCode != "history_capacity" || !validBackupJobSummary(records[0]) {
+		t.Fatalf("records=%+v", records)
 	}
 }

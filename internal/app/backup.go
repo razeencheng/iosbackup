@@ -77,7 +77,7 @@ func backupFailureState(err error) (stateCode, errorCode string) {
 	var translated *i18n.Error
 	if errors.As(err, &translated) {
 		switch translated.Code {
-		case i18n.HistoryImportFailed, i18n.HistoryCapacity, i18n.StorageUnavailable:
+		case i18n.HistoryImportFailed, i18n.HistoryCapacity, i18n.HistoryStoragePermission, i18n.StorageUnavailable:
 			return backupStateFailed, strings.TrimPrefix(translated.Code, "api.")
 		}
 	}
@@ -221,6 +221,9 @@ func (app *application) runBackupJob(job *backupJob) (retErr error) {
 	}
 	history, historyErr := app.prepareBackupHistory(job, backupDir)
 	if historyErr != nil {
+		if errors.Is(historyErr, errHistoryImport) {
+			app.setHistoryJobPhase(job, "import", "")
+		}
 		if (errors.Is(historyErr, context.Canceled) || errors.Is(historyErr, context.DeadlineExceeded)) && context.Cause(job.ctx) != nil {
 			historyErr = context.Cause(job.ctx)
 		}
