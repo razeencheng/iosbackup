@@ -1,7 +1,7 @@
 package app
 
 import (
-	"bytes"
+	"bufio"
 	"context"
 	"encoding/csv"
 	"errors"
@@ -9,6 +9,7 @@ import (
 	"io"
 	"io/fs"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -233,6 +234,12 @@ func (app *application) hasLocalBackup(udid string) bool {
 		}
 	}
 	return false
+}
+
+// 只有工具的无备份结果与磁盘一致时，才把失败视为空清单。
+func (app *application) emptyBackupList(udid string, err error) bool {
+	var exit *exec.ExitError
+	return errors.As(err, &exit) && exit.ExitCode() == 51 && !app.hasLocalBackup(udid)
 }
 
 // dirSizeBytes 递归累加目录下所有普通文件的大小（路径不存在/出错时返回已累加值，不报错）。
@@ -494,61 +501,84 @@ func (app *application) streamBackupListCommand(ctx context.Context, device *dev
 	return total, nil
 }
 
-func forEachBackupListRow(reader io.Reader, onRow func([]string) error) error {
-	filteredR, filteredW := io.Pipe()
-	filterResult := make(chan error, 1)
-	go func() {
-		err := consumeBoundedLines(reader, func(line string, _ bool) error {
-			line = strings.TrimSpace(line)
-			if strings.ContainsRune(line, '\x1b') {
-				line = ansiRE.ReplaceAllString(line, "")
-			}
-			if line == "" || strings.HasSuffix(line, backupLogTruncatedMarker) ||
-				(!strings.Contains(line, ",") && isProgressLine(line)) {
-				return nil
-			}
-			if _, writeErr := io.WriteString(filteredW, line); writeErr != nil {
-				return writeErr
-			}
-			_, writeErr := io.WriteString(filteredW, "\n")
-			return writeErr
-		})
-		_ = filteredW.CloseWithError(err)
-		filterResult <- err
-	}()
+var errBackupListRecordLimit = i18n.NewError(i18n.BackupListRecordLimit, nil)
 
-	r := csv.NewReader(filteredR)
-	r.FieldsPerRecord = -1
-	r.LazyQuotes = true
-	r.ReuseRecord = true
-	for {
-		fields, err := r.Read()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			_ = filteredR.CloseWithError(err)
-			<-filterResult
-			return err
-		}
-		if len(fields) > 0 {
-			if err := onRow(fields); err != nil {
-				_ = filteredR.CloseWithError(err)
-				<-filterResult
-				return err
+// 按完整 CSV 记录分割，保留引号内的换行。offset 在 Scanner 补充数据时继续推进。
+func backupListRecordSplitter() bufio.SplitFunc {
+	offset, quoted, fieldStart := 0, false, true
+	return func(data []byte, atEOF bool) (int, []byte, error) {
+		for offset < len(data) {
+			b := data[offset]
+			if !quoted && (b == '\r' || b == '\n') {
+				end := offset
+				offset, fieldStart = 0, true
+				return end + 1, data[:end], nil
 			}
+			if quoted && b == '"' {
+				if offset+1 == len(data) && !atEOF {
+					break
+				}
+				if offset+1 == len(data) {
+					quoted = false
+				} else {
+					switch data[offset+1] {
+					case '"':
+						offset++
+					case ',', '\r', '\n':
+						quoted = false
+					}
+				}
+			} else if !quoted {
+				quoted = fieldStart && b == '"'
+				fieldStart = b == ','
+			}
+			offset++
 		}
+		if atEOF && len(data) > 0 {
+			if quoted {
+				return 0, nil, operationError(i18n.BackupListFailed, errors.New("unterminated quoted CSV field"), "")
+			}
+			return len(data), data, nil
+		}
+		return 0, nil, nil
 	}
-	return <-filterResult
 }
 
-// parseBackupList 把 idevicebackup2 list 的 CSV 输出解析为行集合（字段数可变，容错）。
-// 非 CSV 输出回退为按行拆分，保证不丢信息。
-func parseBackupList(out []byte) []backupListEntry {
-	entries := []backupListEntry{}
-	_ = forEachBackupListRow(bytes.NewReader(out), func(fields []string) error {
-		entries = append(entries, backupListEntry{Fields: append([]string(nil), fields...)})
-		return nil
-	})
-	return entries
+func forEachBackupListRow(reader io.Reader, onRow func([]string) error) error {
+	scanner := bufio.NewScanner(reader)
+	// 额外一个字节允许恰好达到上限的完整记录后跟分隔符。
+	scanner.Buffer(make([]byte, 32<<10), backupIndexMaxRecordBytes+1)
+	scanner.Split(backupListRecordSplitter())
+	var row strings.Reader
+	buffered := bufio.NewReader(&row)
+	csvReader := csv.NewReader(buffered)
+	csvReader.FieldsPerRecord = -1
+	csvReader.LazyQuotes = true
+	csvReader.ReuseRecord = true
+	for scanner.Scan() {
+		record := scanner.Text()
+		if len(record) > backupIndexMaxRecordBytes {
+			return errBackupListRecordLimit
+		}
+		if strings.ContainsRune(record, '\x1b') {
+			record = ansiRE.ReplaceAllString(record, "")
+		}
+		clean := strings.TrimSpace(record)
+		if clean == "" || (!strings.Contains(record, ",") && isProgressLine(clean)) {
+			continue
+		}
+		row.Reset(record)
+		buffered.Reset(&row)
+		fields, err := csvReader.Read()
+		if err != nil {
+			return err
+		}
+		if err = onRow(fields); err != nil {
+			return err
+		}
+	}
+	if errors.Is(scanner.Err(), bufio.ErrTooLong) {
+		return errBackupListRecordLimit
+	}
+	return scanner.Err()
 }

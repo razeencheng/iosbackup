@@ -33,6 +33,7 @@ const (
 	BackupJobStale                        = "api.backup_job_stale"
 	BackupJobStopping                     = "api.backup_job_stopping"
 	BackupListFailed                      = "api.backup_list_failed"
+	BackupListRecordLimit                 = "api.backup_list_record_limit"
 	BackupMissing                         = "api.backup_missing"
 	BackupPasswordIncorrect               = "api.backup_password_incorrect"
 	BackupPasswordMissing                 = "api.backup_password_missing"

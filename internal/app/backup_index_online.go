@@ -151,7 +151,7 @@ func (a *backupListCacheAudit) Write(data []byte) (int, error) {
 			a.checkLine()
 			continue
 		}
-		if len(a.line) >= maxBackupLogLineBytes {
+		if len(a.line) >= backupIndexMaxRecordBytes {
 			a.safe = false
 			a.line = nil
 			break

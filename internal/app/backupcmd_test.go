@@ -1,6 +1,7 @@
 package app
 
 import (
+	"bytes"
 	"context"
 	"strings"
 	"testing"
@@ -136,7 +137,7 @@ func TestBackupCmdOfflineDevice(t *testing.T) {
 
 func TestParseBackupListCSV(t *testing.T) {
 	out := []byte("file1.db,AppDomain-x,2048\nfile2.plist,HomeDomain,64\n")
-	entries := parseBackupList(out)
+	entries := parseBackupList(t, out)
 	if len(entries) != 2 {
 		t.Fatalf("应解析 2 行，得到 %d", len(entries))
 	}
@@ -147,7 +148,7 @@ func TestParseBackupListCSV(t *testing.T) {
 
 func TestParseBackupListFallbackNonCSV(t *testing.T) {
 	out := []byte("just a plain line\nanother line\n")
-	entries := parseBackupList(out)
+	entries := parseBackupList(t, out)
 	if len(entries) != 2 {
 		t.Fatalf("非 CSV 应回退按行，得到 %d 行", len(entries))
 	}
@@ -162,7 +163,7 @@ func TestParseBackupListStripsProgressNoise(t *testing.T) {
 		"deadbeef, cafebabe, 100644, 19665, 25, 25, 2026-05-24 01:27:14, 2026-05-24 01:27:14, 2026-02-07 09:21:06, 45056, 4, WirelessDomain, Library/Databases/CellularUsage.db, , {}\n" +
 		"Backup     [##############################] 100%\n" +
 		"Status     \n"
-	entries := parseBackupList([]byte(raw))
+	entries := parseBackupList(t, []byte(raw))
 	if len(entries) != 1 {
 		t.Fatalf("清洗后应只剩 1 条真实 CSV 记录，得到 %d: %+v", len(entries), entries)
 	}
@@ -201,4 +202,17 @@ func TestCleanBackupOutputKeepsRealInfo(t *testing.T) {
 	if !strings.Contains(clean, "IsEncrypted: No") {
 		t.Errorf("真实信息行应保留，得到:\n%s", clean)
 	}
+}
+
+func parseBackupList(t *testing.T, out []byte) []backupListEntry {
+	t.Helper()
+	entries := []backupListEntry{}
+	err := forEachBackupListRow(bytes.NewReader(out), func(fields []string) error {
+		entries = append(entries, backupListEntry{Fields: append([]string(nil), fields...)})
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return entries
 }

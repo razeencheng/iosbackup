@@ -1228,16 +1228,24 @@ func (app *application) handleBackupList(w http.ResponseWriter, r *http.Request)
 		w.Header().Set("Content-Type", "text/csv; charset=utf-8")
 		w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"backup-list-%s.csv\"", udid))
 		cw := csv.NewWriter(w)
+		started := false
 		_, err := app.streamBackupList(r.Context(), udid, func(fields []string) error {
+			started = true
 			if err := cw.Write(fields); err != nil {
 				return err
 			}
 			cw.Flush()
 			return cw.Error()
 		})
-		cw.Flush()
-		if err != nil && !app.hasLocalBackup(udid) {
-			return
+		if err != nil {
+			if started {
+				app.addWarnLog(udid, fmt.Sprintf("event=backup.list_export_failed error=%v", err))
+				panic(http.ErrAbortHandler)
+			}
+			if !app.emptyBackupList(udid, err) {
+				w.Header().Del("Content-Disposition")
+				writeOperationError(w, http.StatusConflict, err, i18n.BackupListFailed)
+			}
 		}
 		return
 	}
@@ -1247,7 +1255,7 @@ func (app *application) handleBackupList(w http.ResponseWriter, r *http.Request)
 	if err != nil {
 		// 设备还没有任何本地备份 → 友好返回空清单（empty=true），而不是把 idevicebackup2 的
 		// exit status 51 原始错误抛给用户。有备份但报错（加密无密码 / 离线等）仍照常返回错误。
-		if !app.hasLocalBackup(udid) {
+		if total == 0 && app.emptyBackupList(udid, err) {
 			writeJSON(w, http.StatusOK, map[string]interface{}{
 				"udid": udid, "entries": []backupListEntry{}, "count": 0, "truncated": false, "empty": true,
 			})

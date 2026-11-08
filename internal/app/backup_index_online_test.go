@@ -167,7 +167,7 @@ func TestBackupIndexOnlineCaptureCancellation(t *testing.T) {
 }
 
 func TestBackupIndexOnlineCaptureRejectsLossyLegacyOutput(t *testing.T) {
-	for _, raw := range []string{"id,domain," + strings.Repeat("x", maxBackupLogLineBytes+64) + ",1\n", "id,domain,\"first\n  second\",1\n", " id,domain,path,1\n", "id,domain,file [line truncated]\n"} {
+	for _, raw := range []string{"id,domain,\"first\n  second\",1\n", " id,domain,path,1\n", "id,domain,file [line truncated]\n"} {
 		app, m, src := indexCoordinatorTestApp(t)
 		candidate, err := m.store.prepare(context.Background(), src, "manifest-v1", indexTestRows(1))
 		if err != nil {
@@ -192,7 +192,7 @@ func TestBackupIndexOnlineCaptureRejectsLossyLegacyOutput(t *testing.T) {
 		}
 	}
 	audit := &backupListCacheAudit{safe: true}
-	_, _ = audit.Write([]byte("id,domain,\"file,quote\",1\n"))
+	_, _ = audit.Write([]byte("id,domain,\"file,quote\",1\n" + "id,domain," + strings.Repeat("x", 70<<10) + ",1\n"))
 	if !audit.complete() {
 		t.Fatal("valid single-line CSV rejected")
 	}
