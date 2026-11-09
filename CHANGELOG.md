@@ -2,11 +2,11 @@
 
 This project follows Semantic Versioning. Release dates and source metadata are frozen in [`release/manifest.env`](release/manifest.env); this file does not duplicate the current release date.
 
-## Unreleased
+## v1.5.6
 
 ### 中文
 
-**修复大文件历史导入与 CSV 清单完整性**
+**v1.5.6 — 修复大文件历史导入与 CSV 清单完整性**
 
 - 修复 v1.5.5 导入已有备份时，超过 8 MiB 的元数据可能导致存储准备失败、后续备份无法启动的问题。复制、历史保存和 TAR 导出改用流式 SHA-256，不再受 plist 解析大小限制。
 - 新增 `IOSBK_PLIST_MAX_MIB`，默认 `64`，接受 `1–256` 的整数，限制检查和浏览时单个 plist 的输入及转换输出。超过上限的备份仍可保存为可导出的待确认历史点，不参与增量基线选择。
@@ -16,13 +16,13 @@ This project follows Semantic Versioning. Release dates and source metadata are 
 
 ### 升级须知
 
-- 已在 v1.5.5 遇到存储准备失败的设备，升级到包含本修复的版本后，在“设备设置 → 备份保留策略”点击“重试存储准备”。不需要删除原备份或重新开启策略。
+- 已在 v1.5.5 遇到存储准备失败的设备，升级到 v1.5.6 后，在“设备设置 → 备份保留策略”点击“重试存储准备”。不需要删除原备份或重新开启策略。
 - 通常无需新增配置。若需要解析超过 64 MiB 的 plist，可在 Compose 的 `environment` 中设置 `IOSBK_PLIST_MAX_MIB: "128"` 并重建容器。该值仅控制 plist 解析，不是整份备份或 TAR 导出的大小限制；调高上限可能增加解析内存占用。
 - 待确认历史点可保留和导出，但不能作为正常增量基线。检查通过及导出哈希一致不代表已验证整机恢复成功。
 
 ### English
 
-**Fix large-metadata history imports and CSV list completeness**
+**v1.5.6 — Fix large-metadata history imports and CSV list completeness**
 
 - Fix a v1.5.5 failure where metadata larger than 8 MiB could leave an existing-backup import pending and prevent subsequent backups from starting. Copying, history preservation, and TAR export now stream SHA-256 independently of plist parsing limits.
 - Add `IOSBK_PLIST_MAX_MIB`, defaulting to `64` and accepting integers from `1–256`. It limits each plist input and converted output during checks and browsing. An over-budget backup can still be preserved and exported as a pending history point, without becoming an incremental baseline.
@@ -32,7 +32,7 @@ This project follows Semantic Versioning. Release dates and source metadata are 
 
 ### Upgrade notes
 
-- If storage preparation failed on v1.5.5, upgrade to a version containing this fix, then select **Device settings → Backup retention → Retry storage preparation**. Keep the original backup and saved policy settings.
+- If storage preparation failed on v1.5.5, upgrade to v1.5.6, then select **Device settings → Backup retention → Retry storage preparation**. Keep the original backup and saved policy settings.
 - No new setting is normally required. To parse plists larger than 64 MiB, set `IOSBK_PLIST_MAX_MIB: "128"` under your Compose service's `environment` and recreate the container. This setting limits plist parsing, not the total backup or TAR export size. A higher limit can increase parsing memory use.
 - Pending points remain available for preservation and export but cannot serve as normal incremental baselines. Passed checks and matching export hashes do not establish successful whole-device recovery.
 
@@ -43,6 +43,8 @@ This project follows Semantic Versioning. Release dates and source metadata are 
 - A real encrypted history-point export matched all 10,004 source-file SHA-256 hashes. A real unencrypted CSV contained 145,905 data records, matching an independent SQLite count. These checks did not perform a new device backup or whole-device restore.
 
 **Related / 关联**: [#29](https://github.com/razeencheng/iosbackup/issues/29), [#30](https://github.com/razeencheng/iosbackup/pull/30).
+
+**Full changelog / 完整变更**: https://github.com/razeencheng/iosbackup/compare/v1.5.5...v1.5.6
 
 ## v1.5.5
 
