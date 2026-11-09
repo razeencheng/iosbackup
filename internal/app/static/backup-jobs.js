@@ -57,7 +57,7 @@
   function show(id,yes){var node=document.getElementById(id);if(node)node.classList.toggle('hidden',!yes);return node;}
   function date(value){return value&&!String(value).startsWith('0001-')?global.IOSBKI18n.formatDate(value):tr('jobs.noActivity');}
   function label(kind,value){var key='jobs.'+kind+'.'+value;return global.IOSBKI18n.has(key)?tr(key):tr('jobs.unknown');}
-  function historyLabel(job){var key='console.historyResult.'+(job.history_state||'unknown');return tr(global.IOSBKI18n.has(key)?key:'console.historyResult.unknown');}
+  function historyLabel(job){if(job.history_phase==='import')return tr('console.historyPhase.import')+' · '+label('state',job.state);var key='console.historyResult.'+(job.history_state||'unknown');return tr(global.IOSBKI18n.has(key)?key:'console.historyResult.unknown');}
   function durationText(start,end){
     if(!end||String(end).startsWith('0001-'))return tr('console.inProgress');
     var first=Date.parse(start),last=Date.parse(end);

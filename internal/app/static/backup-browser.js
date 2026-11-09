@@ -116,7 +116,10 @@
       if (detail) {
         var messages = [];
         if (vm.stale&&!conciseEncrypted) messages.push(tr('bindex.previousRead'));
-        if (options.message && o.message_code && o.status !== 'missing') messages.push(tr('bindex.overviewDetail', {message: options.message({message_code: o.message_code}, 'common.operationFailed')}));
+        if (options.message && o.message_code && o.status !== 'missing') {
+          var overviewMessage=o.plist_file&&o.plist_limit_mib?tr('check.plistLimit',{file:o.plist_file,limit:o.plist_limit_mib}):options.message({message_code:o.message_code},'common.operationFailed');
+          messages.push(tr('bindex.overviewDetail',{message:overviewMessage}));
+        }
         if (options.message && l.message_code && l.status !== 'missing'&&!(conciseEncrypted&&l.message_code==='api.backup_index_encrypted')) messages.push(tr('bindex.listDetail', {message: options.message({message_code: l.message_code}, 'common.operationFailed')}));
         detail.textContent = messages.join(' '); detail.classList.toggle('hidden', !messages.length);
       }

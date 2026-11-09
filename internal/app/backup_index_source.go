@@ -14,6 +14,7 @@ import (
 	"strings"
 	"syscall"
 
+	"iosbackup/internal/boundedio"
 	"iosbackup/internal/i18n"
 )
 
@@ -62,6 +63,14 @@ func (app *application) resolveBackupIndexSource(ctx context.Context, udid strin
 
 // 来源路径由已经准入的任务固定，后续配置编辑不能把检查切换到另一份备份。
 func resolveBackupIndexSourceAt(ctx context.Context, udid, root string) (backupIndexSource, error) {
+	source, err := locateBackupIndexSourceAt(ctx, udid, root)
+	if err == nil {
+		source.Fingerprint, err = backupIndexSourceFingerprint(ctx, source)
+	}
+	return source, err
+}
+
+func locateBackupIndexSourceAt(ctx context.Context, udid, root string) (backupIndexSource, error) {
 	if !udidPattern.MatchString(udid) {
 		return backupIndexSource{}, errBackupIndexUnsafeSource
 	}
@@ -101,8 +110,7 @@ func resolveBackupIndexSourceAt(ctx context.Context, udid, root string) (backupI
 		return source, indexReadError(i18n.BackupIndexUnsafeSource, errBackupIndexUnsafeSource, nil)
 	}
 	source.Identity = indexDigest(canonical + "\x00" + indexFileIdentity(info))
-	source.Fingerprint, err = backupIndexSourceFingerprint(ctx, source)
-	return source, err
+	return source, nil
 }
 
 func indexDigest(value string) string {
@@ -168,6 +176,11 @@ func originalBackupSizeFS(ctx context.Context, sourceFS fs.FS) (int64, error) {
 // backupIndexSourceFingerprint 检查目录实体及关键清单文件，供发布前后验证。
 // 不读取大体积 Manifest.db 全文，plist 额外计算内容摘要以识别等长修改。
 func backupIndexSourceFingerprint(ctx context.Context, source backupIndexSource) (string, error) {
+	return inspectBackupIndexMetadata(ctx, source, true)
+}
+
+// 控制台探测只核对目录和元数据可读性；检查和索引才计算内容摘要。
+func inspectBackupIndexMetadata(ctx context.Context, source backupIndexSource, fingerprint bool) (string, error) {
 	if err := ctx.Err(); err != nil {
 		return "", err
 	}
@@ -199,24 +212,36 @@ func backupIndexSourceFingerprint(ctx context.Context, source backupIndexSource)
 		}
 		fmt.Fprintf(&b, "\x00%s:%s:%d:%d", name, indexFileIdentity(fi), fi.Size(), fi.ModTime().UnixNano())
 		if strings.HasSuffix(name, ".plist") {
-			f, err := openBackupIndexRegular(root, name)
+			f, _, err := openBackupIndexRegular(root, name)
 			if err != nil {
 				return "", err
 			}
-			hash := sha256.New()
-			n, copyErr := io.Copy(hash, io.LimitReader(f, backupIndexMaxPlistBytes+1))
+			if !fingerprint {
+				if err := f.Close(); err != nil {
+					return "", err
+				}
+				continue
+			}
+			digest, readErr := boundedio.FileSHA256(ctx, f, fi.Size())
+			if readErr == nil {
+				var after os.FileInfo
+				after, readErr = f.Stat()
+				if readErr == nil && (!os.SameFile(fi, after) || fi.Size() != after.Size() || !fi.ModTime().Equal(after.ModTime())) {
+					readErr = errBackupIndexUnavailable
+				}
+			}
 			closeErr := f.Close()
-			if copyErr != nil {
-				return "", copyErr
+			if readErr != nil {
+				return "", readErr
 			}
 			if closeErr != nil {
 				return "", closeErr
 			}
-			if n > backupIndexMaxPlistBytes {
-				return "", indexReadError(i18n.BackupIndexLimit, errBackupIndexLimit, nil)
-			}
-			fmt.Fprintf(&b, ":%x", hash.Sum(nil))
+			fmt.Fprintf(&b, ":%s", digest)
 		}
+	}
+	if !fingerprint {
+		return "", nil
 	}
 	return indexDigest(b.String()), nil
 }
@@ -247,21 +272,21 @@ func openBackupIndexRoot(source backupIndexSource) (*os.Root, error) {
 }
 
 // openBackupIndexRegular 通过已锚定目录读取，禁止跟随最后一级链接并避免 FIFO 阻塞。
-func openBackupIndexRegular(root *os.Root, name string) (*os.File, error) {
+func openBackupIndexRegular(root *os.Root, name string) (*os.File, os.FileInfo, error) {
 	f, err := root.OpenFile(name, os.O_RDONLY|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	info, err := f.Stat()
 	if err != nil {
 		f.Close()
-		return nil, err
+		return nil, nil, err
 	}
 	if !info.Mode().IsRegular() {
 		f.Close()
-		return nil, indexReadError(i18n.BackupIndexUnsafeSource, errBackupIndexUnsafeSource, nil)
+		return nil, nil, indexReadError(i18n.BackupIndexUnsafeSource, errBackupIndexUnsafeSource, nil)
 	}
-	return f, nil
+	return f, info, nil
 }
 
 func checkedBackupIndexSize(total, size int64) (int64, error) {

@@ -19,26 +19,45 @@ import (
 
 const cmdPlistutil = "/usr/local/bin/plistutil"
 
+// plistReadLimit 仅约束单个 plist 的解析输入和转换输出。
+type plistReadLimit int
+
+func (app *application) plistLimit() plistReadLimit {
+	return plistReadLimit(app.runtimeConfig.PlistMaxMiB << 20)
+}
+
+var errPlistTooLarge = fmt.Errorf("%w: plist exceeds parsing budget", errBackupIndexLimit)
+
+type plistLimitError struct {
+	file  string
+	limit plistReadLimit
+}
+
+func (e *plistLimitError) Error() string {
+	return fmt.Sprintf("%s: %s (%d MiB)", e.file, errPlistTooLarge, e.limit>>20)
+}
+func (e *plistLimitError) Unwrap() error { return errPlistTooLarge }
+
 type backupPlistConverter func(context.Context, []byte) ([]byte, error)
 
-func parseBackupPlist(ctx context.Context, data []byte, converter backupPlistConverter) (map[string]any, error) {
+func (limit plistReadLimit) parseBackupPlist(ctx context.Context, data []byte, converter backupPlistConverter) (map[string]any, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	if len(data) > backupIndexMaxPlistBytes {
-		return nil, indexReadError(i18n.BackupIndexLimit, errBackupIndexLimit, nil)
+	if len(data) > int(limit) {
+		return nil, indexReadError(i18n.BackupIndexLimit, errPlistTooLarge, nil)
 	}
 	if bytes.HasPrefix(data, []byte("bplist00")) {
 		if converter == nil {
-			converter = convertBackupBinaryPlist
+			converter = limit.convertBackupBinaryPlist
 		}
 		var err error
 		data, err = converter(ctx, data)
 		if err != nil {
 			return nil, err
 		}
-		if len(data) > backupIndexMaxPlistBytes {
-			return nil, indexReadError(i18n.BackupIndexLimit, errBackupIndexLimit, nil)
+		if len(data) > int(limit) {
+			return nil, indexReadError(i18n.BackupIndexLimit, errPlistTooLarge, nil)
 		}
 	}
 	p := backupPlistXML{ctx: ctx, decoder: xml.NewDecoder(bytes.NewReader(data))}
@@ -233,15 +252,12 @@ func (p *backupPlistXML) value(start xml.StartElement, depth int) (any, error) {
 	}
 }
 
-func convertBackupBinaryPlist(ctx context.Context, data []byte) ([]byte, error) {
-	return convertBackupBinaryPlistCommand(ctx, cmdPlistutil, data)
+func (limit plistReadLimit) convertBackupBinaryPlist(ctx context.Context, data []byte) ([]byte, error) {
+	return limit.convertBackupBinaryPlistCommand(ctx, cmdPlistutil, data)
 }
-func convertBackupBinaryPlistCommand(ctx context.Context, binary string, data []byte) ([]byte, error) {
+func (limit plistReadLimit) convertBackupBinaryPlistCommand(ctx context.Context, binary string, data []byte) ([]byte, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
-	}
-	if len(data) > backupIndexMaxPlistBytes {
-		return nil, indexReadError(i18n.BackupIndexLimit, errBackupIndexLimit, nil)
 	}
 	cmdCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
@@ -249,13 +265,13 @@ func convertBackupBinaryPlistCommand(ctx context.Context, binary string, data []
 	cmd := newExecCmd(cmdCtx, binary, "-f", "xml", "-i", "-", "-o", "-")
 	cmd.SetGracefulCancel(time.Second)
 	cmd.cmd.Stdin = bytes.NewReader(data)
-	output := &backupPlistOutput{cancel: cancel}
+	output := &backupPlistOutput{cancel: cancel, limit: limit}
 	cmd.SetStdout(output)
 	stderr := newTailBuffer(maxCommandErrorBytes)
 	cmd.SetStderr(stderr)
 	err := cmd.Run()
 	if output.exceeded {
-		return nil, indexReadError(i18n.BackupIndexLimit, errBackupIndexLimit, nil)
+		return nil, indexReadError(i18n.BackupIndexLimit, errPlistTooLarge, nil)
 	}
 	if cmdCtx.Err() != nil {
 		return nil, cmdCtx.Err()
@@ -270,13 +286,14 @@ func convertBackupBinaryPlistCommand(ctx context.Context, binary string, data []
 }
 
 type backupPlistOutput struct {
+	limit    plistReadLimit
 	buffer   bytes.Buffer
 	cancel   context.CancelFunc
 	exceeded bool
 }
 
 func (b *backupPlistOutput) Write(p []byte) (int, error) {
-	if len(p) > backupIndexMaxPlistBytes-b.buffer.Len() {
+	if len(p) > int(b.limit)-b.buffer.Len() {
 		b.exceeded = true
 		b.cancel()
 		return 0, errBackupIndexLimit

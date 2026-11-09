@@ -13,6 +13,8 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"iosbackup/internal/boundedio"
 )
 
 type CopyOptions struct {
@@ -137,10 +139,7 @@ func stampTreeProgress(ctx context.Context, root *os.Root, progress func(treeSta
 		// 目录枚举顺序不参与摘要；包含实体和变更时间，识别等长改写及替换。
 		metadata := ""
 		if filepath.Dir(path) == "." && (path == "Info.plist" || path == "Status.plist" || path == "Manifest.plist") {
-			// 某些 Linux 文件系统短时间内的 mtime/ctime 相同；小型元数据另核对字节。
-			if info.Size() > 8<<20 {
-				return ErrUnsafe
-			}
+			// 以原始字节校验元数据，摘要格式须兼容已有提交事务。
 			file, err := root.OpenFile(path, os.O_RDONLY|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0)
 			if err != nil {
 				return err
@@ -150,8 +149,14 @@ func stampTreeProgress(ctx context.Context, root *os.Root, progress func(treeSta
 				file.Close()
 				return ErrChanged
 			}
-			digest := sha256.New()
-			err = copyBytes(ctx, digest, io.LimitReader(file, (8<<20)+1), make([]byte, 32<<10))
+			metadata, err = boundedio.FileSHA256(ctx, file, opened.Size())
+			if err == nil {
+				var after os.FileInfo
+				after, err = file.Stat()
+				if err == nil && !sameFileVersion(opened, after) {
+					err = ErrChanged
+				}
+			}
 			closeErr := file.Close()
 			if err != nil {
 				return err
@@ -159,7 +164,6 @@ func stampTreeProgress(ctx context.Context, root *os.Root, progress func(treeSta
 			if closeErr != nil {
 				return closeErr
 			}
-			metadata = fmt.Sprintf("%x", digest.Sum(nil))
 		}
 		sum := sha256.Sum256([]byte(fmt.Sprintf("%s\x00%d\x00%d\x00%d\x00%s\x00%s", path, info.Size(), info.Mode(), info.ModTime().UnixNano(), fileIdentity(info), metadata)))
 		stable := sha256.Sum256([]byte(fmt.Sprintf("%s\x00%d\x00%d\x00%d\x00%s\x00%s", path, info.Size(), info.Mode(), info.ModTime().UnixNano(), persistentFileIdentity(info), metadata)))

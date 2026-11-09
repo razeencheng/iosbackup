@@ -5,10 +5,7 @@ import (
 	"time"
 )
 
-const (
-	backupIndexMaxPlistBytes  = 8 << 20
-	backupIndexMaxRecordBytes = 1 << 20
-)
+const backupIndexMaxRecordBytes = 1 << 20
 
 var (
 	errBackupIndexUnavailable  = errors.New("backup source unavailable")
@@ -37,14 +34,16 @@ type backupIndexSource struct {
 }
 
 type backupIndexOverview struct {
-	Status      string     `json:"status"`
-	Freshness   string     `json:"freshness"`
-	MessageCode string     `json:"message_code,omitempty"`
-	ReadAt      time.Time  `json:"read_at,omitempty"`
-	SizeBytes   *int64     `json:"size_bytes"`
-	Encrypted   *bool      `json:"encrypted"`
-	BackupDate  *time.Time `json:"backup_date,omitempty"`
-	DeviceName  string     `json:"device_name,omitempty"`
+	PlistFile     string     `json:"plist_file,omitempty"`
+	PlistLimitMiB int        `json:"plist_limit_mib,omitempty"`
+	Status        string     `json:"status"`
+	Freshness     string     `json:"freshness"`
+	MessageCode   string     `json:"message_code,omitempty"`
+	ReadAt        time.Time  `json:"read_at,omitempty"`
+	SizeBytes     *int64     `json:"size_bytes"`
+	Encrypted     *bool      `json:"encrypted"`
+	BackupDate    *time.Time `json:"backup_date,omitempty"`
+	DeviceName    string     `json:"device_name,omitempty"`
 }
 
 type backupIndexRecord struct {

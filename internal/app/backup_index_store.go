@@ -593,6 +593,7 @@ func (s *backupIndexStore) publish(src backupIndexSource, overview backupIndexOv
 	} else if old.Overview.Status == "available" {
 		result.Overview.Freshness = "stale"
 		result.Overview.MessageCode = overview.MessageCode
+		result.Overview.PlistFile, result.Overview.PlistLimitMiB = overview.PlistFile, overview.PlistLimitMiB
 	} else {
 		result.Overview = overview
 	}

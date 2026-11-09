@@ -64,7 +64,7 @@ func validJobEvent(e backupJobEvent) bool {
 		return false
 	}
 	switch e.ErrorCode {
-	case "", "backup_failed", "backup_stalled", "device_disconnected", "backup_cancelled", "storage_unavailable", "device_locked", "backup_stopped_by_user", "process_restarted", "check_cancelled", "check_timeout", "check_unavailable":
+	case "", "backup_failed", "backup_stalled", "device_disconnected", "backup_cancelled", "storage_unavailable", "history_import_failed", "history_capacity", "history_storage_permission", "device_locked", "backup_stopped_by_user", "process_restarted", "check_cancelled", "check_timeout", "check_unavailable":
 	default:
 		return false
 	}
@@ -83,7 +83,7 @@ func validBackupJobSummary(summary backupJobSummary) bool {
 		return false
 	}
 	switch summary.HistoryPhase {
-	case "", "commit", "reference", "cleanup", "completed":
+	case "", "import", "commit", "reference", "cleanup", "completed":
 	default:
 		return false
 	}

@@ -41,7 +41,11 @@ func (app *application) historyCurrentSource(ctx context.Context, udid string, c
 	actualRoot, release, source, err := app.acquireHistorySource(udid, root)
 	if err == nil {
 		defer release()
-		_, err = resolveBackupIndexSourceAt(ctx, udid, actualRoot)
+		var src backupIndexSource
+		src, err = locateBackupIndexSourceAt(ctx, udid, actualRoot)
+		if err == nil {
+			_, err = inspectBackupIndexMetadata(ctx, src, false)
+		}
 	}
 	switch {
 	case err == nil:

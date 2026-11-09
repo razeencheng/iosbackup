@@ -8,6 +8,8 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"iosbackup/internal/i18n"
 )
 
 var errBackupCheckMetadataMissing = errors.New("required backup metadata missing")
@@ -26,6 +28,8 @@ type backupCheckResult struct {
 	ID                 string             `json:"id,omitempty"`
 	Kind               string             `json:"kind"`
 	State              string             `json:"state"`
+	PlistFile          string             `json:"plist_file,omitempty"`
+	PlistLimitMiB      int                `json:"plist_limit_mib,omitempty"`
 	Reason             string             `json:"reason,omitempty"`
 	StartedAt          time.Time          `json:"started_at"`
 	CompletedAt        time.Time          `json:"completed_at,omitempty"`
@@ -62,18 +66,22 @@ func backupCheckError(err error) (string, string) {
 	}
 }
 
-func readBackupCheckPlist(ctx context.Context, root *os.Root, name string, converter backupPlistConverter) (map[string]any, error) {
+func (limit plistReadLimit) readPlist(ctx context.Context, root *os.Root, name string, converter backupPlistConverter) (map[string]any, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	file, err := openBackupIndexRegular(root, name)
+	file, info, err := openBackupIndexRegular(root, name)
 	if errors.Is(err, os.ErrNotExist) {
 		return nil, errors.Join(errBackupCheckMetadataMissing, err)
 	}
 	if err != nil {
-		return nil, err
+		return nil, indexReadError(i18n.BackupIndexUnavailable, errBackupIndexUnavailable, err)
 	}
-	data, err := io.ReadAll(io.LimitReader(file, backupIndexMaxPlistBytes+1))
+	if info.Size() > int64(limit) {
+		file.Close()
+		return nil, &plistLimitError{file: name, limit: limit}
+	}
+	data, err := io.ReadAll(io.LimitReader(file, int64(limit)+1))
 	closeErr := file.Close()
 	if err != nil {
 		return nil, err
@@ -81,11 +89,15 @@ func readBackupCheckPlist(ctx context.Context, root *os.Root, name string, conve
 	if closeErr != nil {
 		return nil, closeErr
 	}
-	return parseBackupPlist(ctx, data, converter)
+	values, err := limit.parseBackupPlist(ctx, data, converter)
+	if errors.Is(err, errPlistTooLarge) {
+		return nil, &plistLimitError{file: name, limit: limit}
+	}
+	return values, err
 }
 
 // 调用者持有来源占用；独立读取器不访问设备、不修改清单或备份对象。
-func runBackupCheck(ctx context.Context, src backupIndexSource, kind string, converter backupPlistConverter, streamer backupManifestRowStreamer) (result backupCheckResult) {
+func (limit plistReadLimit) runBackupCheck(ctx context.Context, src backupIndexSource, kind string, converter backupPlistConverter, streamer backupManifestRowStreamer) (result backupCheckResult) {
 	result = backupCheckResult{Kind: kind, State: "passed", Freshness: "current", StartedAt: time.Now().UTC(), SourceKey: src.Key, SourceIdentity: src.Identity, SourceFingerprint: src.Fingerprint}
 	defer func() { result.CompletedAt = time.Now().UTC() }()
 	fail := func(err error) {
@@ -93,6 +105,11 @@ func runBackupCheck(ctx context.Context, src backupIndexSource, kind string, con
 			err = ctx.Err()
 		}
 		result.State, result.Reason = backupCheckError(err)
+		var sizeErr *plistLimitError
+		if errors.As(err, &sizeErr) {
+			result.PlistFile = sizeErr.file
+			result.PlistLimitMiB = int(sizeErr.limit >> 20)
+		}
 	}
 	if err := ctx.Err(); err != nil {
 		fail(err)
@@ -128,7 +145,7 @@ func runBackupCheck(ctx context.Context, src backupIndexSource, kind string, con
 			result.ManifestComplete = false
 		}
 	}()
-	manifest, err := readBackupCheckPlist(ctx, root, "Manifest.plist", converter)
+	manifest, err := limit.readPlist(ctx, root, "Manifest.plist", converter)
 	if err != nil {
 		fail(err)
 		return
@@ -138,11 +155,11 @@ func runBackupCheck(ctx context.Context, src backupIndexSource, kind string, con
 		result.State, result.Reason = "issues", "metadata_invalid"
 		return
 	}
-	if _, err = readBackupCheckPlist(ctx, root, "Info.plist", converter); err != nil {
+	if _, err = limit.readPlist(ctx, root, "Info.plist", converter); err != nil {
 		fail(err)
 		return
 	}
-	status, err := readBackupCheckPlist(ctx, root, "Status.plist", converter)
+	status, err := limit.readPlist(ctx, root, "Status.plist", converter)
 	if err != nil {
 		fail(err)
 		return
@@ -156,7 +173,7 @@ func runBackupCheck(ctx context.Context, src backupIndexSource, kind string, con
 		result.State, result.Reason = "issues", "not_finished"
 		return
 	}
-	file, err := openBackupIndexRegular(root, "Manifest.db")
+	file, _, err := openBackupIndexRegular(root, "Manifest.db")
 	if errors.Is(err, os.ErrNotExist) {
 		err = errors.Join(errBackupCheckMetadataMissing, err)
 	}
@@ -237,7 +254,7 @@ func checkBackupObject(root *os.Root, id string) error {
 		if !bucket.IsDir() || bucket.Mode()&os.ModeSymlink != 0 {
 			return errBackupIndexUnsafeSource
 		}
-		file, openErr := openBackupIndexRegular(root, id[:2]+"/"+id)
+		file, _, openErr := openBackupIndexRegular(root, id[:2]+"/"+id)
 		if openErr == nil {
 			return file.Close()
 		}
@@ -247,7 +264,7 @@ func checkBackupObject(root *os.Root, id string) error {
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return err
 	}
-	file, err := openBackupIndexRegular(root, id)
+	file, _, err := openBackupIndexRegular(root, id)
 	if err != nil {
 		return err
 	}

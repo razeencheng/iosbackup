@@ -3,6 +3,10 @@ package app
 import (
 	"context"
 	"errors"
+	"fmt"
+	"os"
+	"syscall"
+
 	"iosbackup/internal/backupstore"
 	"iosbackup/internal/i18n"
 )
@@ -11,6 +15,7 @@ type historyPolicyRun struct {
 	Progress      *backupLocalProgress `json:"progress,omitempty"`
 	ID            string               `json:"id,omitempty"`
 	State         string               `json:"state"`
+	Phase         string               `json:"phase,omitempty"`
 	ErrorCode     string               `json:"error_code,omitempty"`
 	SettingsSaved bool                 `json:"settings_saved"`
 	CleanupState  string               `json:"cleanup_state,omitempty"`
@@ -31,9 +36,23 @@ func (app *application) historyPolicyStatus(udid string, cfg *backupConfig) hist
 	if run := service.policies[udid]; run != nil {
 		view.ID, view.State, view.ErrorCode = run.ID, run.State, run.ErrorCode
 		view.SettingsSaved, view.CleanupState = run.SettingsSaved, run.CleanupState
-		view.Progress = run.Progress
+		view.Progress, view.Phase = run.Progress, run.Phase
 	}
 	return view
+}
+
+func historyPolicyErrorCode(err error, fallback string) string {
+	var translated *i18n.Error
+	switch {
+	case errors.As(err, &translated):
+		return translated.Code
+	case errors.Is(err, backupstore.ErrCapacity), errors.Is(err, syscall.ENOSPC), errors.Is(err, syscall.EDQUOT):
+		return i18n.HistoryCapacity
+	case errors.Is(err, os.ErrPermission), errors.Is(err, syscall.EROFS):
+		return i18n.HistoryStoragePermission
+	default:
+		return fallback
+	}
 }
 
 func (app *application) startHistoryPolicy(requestCtx context.Context, udid string, policy backupstore.Policy, confirmed *historyPolicyPreview) (historyPolicyRun, error) {
@@ -65,6 +84,9 @@ func (app *application) startHistoryPolicy(requestCtx context.Context, udid stri
 	go func() {
 		defer cancel()
 		err := app.runHistoryPolicy(work)
+		if err != nil {
+			app.addWarnLog(udid, fmt.Sprintf("event=backup.history_policy_failed job_id=%s error=%v", run.ID, err))
+		}
 		service.mu.Lock()
 		run.CleanupState = work.job.historyCleanup
 		if run.CleanupState == "" {
@@ -72,12 +94,12 @@ func (app *application) startHistoryPolicy(requestCtx context.Context, udid stri
 		}
 		run.State = "succeeded"
 		if err != nil {
-			run.State, run.ErrorCode = "failed", i18n.HistoryUnavailable
+			run.State, run.ErrorCode = "failed", historyPolicyErrorCode(err, i18n.HistoryUnavailable)
+			if errors.Is(err, errHistoryImport) {
+				run.Phase = "import"
+			}
 			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 				run.State = "interrupted"
-			}
-			if errors.Is(err, backupstore.ErrCapacity) {
-				run.ErrorCode = i18n.HistoryCapacity
 			}
 		}
 		close(run.done)

@@ -212,9 +212,9 @@
     host.replaceChildren();host.classList.toggle('hidden',!job||!needsAttention(job));
     if(job&&needsAttention(job)){
       var stateText;
-      if(job.error_code&&global.IOSBKI18n.has('api.'+job.error_code))stateText=tr('api.'+job.error_code);
+      if(job.error_code&&global.IOSBKI18n.has('api.'+job.error_code))stateText=(job.history_phase==='import'&&job.error_code!=='history_import_failed'?tr('console.historyPhase.import')+' · ':'')+tr('api.'+job.error_code);
       else if(['failed','uncertain'].indexOf(job.history_state)>=0)stateText=tr(job.history_committed?'console.savedWithIssue':'console.historyIssue',{phase:tr('console.historyPhase.'+(job.history_phase||'unknown'))});
-      else if(job.check&&job.check.reason&&global.IOSBKI18n.has('check.reason.'+job.check.reason))stateText=tr('check.reason.'+job.check.reason);
+      else if(job.check&&job.check.reason&&global.IOSBKI18n.has('check.reason.'+job.check.reason))stateText=global.IOSBKChecks.reason(job.check);
       else if(job.check&&['issues','unavailable','cancelled'].indexOf(job.check.state)>=0)stateText=tr('check.state.'+job.check.state);
       else if(job.history_state==='pending')stateText=tr('history.state.pending');
       else stateText=tr('jobs.state.'+job.state);

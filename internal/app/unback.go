@@ -283,7 +283,7 @@ func streamBackupManifestRowsCommand(ctx context.Context, binary, manifestPath s
 	if err := requireStableBackupManifest(root, filepath.Base(manifestPath)); err != nil {
 		return err
 	}
-	file, err := openBackupIndexRegular(root, filepath.Base(manifestPath))
+	file, _, err := openBackupIndexRegular(root, filepath.Base(manifestPath))
 	if err != nil {
 		return err
 	}

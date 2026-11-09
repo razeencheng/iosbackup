@@ -17,7 +17,7 @@ func TestBackupStorageRegistrationAndRecovery(t *testing.T) {
 	if err := os.Mkdir(backups, 0700); err != nil {
 		t.Fatal(err)
 	}
-	m := newBackupStorage(registry)
+	m := newBackupStorage(registry, testPlistLimit)
 	id, err := m.create(context.Background(), backups, "PHONE")
 	if err != nil {
 		t.Fatal(err)
@@ -61,7 +61,7 @@ func TestBackupStorageRegistrationAndRecovery(t *testing.T) {
 	if err = m.close(); err != nil {
 		t.Fatal(err)
 	}
-	restarted := newBackupStorage(registry)
+	restarted := newBackupStorage(registry, testPlistLimit)
 	defer restarted.close()
 	if err = restarted.load(context.Background()); err != nil {
 		t.Fatal(err)
@@ -77,7 +77,7 @@ func TestBackupStorageRegistrationAndRecovery(t *testing.T) {
 	if err = os.Rename(path, path+"-offline"); err != nil {
 		t.Fatal(err)
 	}
-	missing := newBackupStorage(registry)
+	missing := newBackupStorage(registry, testPlistLimit)
 	defer missing.close()
 	if err = missing.load(context.Background()); err != nil {
 		t.Fatal(err)
@@ -91,7 +91,7 @@ func TestBackupStorageRegistrationAndRecovery(t *testing.T) {
 }
 func TestBackupStorageRegisterBeforeCreate(t *testing.T) {
 	dir := t.TempDir()
-	m := newBackupStorage(filepath.Join(dir, "registry.json"))
+	m := newBackupStorage(filepath.Join(dir, "registry.json"), testPlistLimit)
 	m.write = func(string, []byte, os.FileMode) error { return errors.New("disk full") }
 	if _, err := m.create(context.Background(), dir, "PHONE"); err == nil {
 		t.Fatal("registration failure ignored")
@@ -101,7 +101,7 @@ func TestBackupStorageRegisterBeforeCreate(t *testing.T) {
 	}
 }
 func TestBackupStorageQueueCanCancel(t *testing.T) {
-	m := newBackupStorage(filepath.Join(t.TempDir(), "registry.json"))
+	m := newBackupStorage(filepath.Join(t.TempDir(), "registry.json"), testPlistLimit)
 	m.slot <- struct{}{}
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
@@ -113,7 +113,7 @@ func TestBackupStorageQueueCanCancel(t *testing.T) {
 
 func TestBackupStorageEmptyWorkChecksCapacity(t *testing.T) {
 	root := t.TempDir()
-	m := newBackupStorage(filepath.Join(t.TempDir(), "registry.json"))
+	m := newBackupStorage(filepath.Join(t.TempDir(), "registry.json"), testPlistLimit)
 	defer m.close()
 	id, err := m.create(context.Background(), root, "PHONE")
 	if err != nil {

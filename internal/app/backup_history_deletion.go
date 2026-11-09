@@ -48,7 +48,7 @@ func (m *backupStorage) finishHistoryPointDeletion(ctx context.Context, udid str
 				if selected.ID != "" && (p.CommittedAt.Before(selected.CommittedAt) || p.CommittedAt.Equal(selected.CommittedAt) && p.ID <= selected.ID) {
 					continue
 				}
-				if historyBaselineMetadata(ctx, s, p, intent.Generation) {
+				if m.plistLimit.historyBaselineMetadata(ctx, s, p, intent.Generation) {
 					selected = p
 				}
 			}

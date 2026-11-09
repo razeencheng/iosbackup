@@ -5,6 +5,9 @@ import (
 	"context"
 	"errors"
 	"io"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -59,5 +62,51 @@ func TestLongCommandKeepsOnlyErrorTail(t *testing.T) {
 	}
 	if len(out) != maxCommandErrorBytes {
 		t.Fatalf("tail length=%d", len(out))
+	}
+}
+
+func TestBackupListLongCSVRecords(t *testing.T) {
+	long := strings.Repeat("x", 70<<10)
+	multiline := "first\nsecond,\"third\""
+	input := "before,1\r\n" + long + ",\"first\nsecond,\"\"third\"\"\"\r\nafter,3"
+	var rows [][]string
+	err := forEachBackupListRow(strings.NewReader(input), func(fields []string) error {
+		rows = append(rows, append([]string(nil), fields...))
+		return nil
+	})
+	if err != nil || len(rows) != 3 || rows[1][0] != long || rows[1][1] != multiline || rows[2][0] != "after" {
+		t.Fatalf("rows=%d err=%v", len(rows), err)
+	}
+}
+
+func TestBackupListHTTPRejectsOversizedRecords(t *testing.T) {
+	app := newBackupControlTestApp(t)
+	for _, tc := range []struct {
+		name, format, prefix string
+		abort                bool
+	}{
+		{"JSON", "", "ok,1\n", false}, {"CSV-first", "?format=csv", "", false}, {"CSV-started", "?format=csv", "ok,1\n", true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			// 每个物理行都在上限内，整条引号记录超限。
+			output := tc.prefix + "\"" + strings.Repeat("x\n", backupIndexMaxRecordBytes/2) + "\""
+			app.streamCmdRunner = streamRunnerFunc(func(_ context.Context, _ string, _, _ []string, stdout, _ io.Writer) error {
+				_, err := io.WriteString(stdout, output)
+				return err
+			})
+			w := httptest.NewRecorder()
+			r := httptest.NewRequest(http.MethodGet, "/api/backup-list/CONTROL"+tc.format, nil)
+			if tc.abort {
+				defer func() {
+					if recover() != http.ErrAbortHandler || w.Body.String() != "ok,1\n" {
+						t.Fatal("partial CSV response was not aborted")
+					}
+				}()
+			}
+			app.handleBackupList(w, r)
+			if w.Code != http.StatusConflict || !strings.Contains(w.Body.String(), "api.backup_list_record_limit") || w.Header().Get("Content-Disposition") != "" {
+				t.Fatalf("response=%d body=%q", w.Code, w.Body.String())
+			}
+		})
 	}
 }

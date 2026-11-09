@@ -47,6 +47,7 @@ type Runtime struct {
 	SecretKey                    string
 	SecretKeyFile                string
 	MaxHeavyJobs                 int
+	PlistMaxMiB                  int
 	PresenceInterval             time.Duration
 	DeviceDisconnectGrace        time.Duration
 	BackupPreparationTimeout     time.Duration
@@ -73,6 +74,7 @@ func Default() Runtime {
 		AuthEnabled:                  false,
 		EnableExperimentalOperations: false,
 		MaxHeavyJobs:                 defaultMaxHeavyJobs,
+		PlistMaxMiB:                  64,
 		PresenceInterval:             defaultPresenceInterval,
 		DeviceDisconnectGrace:        defaultDisconnectGrace,
 		BackupPreparationTimeout:     30 * time.Minute,
@@ -171,6 +173,13 @@ func Load(getenv func(string) string) (Runtime, error) {
 
 	if value := strings.TrimSpace(getenv("IOSBK_MAX_HEAVY_JOBS")); value != "" {
 		cfg.MaxHeavyJobs, err = parseIntRange("IOSBK_MAX_HEAVY_JOBS", value, 1, maxHeavyJobs)
+		if err != nil {
+			return Runtime{}, err
+		}
+	}
+
+	if value := strings.TrimSpace(getenv("IOSBK_PLIST_MAX_MIB")); value != "" {
+		cfg.PlistMaxMiB, err = parseIntRange("IOSBK_PLIST_MAX_MIB", value, 1, 256)
 		if err != nil {
 			return Runtime{}, err
 		}

@@ -61,6 +61,8 @@ type Identity struct {
 }
 
 type Check struct {
+	PlistFile          string    `json:"plist_file,omitempty"`
+	PlistLimitMiB      int       `json:"plist_limit_mib,omitempty"`
 	Reason             string    `json:"reason,omitempty"`
 	MetadataComplete   bool      `json:"metadata_complete"`
 	ManifestComplete   bool      `json:"manifest_complete"`

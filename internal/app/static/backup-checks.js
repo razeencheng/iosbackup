@@ -3,10 +3,14 @@
  var doc=global.document,devices={},pending={},sources={};
  function tr(key,params){return global.IOSBKI18n.t(key,params);}
  function label(key,value){var name='check.'+key+'.'+value;return global.IOSBKI18n.has(name)?tr(name):tr('check.unknown');}
+ function reason(result){
+  if(result.reason==='resource_limit'&&result.plist_file&&result.plist_limit_mib)return tr('check.plistLimit',{file:result.plist_file,limit:result.plist_limit_mib});
+  return label('reason',result.reason||'read_failed');
+ }
  function summary(result,options){
   if(!result)return tr('check.none');
   var text=label('kind',result.kind)+(options&&options.detailsOnly?'':' · '+label('state',result.state));
-  if(result.reason)text+=' · '+label('reason',result.reason);
+  if(result.reason)text+=' · '+reason(result);
   text+='\n'+tr(result.kind==='quick'?'check.quickCoverage':'check.coverage',{metadata:tr(result.metadata_complete?'check.yes':'check.no'),manifest:tr(result.manifest_complete?'check.yes':'check.no'),records:result.records_checked||0,objects:result.objects_checked||0,missing:result.missing_objects||0});
   if(result.completed_at&&!result.completed_at.startsWith('0001-'))text+='\n'+global.IOSBKI18n.formatDate(result.completed_at);
   if(result.freshness==='stale'||result.freshness==='unknown')text+='\n'+label('freshness',result.freshness);
@@ -28,7 +32,7 @@
   var top=node('div',undefined,'check-card-top'),icon=node('span',undefined,'check-card-icon');
   var iconName=!result||historical(result)?'info':result.state==='passed'?'check-circle':result.state==='running'?'loader':'alert';
   icon.innerHTML='<svg class="ui-icon" aria-hidden="true"><use href="/static/ui-icons.svg#icon-'+iconName+'"></use></svg>';top.appendChild(icon);
-  var copy=node('div',undefined,'check-card-copy'),title=!result?tr('check.none'):historical(result)?tr('check.card.'+(result.freshness==='stale'?'stale':'historical')):result.state==='passed'?tr(result.kind==='quick'?'check.card.quickPassed':'check.state.passed'):result.state==='unavailable'&&result.reason?label('reason',result.reason):label('state',result.state);
+  var copy=node('div',undefined,'check-card-copy'),title=!result?tr('check.none'):historical(result)?tr('check.card.'+(result.freshness==='stale'?'stale':'historical')):result.state==='passed'?tr(result.kind==='quick'?'check.card.quickPassed':'check.state.passed'):result.state==='unavailable'&&result.reason?reason(result):label('state',result.state);
   copy.appendChild(node('strong',title,'check-card-title'));
   if(result){
    var meta=node('div',undefined,'check-card-meta');meta.appendChild(node('span',tr('check.card.kind.'+result.kind)));
@@ -37,7 +41,7 @@
    copy.appendChild(meta);
   }
   top.appendChild(copy);if(options.action)top.appendChild(options.action);host.appendChild(top);
-  if(result&&result.reason&&result.state!=='unavailable')host.appendChild(node('p',label('reason',result.reason),'check-card-note console-amber'));
+  if(result&&result.reason&&(result.state!=='unavailable'||historical(result)))host.appendChild(node('p',reason(result),'check-card-note console-amber'));
   if(historical(result))host.appendChild(node('p',label('freshness',result.freshness),'check-card-note'));
   if(encrypted)host.appendChild(node('p',tr('check.card.encrypted'),'check-card-note'));
   if(previous&&result&&['passed','issues'].indexOf(result.state)<0){var prior=tr('check.card.previous',{kind:tr('check.card.kind.'+previous.kind),state:label('state',previous.state),time:date(previous.completed_at)});if(historical(previous))prior+=' · '+tr('check.card.'+(previous.freshness==='stale'?'stale':'historical'));host.appendChild(node('p',prior,'check-card-note'));}
@@ -81,5 +85,5 @@
  }
  doc.addEventListener('click',function(event){var button=event.target.closest('[data-check-action]');if(button)act(button);});
  global.addEventListener('iosbk:localechange',function(){Object.keys(devices).forEach(function(u){render(devices[u]);});});
- global.IOSBKChecks={summary:summary,card:card,render:render,source:function(u,snapshot){sources[u]=snapshot;if(devices[u])render(devices[u]);}};
+ global.IOSBKChecks={summary:summary,reason:reason,card:card,render:render,source:function(u,snapshot){sources[u]=snapshot;if(devices[u])render(devices[u]);}};
 })(window);

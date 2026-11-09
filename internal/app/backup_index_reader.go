@@ -16,13 +16,17 @@ import (
 	"iosbackup/internal/i18n"
 )
 
-func readBackupIndexOverview(ctx context.Context, source backupIndexSource, converter backupPlistConverter) (result backupIndexOverview, err error) {
+func (limit plistReadLimit) readBackupIndexOverview(ctx context.Context, source backupIndexSource, converter backupPlistConverter) (result backupIndexOverview, err error) {
 	result = backupIndexOverview{Status: "available", Freshness: "current"}
 	defer func() {
 		if err != nil {
 			result.Status = "unavailable"
 			result.Freshness = "unknown"
 			result.MessageCode = backupIndexErrorCode(err)
+			var sizeErr *plistLimitError
+			if errors.As(err, &sizeErr) {
+				result.PlistFile, result.PlistLimitMiB = sizeErr.file, int(sizeErr.limit>>20)
+			}
 		}
 	}()
 	root, err := openBackupIndexRoot(source)
@@ -35,22 +39,10 @@ func readBackupIndexOverview(ctx context.Context, source backupIndexSource, conv
 		if err := ctx.Err(); err != nil {
 			return result, err
 		}
-		f, err := openBackupIndexRegular(root, name)
-		if errors.Is(err, os.ErrNotExist) {
+		values, err := limit.readPlist(ctx, root, name, converter)
+		if errors.Is(err, errBackupCheckMetadataMissing) {
 			continue
 		}
-		if err != nil {
-			return result, indexReadError(i18n.BackupIndexUnavailable, errBackupIndexUnavailable, err)
-		}
-		data, readErr := io.ReadAll(io.LimitReader(f, backupIndexMaxPlistBytes+1))
-		closeErr := f.Close()
-		if readErr != nil {
-			return result, readErr
-		}
-		if closeErr != nil {
-			return result, closeErr
-		}
-		values, err := parseBackupPlist(ctx, data, converter)
 		if err != nil {
 			return result, err
 		}
@@ -120,7 +112,7 @@ func streamLocalBackupIndex(ctx context.Context, source backupIndexSource, encry
 		return 0, err
 	}
 	manifestPath := filepath.Join(source.Directory, "Manifest.db")
-	file, err := openBackupIndexRegular(root, "Manifest.db")
+	file, _, err := openBackupIndexRegular(root, "Manifest.db")
 	if err != nil {
 		return 0, indexReadError(i18n.BackupIndexUnavailable, errBackupIndexUnavailable, err)
 	}

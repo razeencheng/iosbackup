@@ -103,15 +103,10 @@ func (m *backupIndexCoordinator) runOnlineCapture(ctx context.Context, c *backup
 		m.app.addWarnLog(c.source.UDID, "event=backup_index.capture_failed reason="+backupIndexErrorCode(cacheErr))
 		return
 	}
-	overview, overviewErr := readBackupIndexOverview(ctx, c.source, nil)
+	overview, overviewErr := m.app.plistLimit().readBackupIndexOverview(ctx, c.source, nil)
 	fingerprint, err := backupIndexSourceFingerprint(ctx, c.source)
 	if err != nil || fingerprint != c.source.Fingerprint || ctx.Err() != nil {
 		return
-	}
-	if overviewErr != nil {
-		overview.Status = "unavailable"
-		overview.Freshness = "unknown"
-		overview.MessageCode = backupIndexErrorCode(overviewErr)
 	}
 	m.mu.Lock()
 	m.app.mu.RLock()
@@ -156,7 +151,7 @@ func (a *backupListCacheAudit) Write(data []byte) (int, error) {
 			a.checkLine()
 			continue
 		}
-		if len(a.line) >= maxBackupLogLineBytes {
+		if len(a.line) >= backupIndexMaxRecordBytes {
 			a.safe = false
 			a.line = nil
 			break

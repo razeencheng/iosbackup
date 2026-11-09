@@ -86,13 +86,13 @@ func TestBackupIndexPlistToolIntegration(t *testing.T) {
 	if !bytes.HasPrefix(binaryData, []byte("bplist00")) {
 		t.Fatal("plistutil did not produce a binary plist")
 	}
-	values, err := parseBackupPlist(ctx, binaryData, func(ctx context.Context, data []byte) ([]byte, error) {
-		return convertBackupBinaryPlistCommand(ctx, binary, data)
+	values, err := testPlistLimit.parseBackupPlist(ctx, binaryData, func(ctx context.Context, data []byte) ([]byte, error) {
+		return testPlistLimit.convertBackupBinaryPlistCommand(ctx, binary, data)
 	})
 	if err != nil || values["IsEncrypted"] != false || values["Device Name"] != "合成 fixture" {
 		t.Fatalf("actual binary plist conversion: %v %v", values, err)
 	}
-	if _, err := convertBackupBinaryPlistCommand(ctx, binary, []byte("bplist00invalid")); err == nil {
+	if _, err := testPlistLimit.convertBackupBinaryPlistCommand(ctx, binary, []byte("bplist00invalid")); err == nil {
 		t.Fatal("actual plistutil must reject corrupt binary")
 	}
 }

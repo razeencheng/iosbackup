@@ -148,7 +148,7 @@ func TestBackupHistoryEncryptionEvidenceRotatesWithoutOverwritingOldPoint(t *tes
 		t.Fatal(err)
 	}
 	defer lease.Close()
-	manifest, err := readBackupCheckPlist(context.Background(), lease.Root, "Manifest.plist", nil)
+	manifest, err := testPlistLimit.readPlist(context.Background(), lease.Root, "Manifest.plist", nil)
 	if err != nil {
 		t.Fatal(err)
 	}

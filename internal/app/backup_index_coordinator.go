@@ -69,7 +69,7 @@ func (app *application) backupIndexManager() *backupIndexCoordinator {
 	return app.backupIndex
 }
 func (app *application) readLocalBackupIndex(ctx context.Context, src backupIndexSource) (backupIndexOverview, backupIndexProducer, error) {
-	overview, overviewErr := readBackupIndexOverview(ctx, src, nil)
+	overview, overviewErr := app.plistLimit().readBackupIndexOverview(ctx, src, nil)
 	produce := func(emit func([]string) error) error {
 		_, err := streamLocalBackupIndex(ctx, src, overview.Encrypted, app.manifestRows, func(r backupIndexRecord) error {
 			return emit([]string{r.FileID, r.Domain, r.RelativePath, strconv.Itoa(r.Flags)})
@@ -330,6 +330,7 @@ func (m *backupIndexCoordinator) snapshot(src backupIndexSource, sourceErr error
 			result.Overview.Status = "unavailable"
 		}
 		result.Overview.MessageCode = backupIndexErrorCode(sourceErr)
+		result.Overview.PlistFile, result.Overview.PlistLimitMiB = "", 0
 		if result.FileList.Complete {
 			result.FileList.Freshness = "stale"
 		}

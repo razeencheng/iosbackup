@@ -20,6 +20,9 @@ func TestLoadDefaults(t *testing.T) {
 	if cfg.ListenAddr != "127.0.0.1" {
 		t.Fatalf("listen address=%q", cfg.ListenAddr)
 	}
+	if cfg.PlistMaxMiB != 64 {
+		t.Fatalf("plist budget=%d", cfg.PlistMaxMiB)
+	}
 	if cfg.Port != 8080 {
 		t.Fatalf("port=%d", cfg.Port)
 	}
@@ -59,6 +62,7 @@ func TestLoadCustomValues(t *testing.T) {
 	cfg, err := config.Load(mapEnv(map[string]string{
 		"IOSBK_LISTEN_ADDR":             "192.0.2.10",
 		"PORT":                          "9000",
+		"IOSBK_PLIST_MAX_MIB":           "128",
 		"IOSBK_CONFIGS_DIR":             "/srv/iosbackup/configs",
 		"IOSBK_BACKUPS_DIR":             "/srv/iosbackup/backups",
 		"IOSBK_AUTH_ENABLED":            "true",
@@ -85,6 +89,9 @@ func TestLoadCustomValues(t *testing.T) {
 	}
 	if !cfg.AuthEnabled || cfg.AdminPasswordFile != "/run/secrets/iosbackup-password" {
 		t.Fatalf("auth=%v password file=%q", cfg.AuthEnabled, cfg.AdminPasswordFile)
+	}
+	if cfg.PlistMaxMiB != 128 {
+		t.Fatalf("plist budget=%d", cfg.PlistMaxMiB)
 	}
 	if cfg.MaxHeavyJobs != 2 || cfg.MinFreeBytes != 1048576 {
 		t.Fatalf("limits=%d,%d", cfg.MaxHeavyJobs, cfg.MinFreeBytes)
@@ -153,6 +160,7 @@ func TestLoadRejectsInvalidValues(t *testing.T) {
 		{"IOSBK_INSECURE_ALLOW_REMOTE": "maybe"},
 		{"PORT": "0"},
 		{"PORT": "65536"},
+		{"IOSBK_PLIST_MAX_MIB": "0"}, {"IOSBK_PLIST_MAX_MIB": "257"}, {"IOSBK_PLIST_MAX_MIB": "64MiB"},
 		{"IOSBK_LISTEN_ADDR": "not-an-address"},
 		{"IOSBK_MAX_HEAVY_JOBS": "0"},
 		{"IOSBK_MAX_HEAVY_JOBS": "3"},

@@ -23,8 +23,10 @@ api.source('PHONE',{source_key:'two',revision:'old',overview:{status:'available'
 api.source('PHONE',{source_key:'two',revision:'new',overview:{status:'available',freshness:'current',encrypted:true}});assert.equal(actions().length,0);
 api.render({udid:'PHONE',backup_index:{source_key:'two'},backup_check:{...prior,kind:'manifest'}});assert.equal(actions().length,1,'a current successful file check supersedes cached encryption');
 const quick=api.summary({...check,kind:'quick',state:'passed',reason:''});assert.match(quick,/metadata/i);assert.doesNotMatch(quick,/manifest scan complete: No|records read: 0|missing objects: 0/);
+const limited={...check,reason:'resource_limit',plist_file:'Info.plist',plist_limit_mib:128};
+assert.match(api.summary(limited),/Info\.plist.*128 MiB/);
 const cancelled=api.summary({...check,reason:'cancelled',last_completed:{...check,state:'passed',reason:'',completed_at:'2026-10-30T12:00:00Z'}});assert.match(cancelled,/cancelled/i);assert.match(cancelled,/Previous completed check/);
-locale='zh-CN';listeners['iosbk:localechange']();assert.match(api.summary({...check,state:'passed',reason:'',freshness:'stale'}),/已过期/);
+locale='zh-CN';assert.match(api.reason(limited),/Info\.plist.*128 MiB.*解析上限/);listeners['iosbk:localechange']();assert.match(api.summary({...check,state:'passed',reason:'',freshness:'stale'}),/已过期/);
 api.render({udid:'PHONE',backing_up:true,backup_check_active:true,backup_check:check});assert.equal(actions()[0].dataset.checkAction,'cancel');
 listeners.click({target:{closest:()=>actions()[0]}});assert.equal(calls.length,1);assert.equal(calls[0].body.id,check.id);
 listeners.click({target:{closest:()=>actions()[0]}});assert.equal(calls.length,1,'in-flight cancellation is deduplicated');
