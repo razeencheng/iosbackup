@@ -1,12 +1,63 @@
-# iOS Backup
+<p align="center">
+  <img src="docs/images/readme/logo.png" alt="iOS Backup logo" width="160" height="160">
+</p>
 
-[简体中文](README.zh-CN.md)
+<h1 align="center">iOS Backup</h1>
+
+<p align="center">
+  <strong>Back home on Wi-Fi — your iPhone and iPad back up automatically.</strong>
+</p>
+
+<p align="center">
+  <a href="#quick-start">Quick start</a> ·
+  <a href="docs/OPERATIONS.md">Documentation</a> ·
+  <a href="#troubleshooting">Troubleshooting</a> ·
+  <a href="CHANGELOG.md">Changelog</a>
+</p>
+
+<p align="center">
+  English · <a href="README.zh-CN.md">简体中文</a>
+</p>
+
+<p align="center">
+  <img src="docs/images/readme/iosbackup-en.png" alt="English iOS Backup console showing Wi-Fi devices, a completed backup, and backup history" width="1200">
+</p>
+
+<p align="center">
+  <sub>English console · Wi-Fi devices, backup progress, and backup history.</sub>
+</p>
 
 iOS Backup lets you back up an iPhone or iPad to your own Linux host or NAS through a browser. It is designed for one administrator and runs libimobiledevice, usbmuxd2, and netmuxd in a privileged container. It supports USB device discovery, scheduled backups, read-only backup inspection, and optional notifications.
 
-![iOS Backup console after a successful USB backup](docs/images/tutorial/09-usb-backup-completed.png)
+## Quick start
 
-The screenshot is from the maintainer's Synology NAS, where a USB backup completed and its on-disk completion marker was checked. See the [illustrated quick start](docs/QUICKSTART.md) for real setup, progress, and completion screenshots.
+You need a Linux host or NAS with Docker Engine and Docker Compose, an iPhone/iPad whose passcode you know, a USB data cable, and enough disk space for a complete device backup. For Synology DSM, use the [Synology guide](docs/manual/synology.md). For an existing deployment, follow [upgrade and rollback](#upgrade-and-rollback).
+
+**1. Start the service**
+
+Download [compose.yaml](compose.yaml) into a new deployment directory on your Linux host, then start the container:
+
+```bash
+mkdir -p "$HOME/iosbackup-deploy"
+cd "$HOME/iosbackup-deploy"
+curl -fL https://raw.githubusercontent.com/razeencheng/iosbackup/main/compose.yaml -o compose.yaml
+docker compose up -d
+docker compose logs iosbackup
+```
+
+Compose defaults to the official image `ghcr.io/razeencheng/iosbackup:latest` and port `9000`.
+
+**2. Sign in**
+
+Open `http://<Linux-host>:9000/` and sign in with the administrator password shown in the first-start log. The password and encryption master key are generated automatically and saved in `data/configs`; restarts and upgrades reuse them. Do not share the first-start log.
+
+**3. Complete your first backup**
+
+Connect the iPhone or iPad to your Linux host over USB, unlock it, and tap **Trust** when prompted. Follow the setup wizard, confirm the device shows **USB**, and click **Back up now**. After a successful USB backup, follow the [Wi-Fi guide](docs/manual/wifi.md) to enable wireless backups, then configure [automatic schedules](docs/manual/scheduling.md).
+
+See the [illustrated quick start](docs/QUICKSTART.md) for the full sign-in, pairing, and backup walkthrough, or the [installation guide](docs/manual/installation.md) for advanced setup.
+
+Keep all three persistent directories: `data/backups` (device backups), `data/configs` (settings, passwords, default `secret_key`, and encrypted secrets), and `data/lockdown` (pairing records). Back up these before upgrades, plus Compose configuration and external credentials in use. Protect the administrator password and keep the master key used for stored secrets unchanged.
 
 ## Feature status
 
@@ -18,16 +69,6 @@ The local Web UI has no telemetry or remote frontend assets. Optional Telegram, 
 The application is distributed as a Linux container for `linux/amd64` and `linux/arm64`. Native device operation on Windows or macOS is not promised. The Go module itself uses only the standard library, but the running application still depends on the libimobiledevice/netmuxd toolchain included in the image.
 
 The container requires `--privileged`, `--network host`, `/dev/bus/usb:/dev/bus/usb`, and `/run/udev:/run/udev:ro`. **Privileged mode grants host-level access. We recommend running it only on a trusted host and trusted network. Do not expose the Web UI directly to the public Internet.** Even with authentication enabled, a firewall, VPN, or authenticated HTTPS reverse proxy is still recommended.
-
-## Quick start
-
-Requirements: a Linux host or NAS with Docker Engine and Docker Compose, an iPhone/iPad whose passcode you know, and a data directory on a filesystem with enough space for a complete device backup.
-
-Follow the [illustrated quick start](docs/QUICKSTART.md) to download Compose, start the service, retrieve the first-start password, and sign in for pairing. It uses the same separate deployment directory, `$HOME/iosbackup-deploy`, as the [detailed installation guide](docs/manual/installation.md). For an existing deployment, follow upgrade and rollback instead of repeating initialization.
-
-[compose.yaml](compose.yaml) defaults to the official image `ghcr.io/razeencheng/iosbackup:latest`, so upgrades do not require changing the version tag.
-
-Data you need to keep includes `/backups` (device backups), `/configs` (settings, passwords, default `secret_key`, and encrypted secrets), and `/var/lib/lockdown` (pairing records). Back up these before upgrades, plus Compose configuration and external credentials in use. Protect the administrator password and keep the master key used for stored secrets unchanged.
 
 ## Upgrade and rollback
 

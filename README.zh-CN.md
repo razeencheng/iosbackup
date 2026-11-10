@@ -1,12 +1,63 @@
-# iOS Backup
+<p align="center">
+  <img src="docs/images/readme/logo.png" alt="iOS Backup 标志" width="160" height="160">
+</p>
 
-[English](README.md)
+<h1 align="center">iOS Backup</h1>
+
+<p align="center">
+  <strong>回到家连上 Wi-Fi，就自动备份你的 iPhone 和 iPad。</strong>
+</p>
+
+<p align="center">
+  <a href="#快速开始">快速开始</a> ·
+  <a href="docs/OPERATIONS.zh-CN.md">使用文档</a> ·
+  <a href="#排错">常见问题</a> ·
+  <a href="CHANGELOG.md">更新记录</a>
+</p>
+
+<p align="center">
+  <a href="README.md">English</a> · 简体中文
+</p>
+
+<p align="center">
+  <img src="docs/images/readme/iosbackup-cn.png" alt="iOS Backup 中文控制台，展示 Wi-Fi 设备、备份完成状态和历史备份" width="1200">
+</p>
+
+<p align="center">
+  <sub>中文控制台 · Wi-Fi 设备、备份进度与历史版本。</sub>
+</p>
 
 iOS Backup 让你通过浏览器把 iPhone/iPad 备份到自己的 Linux 主机或 NAS，由一位管理员管理。它在特权容器中运行 libimobiledevice、usbmuxd2 和 netmuxd，支持发现 USB 设备、定时备份和只读查看备份，也可以配置通知。
 
-![iOS Backup 真机 USB 备份成功后的控制台](docs/images/tutorial/09-usb-backup-completed.png)
+## 快速开始
 
-上图来自自用的群晖 NAS，已完成一次 USB 备份并核对磁盘完成标记。安装、连接设备、备份进度和完成后的真实截图见[图文快速开始](docs/QUICKSTART.zh-CN.md)。
+准备一台安装 Docker Engine 和 Docker Compose 的 Linux 主机或 NAS、一台 iPhone/iPad（需知道锁屏密码）、USB 数据线，以及足够容纳完整设备备份的磁盘空间。群晖 DSM 请看[群晖安装指南](docs/manual/synology.zh-CN.md)；已有部署请直接看[升级与回滚](#升级与回滚)。
+
+**1. 启动服务**
+
+在 Linux 主机上新建部署目录，下载 [compose.yaml](compose.yaml) 并启动容器：
+
+```bash
+mkdir -p "$HOME/iosbackup-deploy"
+cd "$HOME/iosbackup-deploy"
+curl -fL https://raw.githubusercontent.com/razeencheng/iosbackup/main/compose.yaml -o compose.yaml
+docker compose up -d
+docker compose logs iosbackup
+```
+
+Compose 默认使用官方镜像 `ghcr.io/razeencheng/iosbackup:latest`，访问端口为 `9000`。
+
+**2. 登录控制台**
+
+浏览器打开 `http://<Linux主机>:9000/`，输入首次启动日志中的管理员密码。密码和内部加密主密钥会自动生成并保存在 `data/configs` 中，重启和升级继续复用。不要公开首次日志。
+
+**3. 完成第一次备份**
+
+用 USB 把 iPhone 或 iPad 连接到 Linux 主机，按提示解锁并点击“信任”。跟随首次使用向导，确认设备显示 **USB**，点击“立即备份”。首次 USB 备份成功后，按 [Wi-Fi 备份指南](docs/manual/wifi.zh-CN.md)启用无线备份，再设置[自动备份计划](docs/manual/scheduling.zh-CN.md)。
+
+完整的登录、配对和备份过程见[图文快速开始](docs/QUICKSTART.zh-CN.md)，高级设置见[安装指南](docs/manual/installation.zh-CN.md)。
+
+请保留三个持久化目录：`data/backups`（设备备份）、`data/configs`（设置、密码、默认 `secret_key` 和加密秘密）、`data/lockdown`（配对记录）。升级前备份这些内容、Compose 配置及实际使用的外部凭据。保护管理员密码，保持已保存秘密所用的主密钥不变。
 
 ## 功能状态
 
@@ -18,16 +69,6 @@ iOS Backup 让你通过浏览器把 iPhone/iPad 备份到自己的 Linux 主机�
 目前分发形式是 Linux 容器，支持 `linux/amd64` 和 `linux/arm64`。不承诺在 Windows 或 macOS 上直接运行真机功能。Go 模块本身只使用标准库，运行时依赖镜像内的 libimobiledevice/netmuxd 工具链。
 
 容器必须使用 `--privileged`、`--network host`、`/dev/bus/usb:/dev/bus/usb` 和 `/run/udev:/run/udev:ro`。**特权模式等同授予宿主机级权限，建议只在可信主机和可信网络运行。不要暴露到公网。** 即使启用了认证，仍然建议开启防火墙、VPN 或带认证的 HTTPS 反向代理。
-
-## 快速开始
-
-需要：安装 Docker Engine 和 Docker Compose 的 Linux 主机（或 NAS）、一台 iPhone/iPad（需知道锁屏密码），以及空间足够的数据目录。请按完整设备备份预留空间。
-
-首次部署按[图文快速开始](docs/QUICKSTART.zh-CN.md)下载 Compose、启动、从首次日志取得密码并登录配对。它与[详细安装指南](docs/manual/installation.zh-CN.md)统一使用独立部署目录 `$HOME/iosbackup-deploy`；已有部署请直接看升级与回滚，不要重复初始化。
-
-[compose.yaml](compose.yaml) 默认使用官方镜像 `ghcr.io/razeencheng/iosbackup:latest`，升级时无需修改版本标签。
-
-需要长期保存的数据包括 `/backups`（设备备份）、`/configs`（设置、密码、默认 `secret_key` 和加密秘密）、`/var/lib/lockdown`（配对记录）。升级前备份这些内容、Compose 配置及实际使用的外部凭据。保护管理员密码，保持已保存秘密所用的主密钥不变。
 
 ## 升级与回滚
 
