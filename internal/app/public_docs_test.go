@@ -48,7 +48,7 @@ func TestPublicReadmesDocumentReleaseDeployment(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.path, func(t *testing.T) {
 			text := readRepoFile(t, test.path)
-			if !strings.Contains(text, "]("+test.other+")") {
+			if !strings.Contains(text, "]("+test.other+")") && !strings.Contains(text, `href="`+test.other+`"`) {
 				t.Fatalf("%s does not link to %s", test.path, test.other)
 			}
 			for _, marker := range test.markers {

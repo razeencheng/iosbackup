@@ -31,7 +31,7 @@ iOS Backup 让你通过浏览器把 iPhone/iPad 备份到自己的 Linux 主机�
 
 ## 快速开始
 
-准备一台安装 Docker Engine 和 Docker Compose 的 Linux 主机或 NAS、一台 iPhone/iPad（需知道锁屏密码）、USB 数据线，以及足够容纳完整设备备份的磁盘空间。群晖 DSM 请看[群晖安装指南](docs/manual/synology.zh-CN.md)；已有部署请直接看[升级与回滚](#升级与回滚)。
+准备一台安装 Docker Engine 和 Docker Compose 的 Linux 主机或 NAS、一台 iPhone/iPad（需知道锁屏密码）、USB 数据线，以及足够容纳完整设备备份的磁盘空间（请按完整设备备份预留空间）。群晖 DSM 请看[群晖安装指南](docs/manual/synology.zh-CN.md)；已有部署请直接看[升级与回滚](#升级与回滚)。
 
 **1. 启动服务**
 
@@ -57,7 +57,7 @@ Compose 默认使用官方镜像 `ghcr.io/razeencheng/iosbackup:latest`，访问
 
 完整的登录、配对和备份过程见[图文快速开始](docs/QUICKSTART.zh-CN.md)，高级设置见[安装指南](docs/manual/installation.zh-CN.md)。
 
-请保留三个持久化目录：`data/backups`（设备备份）、`data/configs`（设置、密码、默认 `secret_key` 和加密秘密）、`data/lockdown`（配对记录）。升级前备份这些内容、Compose 配置及实际使用的外部凭据。保护管理员密码，保持已保存秘密所用的主密钥不变。
+请保留三个持久化目录：`data/backups`（设备备份）、`data/configs`（设置、密码、默认 `secret_key` 和加密秘密）、`data/lockdown`（配对记录，容器内对应 `/var/lib/lockdown`）。升级前备份这些内容、Compose 配置及实际使用的外部凭据。保护管理员密码，保持已保存秘密所用的主密钥不变。
 
 ## 功能状态
 

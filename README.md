@@ -57,7 +57,7 @@ Connect the iPhone or iPad to your Linux host over USB, unlock it, and tap **Tru
 
 See the [illustrated quick start](docs/QUICKSTART.md) for the full sign-in, pairing, and backup walkthrough, or the [installation guide](docs/manual/installation.md) for advanced setup.
 
-Keep all three persistent directories: `data/backups` (device backups), `data/configs` (settings, passwords, default `secret_key`, and encrypted secrets), and `data/lockdown` (pairing records). Back up these before upgrades, plus Compose configuration and external credentials in use. Protect the administrator password and keep the master key used for stored secrets unchanged.
+Keep all three persistent directories: `data/backups` (device backups), `data/configs` (settings, passwords, default `secret_key`, and encrypted secrets), and `data/lockdown` (pairing records, `/var/lib/lockdown` in the container). Back up these before upgrades, plus Compose configuration and external credentials in use. Protect the administrator password and keep the master key used for stored secrets unchanged.
 
 ## Feature status
 
