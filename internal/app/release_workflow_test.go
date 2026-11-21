@@ -59,6 +59,8 @@ var releaseWorkflowStepNames = []string{
 	"Attest linux/arm64 SPDX SBOM with Cosign keyless",
 	"Verify Cosign signature and platform SBOM attestations",
 	"Verify Docker Hub signature and SBOM attestations",
+	"Set up Go for Synology SPK packaging",
+	"Build and verify Synology SPK packages",
 	"Generate deterministic release notes",
 	"Upload verified release assets",
 	"Download verified release assets",
@@ -100,7 +102,7 @@ var releaseWorkflowJobSpecs = []workflowJobSpec{
 			"arm64_digest": "${{ steps.platforms.outputs.arm64_digest }}",
 			"artifact_id":  "${{ steps.assets.outputs.artifact-id }}",
 		},
-		steps: releaseWorkflowStepNames[4:28],
+		steps: releaseWorkflowStepNames[4:30],
 	},
 	{
 		name:    "release",
@@ -110,7 +112,7 @@ var releaseWorkflowJobSpecs = []workflowJobSpec{
 			"contents": "write",
 			"packages": "write",
 		},
-		steps: releaseWorkflowStepNames[28:],
+		steps: releaseWorkflowStepNames[30:],
 	},
 }
 
@@ -124,6 +126,9 @@ var releaseSupplyChainAssetPaths = []string{
 	"dist/iosbackup-cosign-signature-verification.json",
 	"dist/iosbackup-linux-amd64-cosign-sbom-attestation-verification.json",
 	"dist/iosbackup-linux-arm64-cosign-sbom-attestation-verification.json",
+	"dist/iosbackup-synology-x86_64.spk",
+	"dist/iosbackup-synology-armv8.spk",
+	"dist/iosbackup-synology-spk-sha256sums.txt",
 }
 
 var releaseTransferPaths = append(
@@ -363,6 +368,8 @@ func TestReleaseWorkflowPublishesPerPlatformEvidenceAfterPublicGate(t *testing.T
 		"Attest linux/amd64 SPDX SBOM with Cosign keyless",
 		"Attest linux/arm64 SPDX SBOM with Cosign keyless",
 		"Verify Cosign signature and platform SBOM attestations",
+		"Set up Go for Synology SPK packaging",
+		"Build and verify Synology SPK packages",
 		"Generate deterministic release notes",
 		"Upload verified release assets",
 		"Download verified release assets",
@@ -1597,6 +1604,16 @@ func validateReleaseWorkflowSafety(workflow string) error {
 			`"ghcr.io/razeencheng/iosbackup@${{ steps.image.outputs.digest }}" \`,
 			`"ghcr.io/razeencheng/iosbackup@${{ steps.platforms.outputs.amd64_digest }}" \`,
 			`"ghcr.io/razeencheng/iosbackup@${{ steps.platforms.outputs.arm64_digest }}" \`,
+		},
+		"Build and verify Synology SPK packages": {
+			"VERSION: ${{ needs.validate.outputs.version }}",
+			"AMD64_DIGEST: ${{ steps.platforms.outputs.amd64_digest }}",
+			"ARM64_DIGEST: ${{ steps.platforms.outputs.arm64_digest }}",
+			`--expected-manifest-digest "$AMD64_DIGEST" \`,
+			`--output-file dist/iosbackup-synology-x86_64.spk`,
+			`--expected-manifest-digest "$ARM64_DIGEST" \`,
+			`--output-file dist/iosbackup-synology-armv8.spk`,
+			`sha256sum -c iosbackup-synology-spk-sha256sums.txt`,
 		},
 		"Generate deterministic release notes": {
 			"VERSION: ${{ needs.validate.outputs.version }}",

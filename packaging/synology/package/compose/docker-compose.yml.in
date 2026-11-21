@@ -1,0 +1,38 @@
+services:
+  iosbackup:
+    image: __CONTAINER_IMAGE__
+    container_name: iosbackup-spk
+    pull_policy: __PULL_POLICY__
+    user: "0:0"
+    network_mode: host
+    privileged: true
+    restart: unless-stopped
+    stop_grace_period: 20s
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+      - /var/run:size=16m,mode=0755
+    environment:
+      PORT: "@PORT@"
+      TZ: "@TZ@"
+      LOG_LEVEL: "@LOG_LEVEL@"
+      IOSBK_LISTEN_ADDR: "0.0.0.0"
+      IOSBK_AUTH_ENABLED: "true"
+      IOSBK_ADMIN_PASSWORD_FILE: "/run/iosbackup-secrets/admin_password"
+      IOSBK_BACKUPS_DIR: "/data/@BACKUP_SUB@"
+      IOSBK_CONFIGS_DIR: "/data/@CONFIG_SUB@"
+      IOSBK_MIN_FREE_BYTES: "@MIN_FREE_BYTES@"
+      IOSBK_MAX_HEAVY_JOBS: "@MAX_HEAVY_JOBS@"
+      IOSBK_PLIST_MAX_MIB: "@PLIST_MAX_MIB@"
+      IOSBK_WEBHOOK_ALLOW_CIDRS: "@WEBHOOK_CIDRS@"
+      IOSBK_ENABLE_EXPERIMENTAL_OPERATIONS: "@EXP_VAL@"
+      IOSBK_DEVICE_DISCONNECT_GRACE: "30s"
+    volumes:
+      - @DATA_MOUNT@:/data
+      - @LOCKDOWN_MOUNT@:/var/lib/lockdown
+      - @SECRETS_MOUNT@:/run/iosbackup-secrets:ro
+      - /dev/bus/usb:/dev/bus/usb
+      - /run/udev:/run/udev:ro
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"

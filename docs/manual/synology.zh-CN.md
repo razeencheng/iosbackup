@@ -14,6 +14,17 @@
 
 界面入口依据群晖官方文档编写，按钮名称可能随 DSM 版本和语言变化。具体型号的 USB 支持以本页最后的实际备份结果为准。
 
+## 快捷方式：使用套件中心 `.spk` 离线安装包（推荐）
+
+每个发行版均提供内置官方容器镜像的全量 `.spk` 套件（NAS 无需联网拉取镜像即可完成安装）：
+
+1. 确认已在 **“套件中心”** 安装好 **Container Manager** 。
+2. 从 [GitHub Releases](https://github.com/razeencheng/iosbackup/releases/latest) 下载对应架构的安装包：`iosbackup-synology-x86_64.spk`（Intel / AMD 机型）或 `iosbackup-synology-armv8.spk`（64 位 ARM 机型）。
+3. 打开 **“套件中心 → 手动安装”** 上传 `.spk`，跟随 3 步图形向导填写共享文件夹与备份/配置子目录、Web 控制台端口（及可选的反向代理域名地址）、管理员密码、时区、磁盘最低预留余量等选项。
+4. 安装完成后，从 DSM 主菜单或套件中心点击 **“打开”** 登录控制台，直接跳至下文 [5. 在 NAS 上完成第一次 USB 备份](#5-在-nas-上完成第一次-usb-备份)。卸载套件不会删除共享文件夹中的数据。
+
+若你更倾向在 Container Manager 中手动导入和维护 Compose 项目，请按下方第 1～4 节操作。
+
 ## 1. 安装 Container Manager 并确认存储空间
 
 1. 登录 DSM，在 **“套件中心”** 找到并安装 Container Manager；已经安装时，直接打开。

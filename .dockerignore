@@ -10,6 +10,9 @@ main
 coverage.out
 coverage.html
 *.log
+dist
+*.spk
+packaging
 
 # 运行时数据和秘密绝不能进入构建上下文
 backups

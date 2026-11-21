@@ -1,0 +1,33 @@
+#!/bin/sh
+set -eu
+
+# Container Manager 通过 conf/resource 中的 docker-project 自动随套件启停 iosbackup-spk 项目；
+# 本脚本负责向套件中心报告对应的运行状态标记（避免镜像首次解压加载期间误判退出）。
+PKG_VAR="${SYNOPKG_PKGVAR:-/var/packages/iosbackup/var}"
+RUNNING_FLAG="${PKG_VAR}/running"
+
+case "${1:-}" in
+  start)
+    if [ -d "$PKG_VAR" ] && [ -w "$PKG_VAR" ]; then
+      printf '1\n' >"$RUNNING_FLAG" 2>/dev/null || true
+      chmod 644 "$RUNNING_FLAG" 2>/dev/null || true
+    fi
+    exit 0
+    ;;
+  stop)
+    rm -f "$RUNNING_FLAG" 2>/dev/null || true
+    exit 0
+    ;;
+  status)
+    if [ -f "$RUNNING_FLAG" ]; then
+      exit 0
+    fi
+    exit 3
+    ;;
+  log)
+    exit 0
+    ;;
+  *)
+    exit 0
+    ;;
+esac

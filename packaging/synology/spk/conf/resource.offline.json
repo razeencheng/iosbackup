@@ -1,0 +1,26 @@
+{
+  "data-share": {
+    "shares": [
+      {
+        "name": "{{pkgwizard_share_name}}",
+        "permission": {
+          "rw": ["sc-iosbackup"]
+        }
+      }
+    ]
+  },
+  "docker-project": {
+    "preload-image": "images/iosbackup.tar.gz",
+    "projects": [
+      {
+        "name": "iosbackup-spk",
+        "path": "compose",
+        "build_params": {
+          "force_pull": false,
+          "build": false,
+          "force_recreate": true
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,134 @@
+name: synology-spk
+run-name: Synology SPK package @ ${{ inputs.version }}-${{ inputs.build_num }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Published release version tag to bundle (e.g. v1.5.6)"
+        required: true
+        type: string
+        default: "v1.5.6"
+      build_num:
+        description: "4-digit Synology SPK build number (e.g. 0001)"
+        required: true
+        type: string
+        default: "0001"
+      attach_to_release:
+        description: "Attach/update built .spk assets on the matching GitHub Release"
+        required: false
+        type: boolean
+        default: false
+
+permissions: {}
+
+concurrency:
+  group: synology-spk-${{ inputs.version }}-${{ inputs.build_num }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build offline Synology SPK packages
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    outputs:
+      artifact_id: ${{ steps.upload.outputs.artifact-id }}
+    steps:
+      - name: Checkout source
+        # actions/checkout v7.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        # actions/setup-go v7.0.0
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Validate inputs and build offline SPK packages
+        shell: bash
+        env:
+          VERSION: ${{ inputs.version }}
+          BUILD_NUM: ${{ inputs.build_num }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$VERSION" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9._-]+)?$'
+          printf '%s' "$BUILD_NUM" | grep -Eq '^[0-9]{4}$'
+          go test -count=1 -run '^TestSynologySPKBuildAndWizardLifecycle$' ./internal/app
+          mkdir -p dist
+          ./packaging/synology/build_spk.sh --offline \
+            --arch x86_64 \
+            --version "$VERSION" \
+            --build-num "$BUILD_NUM" \
+            --image "ghcr.io/razeencheng/iosbackup:$VERSION" \
+            --output-file dist/iosbackup-synology-x86_64.spk
+          ./packaging/synology/build_spk.sh --offline \
+            --arch armv8 \
+            --version "$VERSION" \
+            --build-num "$BUILD_NUM" \
+            --image "ghcr.io/razeencheng/iosbackup:$VERSION" \
+            --output-file dist/iosbackup-synology-armv8.spk
+          test "$(tar -tf dist/iosbackup-synology-x86_64.spk | head -n 1)" = "INFO"
+          test "$(tar -tf dist/iosbackup-synology-armv8.spk | head -n 1)" = "INFO"
+          (
+            cd dist
+            sha256sum iosbackup-synology-x86_64.spk iosbackup-synology-armv8.spk > iosbackup-synology-spk-sha256sums.txt
+            sha256sum -c iosbackup-synology-spk-sha256sums.txt
+          )
+
+      - name: Upload built SPK artifacts
+        id: upload
+        # actions/upload-artifact v7.0.2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: iosbackup-synology-spk-${{ inputs.version }}-${{ inputs.build_num }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            dist/iosbackup-synology-x86_64.spk
+            dist/iosbackup-synology-armv8.spk
+            dist/iosbackup-synology-spk-sha256sums.txt
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
+          overwrite: false
+          include-hidden-files: false
+
+  attach:
+    name: Attach SPK packages to GitHub release
+    if: ${{ inputs.attach_to_release }}
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Download built SPK artifacts
+        # actions/download-artifact v8.0.2
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          artifact-ids: ${{ needs.build.outputs.artifact_id }}
+          path: dist
+          merge-multiple: true
+          digest-mismatch: error
+
+      - name: Verify checksums and upload to GitHub release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$VERSION" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9._-]+)?$'
+          (
+            cd dist
+            sha256sum -c iosbackup-synology-spk-sha256sums.txt
+          )
+          gh release upload "$VERSION" \
+            dist/iosbackup-synology-x86_64.spk \
+            dist/iosbackup-synology-armv8.spk \
+            dist/iosbackup-synology-spk-sha256sums.txt \
+            --repo "$GITHUB_REPOSITORY" \
+            --clobber

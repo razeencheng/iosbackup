@@ -14,6 +14,17 @@ Prepare a DSM administrator account, an iPhone/iPad whose passcode you know, a U
 
 Interface entry points follow Synology's official documentation. Button labels can vary by DSM version and language. Verify USB support on your model with the actual backup at the end of this procedure.
 
+## Quick option: Install via Package Center `.spk` (offline self-contained)
+
+Each release attaches self-contained `.spk` packages with the verified container image bundled inside (no internet image pull required on the NAS):
+
+1. Ensure **Container Manager** is installed in **Package Center** .
+2. Download `iosbackup-synology-x86_64.spk` (Intel / AMD) or `iosbackup-synology-armv8.spk` (64-bit ARM) from [GitHub Releases](https://github.com/razeencheng/iosbackup/releases/latest).
+3. Open **Package Center → Manual Install** , upload the `.spk`, and complete the 3-step wizard (shared folder & backup/config subdirectories, Web UI port & optional reverse-proxy URL, administrator password, timezone, minimum free space, and optional LAN webhook CIDRs).
+4. Once installed, open **iOS Backup** from the DSM Main Menu or Package Center and jump straight to [5. Complete the first USB backup on the NAS](#5-complete-the-first-usb-backup-on-the-nas). Uninstalling the package never deletes your shared folder.
+
+If you prefer managing a manual Compose project directly in Container Manager instead of Package Center, follow sections 1–4 below.
+
 ## 1. Install Container Manager and check storage
 
 1. Sign in to DSM, find Container Manager in **Package Center** , and install it. Open it directly if already installed.

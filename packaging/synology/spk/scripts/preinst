@@ -1,0 +1,302 @@
+#!/bin/sh
+set -eu
+
+PKG_VAR="${SYNOPKG_PKGVAR:-/var/packages/iosbackup/var}"
+
+get_wizard_var() {
+  var_name=$1
+  eval "val=\${${var_name}:-}"
+  if [ -z "$val" ]; then
+    eval "val=\${config_${var_name}:-}"
+  fi
+  printf '%s' "$val"
+}
+
+emit_error() {
+  zh_msg=$1
+  en_msg=$2
+  if [ -n "${SYNOPKG_TEMP_LOGFILE:-}" ]; then
+    case "${SYNOPKG_DSM_LANGUAGE:-chs}" in
+      chs|cht)
+        printf '%s\n' "$zh_msg" >>"$SYNOPKG_TEMP_LOGFILE"
+        ;;
+      *)
+        printf '%s\n' "$en_msg" >>"$SYNOPKG_TEMP_LOGFILE"
+        ;;
+    esac
+  fi
+}
+
+is_port_in_use() {
+  port_num=$1
+  if command -v ss >/dev/null 2>&1; then
+    if ss -ltn 2>/dev/null | awk '{print $4}' | grep -Eq "(^|:|\\])${port_num}$"; then
+      return 0
+    fi
+  elif command -v netstat >/dev/null 2>&1; then
+    if netstat -an 2>/dev/null | grep -Ei 'LISTEN' | awk '{print $4}' | grep -Eq "(^|:|\\.)${port_num}$"; then
+      return 0
+    fi
+  fi
+  return 1
+}
+
+validate_rel_subdir() {
+  sub_val=$1
+  printf '%s' "$sub_val" | grep -Eq '^[A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)*$' || return 1
+  old_ifs=$IFS
+  IFS='/'
+  for seg in $sub_val; do
+    if [ "$seg" = "." ] || [ "$seg" = ".." ] || [ -z "$seg" ]; then
+      IFS=$old_ifs
+      return 1
+    fi
+  done
+  IFS=$old_ifs
+  return 0
+}
+
+validate_single_private_cidr() {
+  cidr=$1
+  case "$cidr" in
+    */*/*|*" "*|""|/*|*/) return 1 ;;
+    */*) ;;
+    *) return 1 ;;
+  esac
+
+  ip_part=${cidr%/*}
+  mask_part=${cidr#*/}
+  printf '%s' "$mask_part" | grep -Eq '^(0|[1-9][0-9]{0,2})$' || return 1
+
+  case "$ip_part" in
+    *.*)
+      [ "$mask_part" -ge 1 ] && [ "$mask_part" -le 32 ] || return 1
+      printf '%s' "$ip_part" | grep -Eq '^(0|[1-9][0-9]{0,2})\.(0|[1-9][0-9]{0,2})\.(0|[1-9][0-9]{0,2})\.(0|[1-9][0-9]{0,2})$' || return 1
+      o1=${ip_part%%.*}
+      rest=${ip_part#*.}
+      o2=${rest%%.*}
+      rest=${rest#*.}
+      o3=${rest%%.*}
+      o4=${rest#*.}
+      for oct in "$o1" "$o2" "$o3" "$o4"; do
+        [ "$oct" -ge 0 ] && [ "$oct" -le 255 ] || return 1
+      done
+      if [ "$o1" -eq 10 ]; then
+        return 0
+      fi
+      if [ "$o1" -eq 172 ] && [ "$o2" -ge 16 ] && [ "$o2" -le 31 ]; then
+        return 0
+      fi
+      if [ "$o1" -eq 192 ] && [ "$o2" -eq 168 ]; then
+        return 0
+      fi
+      return 1
+      ;;
+    *:*)
+      [ "$mask_part" -ge 1 ] && [ "$mask_part" -le 128 ] || return 1
+      case "$ip_part" in
+        *:::*) return 1 ;;
+      esac
+      printf '%s' "$ip_part" | grep -Eq '^[Ff][CcDd][0-9A-Fa-f]{2}:[0-9A-Fa-f:]*$' || return 1
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+validate_private_cidrs_csv() {
+  csv_nospace=$1
+  case "$csv_nospace" in
+    ,*|*,|*"",,""*) return 1 ;;
+  esac
+  old_ifs=$IFS
+  IFS=','
+  for item in $csv_nospace; do
+    if ! validate_single_private_cidr "$item"; then
+      IFS=$old_ifs
+      return 1
+    fi
+  done
+  IFS=$old_ifs
+  return 0
+}
+
+RAW_SHARE=$(get_wizard_var pkgwizard_share_name)
+if [ -n "$RAW_SHARE" ]; then
+  share_clean=$(printf '%s' "$RAW_SHARE" | tr -d '[:space:]')
+  if [ "$share_clean" = "." ] || [ "$share_clean" = ".." ] || ! printf '%s' "$share_clean" | grep -Eq '^[A-Za-z0-9._-]{1,32}$'; then
+    emit_error "共享文件夹名称无效：仅允许 1–32 位字母、数字、点、下划线或连字符。" "Invalid shared folder name: use 1–32 letters, digits, dots, underscores, or hyphens."
+    exit 1
+  fi
+fi
+
+BSUB_CLEAN=""
+CSUB_CLEAN=""
+RAW_BSUB=$(get_wizard_var pkgwizard_backup_subdir)
+if [ -n "$RAW_BSUB" ]; then
+  BSUB_CLEAN=$(printf '%s' "$RAW_BSUB" | tr -d '[:space:]')
+  if ! validate_rel_subdir "$BSUB_CLEAN"; then
+    emit_error "设备备份子目录格式无效：请填写如 backups 或 iosbackup/backups 的相对路径（不含 .. 且首尾不加 /）。" "Invalid backups subdirectory: enter a clean relative path without .. or leading/trailing slashes."
+    exit 1
+  fi
+fi
+RAW_CSUB=$(get_wizard_var pkgwizard_config_subdir)
+if [ -n "$RAW_CSUB" ]; then
+  CSUB_CLEAN=$(printf '%s' "$RAW_CSUB" | tr -d '[:space:]')
+  if ! validate_rel_subdir "$CSUB_CLEAN"; then
+    emit_error "应用配置子目录格式无效：请填写如 configs 或 iosbackup/configs 的相对路径（不含 .. 且首尾不加 /）。" "Invalid configs subdirectory: enter a clean relative path without .. or leading/trailing slashes."
+    exit 1
+  fi
+fi
+if [ -n "$BSUB_CLEAN" ] && [ -n "$CSUB_CLEAN" ]; then
+  case "${BSUB_CLEAN}" in
+    "${CSUB_CLEAN}"|"${CSUB_CLEAN}/"*)
+      emit_error "备份子目录与配置子目录不能相同或互相嵌套（例如可分别设为 backups 与 configs）。" "Backups and configs subdirectories must be distinct and must not nest inside each other."
+      exit 1
+      ;;
+  esac
+  case "${CSUB_CLEAN}" in
+    "${BSUB_CLEAN}/"*)
+      emit_error "备份子目录与配置子目录不能相同或互相嵌套（例如可分别设为 backups 与 configs）。" "Backups and configs subdirectories must be distinct and must not nest inside each other."
+      exit 1
+      ;;
+  esac
+fi
+
+RAW_PORT=$(get_wizard_var pkgwizard_port)
+if [ -n "$RAW_PORT" ]; then
+  port_clean=$(printf '%s' "$RAW_PORT" | tr -d '[:space:]')
+  printf '%s' "$port_clean" | grep -Eq '^[0-9]+$' || {
+    emit_error "端口格式无效：请输入 1024 至 65535 之间的数字。" "Invalid port format: please enter an integer between 1024 and 65535."
+    exit 1
+  }
+  if [ "$port_clean" -lt 1024 ] || [ "$port_clean" -gt 65535 ]; then
+    emit_error "端口超出范围：请选择 1024 至 65535 之间的未占用端口。" "Port out of range: please choose an unused port between 1024 and 65535."
+    exit 1
+  fi
+  case "$port_clean" in
+    5000|5001|27015)
+      emit_error "端口 ${port_clean} 为群晖系统或内部通信保留端口，请更换其它端口。" "Port ${port_clean} is reserved by DSM or internal muxd; please choose another port."
+      exit 1
+      ;;
+  esac
+
+  same_upgrade_port=0
+  if [ "${SYNOPKG_PKG_STATUS:-}" = "UPGRADE" ] && [ -s "${PKG_VAR}/port" ]; then
+    cur_port=$(tr -dc '0-9' <"${PKG_VAR}/port" 2>/dev/null || true)
+    if [ "$cur_port" = "$port_clean" ]; then
+      same_upgrade_port=1
+    fi
+  fi
+  if [ "$same_upgrade_port" -eq 0 ] && is_port_in_use "$port_clean"; then
+    emit_error "端口 ${port_clean} 当前已被 NAS 上的其它服务占用，请返回上一步更换其它未占用端口。" "Port ${port_clean} is already in use on this NAS; please go back and choose another unused port."
+    exit 1
+  fi
+fi
+
+validate_external_url() {
+  url_val=$1
+  printf '%s' "$url_val" | grep -Eq '^https?://(([A-Za-z0-9-]+\.)*[A-Za-z0-9-]+|\[[0-9A-Fa-f:]+\])(:[0-9]{1,5})?/?$' || return 1
+  no_slash=${url_val%/}
+  no_scheme=${no_slash#*://}
+  case "$no_scheme" in
+    \[*\]:*)
+      ext_port=${no_scheme##*:}
+      [ "$ext_port" -ge 1 ] && [ "$ext_port" -le 65535 ] || return 1
+      ;;
+    \[*\]) ;;
+    *:*)
+      ext_port=${no_scheme##*:}
+      [ "$ext_port" -ge 1 ] && [ "$ext_port" -le 65535 ] || return 1
+      ;;
+  esac
+  return 0
+}
+
+RAW_EXT_URL=$(get_wizard_var pkgwizard_external_url)
+if [ -n "$RAW_EXT_URL" ]; then
+  ext_url_clean=$(printf '%s' "$RAW_EXT_URL" | tr -d '[:space:]')
+  if [ -n "$ext_url_clean" ] && ! validate_external_url "$ext_url_clean"; then
+    emit_error "自定义访问地址格式无效：请留空，或填写以 http:// 或 https:// 开头的完整域名地址（如 https://ios.example.com 或 https://ios.example.com:8443，不含子路径）。" "Invalid custom external URL: leave blank or enter an http(s):// domain URL without subpath (e.g. https://ios.example.com:8443)."
+    exit 1
+  fi
+fi
+
+RAW_FREE=$(get_wizard_var pkgwizard_min_free_gb)
+if [ -n "$RAW_FREE" ]; then
+  free_clean=$(printf '%s' "$RAW_FREE" | tr -d '[:space:]')
+  printf '%s' "$free_clean" | grep -Eq '^([0-9]|[1-9][0-9]{1,3})$' || {
+    emit_error "磁盘最低预留空间无效：请输入 0 至 9999 之间的整数（GB）。" "Invalid min free space: enter an integer between 0 and 9999 (GB)."
+    exit 1
+  }
+fi
+
+RAW_TZ=$(get_wizard_var pkgwizard_timezone)
+if [ -n "$RAW_TZ" ]; then
+  tz_clean=$(printf '%s' "$RAW_TZ" | tr -d '[:space:]')
+  case "$tz_clean" in
+    *".."*|/*|*\\*|Local)
+      emit_error "时区无效：请输入标准 IANA 时区名称（如 Asia/Shanghai 或 UTC）。" "Invalid timezone: enter an IANA timezone such as Asia/Shanghai or UTC."
+      exit 1
+      ;;
+  esac
+  printf '%s' "$tz_clean" | grep -Eq '^(UTC|[A-Za-z0-9_+-]+(/[A-Za-z0-9_+-]+)+)$' || {
+    emit_error "时区无效：请输入标准 IANA 时区名称（如 Asia/Shanghai 或 UTC）。" "Invalid timezone: enter an IANA timezone such as Asia/Shanghai or UTC."
+    exit 1
+  }
+fi
+
+RAW_LVL=$(get_wizard_var pkgwizard_log_level)
+if [ -n "$RAW_LVL" ]; then
+  lvl_clean=$(printf '%s' "$RAW_LVL" | tr -d '[:space:]')
+  case "$lvl_clean" in
+    WARN|INFO|DEBUG) ;;
+    *)
+      emit_error "日志级别无效：仅允许填写 WARN、INFO 或 DEBUG。" "Invalid log level: must be WARN, INFO, or DEBUG."
+      exit 1
+      ;;
+  esac
+fi
+
+RAW_JOBS=$(get_wizard_var pkgwizard_max_heavy_jobs)
+if [ -n "$RAW_JOBS" ]; then
+  jobs_clean=$(printf '%s' "$RAW_JOBS" | tr -d '[:space:]')
+  case "$jobs_clean" in
+    1|2) ;;
+    *)
+      emit_error "最大并发备份数无效：仅支持填写 1 或 2。" "Invalid max concurrent backups: must be 1 or 2."
+      exit 1
+      ;;
+  esac
+fi
+
+RAW_PLIST=$(get_wizard_var pkgwizard_plist_max_mib)
+if [ -n "$RAW_PLIST" ]; then
+  plist_clean=$(printf '%s' "$RAW_PLIST" | tr -d '[:space:]')
+  if ! printf '%s' "$plist_clean" | grep -Eq '^[0-9]+$' || [ "$plist_clean" -lt 1 ] || [ "$plist_clean" -gt 256 ]; then
+    emit_error "清单解析上限无效：请输入 1 至 256 之间的整数（MiB）。" "Invalid max plist size: enter an integer between 1 and 256 (MiB)."
+    exit 1
+  fi
+fi
+
+RAW_CIDRS=$(get_wizard_var pkgwizard_webhook_cidrs)
+if [ -n "$RAW_CIDRS" ]; then
+  cidrs_clean=$(printf '%s' "$RAW_CIDRS" | tr -d '[:space:]')
+  if [ -n "$cidrs_clean" ] && ! validate_private_cidrs_csv "$cidrs_clean"; then
+    emit_error "内网 Webhook 网段无效：请留空，或填写英文逗号分隔的私网 CIDR（仅限 10.x.x.x/8..32、172.16-31.x.x/12..32、192.168.x.x/16..32 或 fc00::/7）。" "Invalid LAN Webhook CIDRs: leave blank or enter comma-separated RFC1918/ULA private CIDRs (e.g. 192.168.0.0/16,10.0.0.0/8)."
+    exit 1
+  fi
+fi
+
+RAW_PWD=$(get_wizard_var pkgwizard_admin_password)
+if [ -n "$RAW_PWD" ]; then
+  cleaned=$(printf '%s' "$RAW_PWD" | tr -d '\r\n')
+  if [ "${#cleaned}" -lt 24 ]; then
+    emit_error "管理员密码长度不足：请提供至少 24 个字符的高强度密码。" "Administrator password is too short: please provide at least 24 characters."
+    exit 1
+  fi
+fi
+
+exit 0

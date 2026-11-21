@@ -1,0 +1,16 @@
+#!/bin/sh
+set -eu
+
+PKG_VAR="${SYNOPKG_PKGVAR:-/var/packages/iosbackup/var}"
+mkdir -p "$PKG_VAR" "${PKG_VAR}/secrets" "${PKG_VAR}/lockdown"
+chmod 755 "$PKG_VAR"
+chmod 700 "${PKG_VAR}/secrets" "${PKG_VAR}/lockdown"
+
+SHARE_NAME="iosbackup"
+if [ -s "${PKG_VAR}/share_name" ]; then
+  val=$(tr -cd 'A-Za-z0-9._-' <"${PKG_VAR}/share_name" 2>/dev/null || true)
+  [ -n "$val" ] && SHARE_NAME="$val"
+fi
+ln -sfn "/var/packages/iosbackup/shares/${SHARE_NAME}" "${PKG_VAR}/share_mount"
+
+exit 0
