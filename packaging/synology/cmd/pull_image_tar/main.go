@@ -516,16 +516,36 @@ func parseImageRef(ref string) (host, repo, reference, repoTag string, err error
 	}
 	host = ref[:firstSlash]
 	rest := ref[firstSlash+1:]
-	if at := strings.IndexByte(rest, '@'); at > 0 {
-		repo = rest[:at]
-		reference = rest[at+1:]
-		repoTag = host + "/" + repo + ":latest"
+	if at := strings.IndexByte(rest, '@'); at >= 0 {
+		if at == 0 {
+			return "", "", "", "", errors.New("empty repository before digest")
+		}
+		repoPart := rest[:at]
+		digestPart := rest[at+1:]
+		if _, err := parseSHA256Digest(digestPart); err != nil {
+			return "", "", "", "", fmt.Errorf("invalid image digest: %w", err)
+		}
+		tagPart := "latest"
+		if colon := strings.LastIndexByte(repoPart, ':'); colon >= 0 {
+			repo = repoPart[:colon]
+			tagPart = repoPart[colon+1:]
+			if repo == "" || tagPart == "" || strings.Contains(tagPart, "/") {
+				return "", "", "", "", errors.New("invalid repository or tag before digest")
+			}
+		} else {
+			repo = repoPart
+		}
+		reference = digestPart
+		repoTag = host + "/" + repo + ":" + tagPart
 		return host, repo, reference, repoTag, nil
 	}
 	lastColon := strings.LastIndexByte(rest, ':')
-	if lastColon > 0 {
+	if lastColon >= 0 {
 		repo = rest[:lastColon]
 		reference = rest[lastColon+1:]
+		if strings.Contains(reference, "/") {
+			return "", "", "", "", errors.New("invalid image tag")
+		}
 	} else {
 		repo = rest
 		reference = "latest"

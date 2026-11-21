@@ -141,6 +141,21 @@ if [ -z "$CONTAINER_IMAGE" ]; then
   CONTAINER_IMAGE="ghcr.io/razeencheng/iosbackup:${RAW_VERSION}"
 fi
 
+PULL_IMAGE="$CONTAINER_IMAGE"
+COMPOSE_IMAGE="$CONTAINER_IMAGE"
+if [ "$BUNDLE_MODE" = "offline" ]; then
+  case "$CONTAINER_IMAGE" in
+    *@*)
+      no_digest="${CONTAINER_IMAGE%%@*}"
+      slash_tail="${no_digest#*/}"
+      case "$slash_tail" in
+        *:*) COMPOSE_IMAGE="$no_digest" ;;
+        *)   COMPOSE_IMAGE="${no_digest}:latest" ;;
+      esac
+      ;;
+  esac
+fi
+
 if [ "$BUNDLE_MODE" = "offline" ]; then
   PULL_POLICY="never"
 else
@@ -174,7 +189,7 @@ escape_sed_replacement() {
 ESC_SPK_VERSION=$(escape_sed_replacement "$SPK_VERSION")
 ESC_SPK_ARCH=$(escape_sed_replacement "$SPK_ARCH")
 ESC_SOURCE_URL=$(escape_sed_replacement "$SOURCE_URL")
-ESC_IMAGE=$(escape_sed_replacement "$CONTAINER_IMAGE")
+ESC_IMAGE=$(escape_sed_replacement "$COMPOSE_IMAGE")
 ESC_PULL_POLICY=$(escape_sed_replacement "$PULL_POLICY")
 
 # 1. 组装内层 package.tgz 内容（保留 .in 模板供 postinst 按向导参数动态渲染，并预生成默认文件）
@@ -229,13 +244,13 @@ if [ "$BUNDLE_MODE" = "offline" ]; then
       cd "$REPO_ROOT"
       if [ -n "$EXPECTED_MANIFEST_DIGEST" ]; then
         go run ./packaging/synology/cmd/pull_image_tar \
-          --image "$CONTAINER_IMAGE" \
+          --image "$PULL_IMAGE" \
           --arch "$OCI_ARCH" \
           --expected-manifest-digest "$EXPECTED_MANIFEST_DIGEST" \
           --output "$TARGET_IMAGE_TAR"
       else
         go run ./packaging/synology/cmd/pull_image_tar \
-          --image "$CONTAINER_IMAGE" \
+          --image "$PULL_IMAGE" \
           --arch "$OCI_ARCH" \
           --output "$TARGET_IMAGE_TAR"
       fi
