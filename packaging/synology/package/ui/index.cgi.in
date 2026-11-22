@@ -1,0 +1,51 @@
+#!/bin/sh
+set -eu
+
+EXTERNAL_URL="@EXTERNAL_URL@"
+PORT_VAL="@PORT@"
+case "$PORT_VAL" in
+  ''|*[!0-9]*) PORT_VAL="9000" ;;
+esac
+
+if [ -n "$EXTERNAL_URL" ]; then
+  TARGET_URL="$EXTERNAL_URL"
+else
+  RAW_HOST="${HTTP_HOST:-${SERVER_NAME:-127.0.0.1}}"
+  case "$RAW_HOST" in
+    \[*\]:*)
+      HOST_ONLY="${RAW_HOST%:*}"
+      ;;
+    \[*\])
+      HOST_ONLY="$RAW_HOST"
+      ;;
+    *:*)
+      HOST_ONLY="${RAW_HOST%%:*}"
+      ;;
+    *)
+      HOST_ONLY="$RAW_HOST"
+      ;;
+  esac
+
+  # 防御 CRLF/非法字符注入响应头
+  SAFE_HOST=$(printf '%s' "$HOST_ONLY" | tr -cd 'A-Za-z0-9._:[]-')
+  [ -n "$SAFE_HOST" ] || SAFE_HOST="127.0.0.1"
+  TARGET_URL="http://${SAFE_HOST}:${PORT_VAL}/"
+fi
+
+printf 'Status: 302 Found\r\n'
+printf 'Location: %s\r\n' "$TARGET_URL"
+printf 'Cache-Control: no-store\r\n'
+printf 'Content-Type: text/html; charset=utf-8\r\n\r\n'
+cat <<EOF
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="refresh" content="0;url=${TARGET_URL}">
+  <title>Redirecting to iOS Backup</title>
+</head>
+<body>
+  <p>正在跳转到 <a href="${TARGET_URL}">${TARGET_URL}</a> ...</p>
+</body>
+</html>
+EOF

@@ -35,12 +35,15 @@ func TestGoToolchainSecurityBaselineIsCentralized(t *testing.T) {
 		t.Fatalf("Go %s is below the security baseline 1.27.2", version)
 	}
 
+	setupGoUsesRE := regexp.MustCompile(`(?m)^[ \t]*-?[ \t]*uses:[ \t]+actions/setup-go@`)
 	goVersionFileRE := regexp.MustCompile(`(?m)^[ \t]+go-version-file:[ \t]+go\.mod[ \t]*$`)
 	duplicatedVersionRE := regexp.MustCompile(`(?m)^[ \t]+go-version:[ \t]+`)
-	for _, name := range []string{".github/workflows/ci.yml", ".github/workflows/release.yml"} {
+	for _, name := range []string{".github/workflows/ci.yml", ".github/workflows/release.yml", ".github/workflows/synology-spk.yml"} {
 		workflow := readRepoFile(t, name)
-		if count := len(goVersionFileRE.FindAllString(workflow, -1)); count != 1 {
-			t.Errorf("%s must have exactly one active go-version-file: go.mod field, got %d", name, count)
+		setupCount := len(setupGoUsesRE.FindAllString(workflow, -1))
+		versionFileCount := len(goVersionFileRE.FindAllString(workflow, -1))
+		if setupCount < 1 || versionFileCount != setupCount {
+			t.Errorf("%s must configure go-version-file: go.mod on every actions/setup-go step (setup-go=%d, go-version-file=%d)", name, setupCount, versionFileCount)
 		}
 		if duplicatedVersionRE.MatchString(workflow) {
 			t.Errorf("%s must not duplicate the Go version", name)

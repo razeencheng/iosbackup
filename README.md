@@ -31,7 +31,7 @@ iOS Backup lets you back up an iPhone or iPad to your own Linux host or NAS thro
 
 ## Quick start
 
-You need a Linux host or NAS with Docker Engine and Docker Compose, an iPhone/iPad whose passcode you know, a USB data cable, and enough disk space for a complete device backup. For Synology DSM, use the [Synology guide](docs/manual/synology.md). For an existing deployment, follow [upgrade and rollback](#upgrade-and-rollback).
+You need a Linux host or NAS with Docker Engine and Docker Compose, an iPhone/iPad whose passcode you know, a USB data cable, and enough disk space for a complete device backup. For Synology DSM 7.2+, you can either install the self-contained offline `.spk` package from [GitHub Releases](https://github.com/razeencheng/iosbackup/releases/latest) via **Package Center → Manual Install** or follow the [Synology guide](docs/manual/synology.md). For an existing deployment, follow [upgrade and rollback](#upgrade-and-rollback).
 
 **1. Start the service**
 

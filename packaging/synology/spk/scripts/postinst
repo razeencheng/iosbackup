@@ -1,0 +1,362 @@
+#!/bin/sh
+set -eu
+
+PKG_VAR="${SYNOPKG_PKGVAR:-/var/packages/iosbackup/var}"
+PKG_DEST="${SYNOPKG_PKGDEST:-/var/packages/iosbackup/target}"
+SECRETS_DIR="${PKG_VAR}/secrets"
+LOCKDOWN_DIR="${PKG_VAR}/lockdown"
+PWD_FILE="${SECRETS_DIR}/admin_password"
+SECRET_PORT_FILE="${SECRETS_DIR}/port"
+RUNTIME_ENV_FILE="${SECRETS_DIR}/runtime.env"
+
+mkdir -p "$PKG_VAR"
+chmod 755 "$PKG_VAR"
+
+umask 077
+mkdir -p "$SECRETS_DIR" "$LOCKDOWN_DIR"
+chmod 700 "$SECRETS_DIR" "$LOCKDOWN_DIR"
+
+get_wizard_var() {
+  var_name=$1
+  eval "val=\${${var_name}:-}"
+  if [ -z "$val" ]; then
+    eval "val=\${config_${var_name}:-}"
+  fi
+  printf '%s' "$val"
+}
+
+write_private_atomically() {
+  dest_file=$1
+  content_val=$2
+  tmp_file="${dest_file}.tmp.$$"
+  printf '%s\n' "$content_val" >"$tmp_file"
+  chmod 600 "$tmp_file"
+  mv -f "$tmp_file" "$dest_file"
+}
+
+write_public_atomically() {
+  dest_file=$1
+  content_val=$2
+  tmp_file="${dest_file}.tmp.$$"
+  printf '%s\n' "$content_val" >"$tmp_file"
+  chmod 644 "$tmp_file"
+  mv -f "$tmp_file" "$dest_file"
+}
+
+read_saved_or_default() {
+  file_path=$1
+  fallback=$2
+  if [ -s "$file_path" ]; then
+    val=$(tr -d '\r\n' <"$file_path" 2>/dev/null || true)
+    if [ -n "$val" ]; then
+      printf '%s' "$val"
+      return 0
+    fi
+  fi
+  printf '%s' "$fallback"
+}
+
+read_saved_allow_empty() {
+  file_path=$1
+  fallback=$2
+  if [ -f "$file_path" ]; then
+    val=$(tr -d '\r\n' <"$file_path" 2>/dev/null || true)
+    printf '%s' "$val"
+    return 0
+  fi
+  printf '%s' "$fallback"
+}
+
+escape_sed() {
+  printf '%s' "$1" | sed -e 's/[\/&]/\\&/g'
+}
+
+generate_fallback_password() {
+  if command -v openssl >/dev/null 2>&1; then
+    pwd_val=$(openssl rand -base64 24 2>/dev/null | tr '+/' '-_' | tr -d '=\r\n' || true)
+    if [ "${#pwd_val}" -ge 24 ]; then
+      printf '%s' "$pwd_val"
+      return 0
+    fi
+  fi
+  LC_ALL=C tr -dc 'A-Za-z0-9_-' </dev/urandom | head -c 32
+}
+
+RAW_SHARE=$(get_wizard_var pkgwizard_share_name)
+RAW_BSUB=$(get_wizard_var pkgwizard_backup_subdir)
+RAW_CSUB=$(get_wizard_var pkgwizard_config_subdir)
+RAW_PORT=$(get_wizard_var pkgwizard_port)
+RAW_EXT_URL=$(get_wizard_var pkgwizard_external_url)
+RAW_FREE=$(get_wizard_var pkgwizard_min_free_gb)
+RAW_TZ=$(get_wizard_var pkgwizard_timezone)
+RAW_LVL=$(get_wizard_var pkgwizard_log_level)
+RAW_JOBS=$(get_wizard_var pkgwizard_max_heavy_jobs)
+RAW_PLIST=$(get_wizard_var pkgwizard_plist_max_mib)
+RAW_CIDRS=$(get_wizard_var pkgwizard_webhook_cidrs)
+RAW_EXP=$(get_wizard_var pkgwizard_enable_experimental)
+RAW_PWD=$(get_wizard_var pkgwizard_admin_password)
+
+WIZARD_RAN=0
+if [ -n "$RAW_SHARE" ] || [ -n "$RAW_PORT" ]; then
+  WIZARD_RAN=1
+fi
+
+if [ -n "$RAW_SHARE" ]; then
+  SHARE_NAME=$(printf '%s' "$RAW_SHARE" | tr -cd 'A-Za-z0-9._-')
+else
+  SHARE_NAME=$(read_saved_or_default "${PKG_VAR}/share_name" "iosbackup")
+fi
+[ -n "$SHARE_NAME" ] || SHARE_NAME="iosbackup"
+
+if [ -n "$RAW_BSUB" ]; then
+  BACKUP_SUB=$(printf '%s' "$RAW_BSUB" | tr -cd 'A-Za-z0-9._/-')
+else
+  BACKUP_SUB=$(read_saved_or_default "${PKG_VAR}/backup_subdir" "backups")
+fi
+[ -n "$BACKUP_SUB" ] || BACKUP_SUB="backups"
+
+if [ -n "$RAW_CSUB" ]; then
+  CONFIG_SUB=$(printf '%s' "$RAW_CSUB" | tr -cd 'A-Za-z0-9._/-')
+else
+  CONFIG_SUB=$(read_saved_or_default "${PKG_VAR}/config_subdir" "configs")
+fi
+[ -n "$CONFIG_SUB" ] || CONFIG_SUB="configs"
+
+if [ -n "$RAW_PORT" ]; then
+  PORT_VAL=$(printf '%s' "$RAW_PORT" | tr -dc '0-9')
+else
+  PORT_VAL=$(read_saved_or_default "${PKG_VAR}/port" "9000")
+fi
+if [ -z "$PORT_VAL" ] || [ "$PORT_VAL" -lt 1 ] || [ "$PORT_VAL" -gt 65535 ] 2>/dev/null; then
+  PORT_VAL="9000"
+fi
+
+if [ "$WIZARD_RAN" -eq 1 ]; then
+  EXTERNAL_URL=$(printf '%s' "$RAW_EXT_URL" | tr -d '[:space:]' | tr -cd 'A-Za-z0-9.:/[]-')
+else
+  EXTERNAL_URL=$(read_saved_allow_empty "${PKG_VAR}/external_url" "")
+  EXTERNAL_URL=$(printf '%s' "$EXTERNAL_URL" | tr -d '[:space:]' | tr -cd 'A-Za-z0-9.:/[]-')
+fi
+EXTERNAL_URL="${EXTERNAL_URL%/}"
+
+if [ -n "$RAW_FREE" ]; then
+  MIN_FREE_GB=$(printf '%s' "$RAW_FREE" | tr -dc '0-9')
+else
+  MIN_FREE_GB=$(read_saved_or_default "${PKG_VAR}/min_free_gb" "10")
+fi
+if [ -z "$MIN_FREE_GB" ] || [ "$MIN_FREE_GB" -lt 0 ] || [ "$MIN_FREE_GB" -gt 9999 ] 2>/dev/null; then
+  MIN_FREE_GB="10"
+fi
+MIN_FREE_BYTES=$((MIN_FREE_GB * 1073741824))
+
+if [ -n "$RAW_TZ" ]; then
+  TZ_VAL=$(printf '%s' "$RAW_TZ" | tr -cd 'A-Za-z0-9_+/-')
+else
+  TZ_VAL=$(read_saved_or_default "${PKG_VAR}/timezone" "Asia/Shanghai")
+fi
+[ -n "$TZ_VAL" ] || TZ_VAL="Asia/Shanghai"
+
+if [ -n "$RAW_LVL" ]; then
+  LOG_VAL=$(printf '%s' "$RAW_LVL" | tr -d '[:space:]')
+else
+  LOG_VAL=$(read_saved_or_default "${PKG_VAR}/log_level" "INFO")
+fi
+case "$LOG_VAL" in
+  WARN|INFO|DEBUG) ;;
+  *) LOG_VAL="INFO" ;;
+esac
+
+if [ -n "$RAW_JOBS" ]; then
+  MAX_HEAVY_JOBS=$(printf '%s' "$RAW_JOBS" | tr -dc '0-9')
+else
+  MAX_HEAVY_JOBS=$(read_saved_or_default "${PKG_VAR}/max_heavy_jobs" "1")
+fi
+case "$MAX_HEAVY_JOBS" in
+  1|2) ;;
+  *) MAX_HEAVY_JOBS="1" ;;
+esac
+
+if [ -n "$RAW_PLIST" ]; then
+  PLIST_MAX_MIB=$(printf '%s' "$RAW_PLIST" | tr -dc '0-9')
+else
+  PLIST_MAX_MIB=$(read_saved_or_default "${PKG_VAR}/plist_max_mib" "64")
+fi
+if [ -z "$PLIST_MAX_MIB" ] || [ "$PLIST_MAX_MIB" -lt 1 ] || [ "$PLIST_MAX_MIB" -gt 256 ] 2>/dev/null; then
+  PLIST_MAX_MIB="64"
+fi
+
+if [ "$WIZARD_RAN" -eq 1 ]; then
+  WEBHOOK_CIDRS=$(printf '%s' "$RAW_CIDRS" | tr -d '[:space:]' | tr -cd '0-9A-Fa-f:./,')
+else
+  WEBHOOK_CIDRS=$(read_saved_allow_empty "${PKG_VAR}/webhook_cidrs" "")
+  WEBHOOK_CIDRS=$(printf '%s' "$WEBHOOK_CIDRS" | tr -d '[:space:]' | tr -cd '0-9A-Fa-f:./,')
+fi
+
+if [ "$WIZARD_RAN" -eq 1 ]; then
+  if [ "$RAW_EXP" = "true" ]; then
+    EXP_VAL="true"
+  else
+    EXP_VAL="false"
+  fi
+else
+  EXP_VAL=$(read_saved_or_default "${PKG_VAR}/enable_experimental" "false")
+  [ "$EXP_VAL" = "true" ] || EXP_VAL="false"
+fi
+
+# 1. 持久化所有向导参数并解析真实挂载路径
+write_public_atomically "${PKG_VAR}/share_name" "$SHARE_NAME"
+write_public_atomically "${PKG_VAR}/backup_subdir" "$BACKUP_SUB"
+write_public_atomically "${PKG_VAR}/config_subdir" "$CONFIG_SUB"
+write_public_atomically "${PKG_VAR}/port" "$PORT_VAL"
+write_public_atomically "${PKG_VAR}/external_url" "$EXTERNAL_URL"
+write_public_atomically "${PKG_VAR}/min_free_gb" "$MIN_FREE_GB"
+write_public_atomically "${PKG_VAR}/timezone" "$TZ_VAL"
+write_public_atomically "${PKG_VAR}/log_level" "$LOG_VAL"
+write_public_atomically "${PKG_VAR}/max_heavy_jobs" "$MAX_HEAVY_JOBS"
+write_public_atomically "${PKG_VAR}/plist_max_mib" "$PLIST_MAX_MIB"
+write_public_atomically "${PKG_VAR}/webhook_cidrs" "$WEBHOOK_CIDRS"
+write_public_atomically "${PKG_VAR}/enable_experimental" "$EXP_VAL"
+write_public_atomically "${PKG_VAR}/running" "1"
+
+SHARE_LINK="/var/packages/iosbackup/shares/${SHARE_NAME}"
+ln -sfn "$SHARE_LINK" "${PKG_VAR}/share_mount"
+
+RESOLVED_DATA=$(readlink -f "$SHARE_LINK" 2>/dev/null || true)
+if [ -n "$RESOLVED_DATA" ] && [ -d "$RESOLVED_DATA" ]; then
+  DATA_MOUNT="$RESOLVED_DATA"
+  mkdir -p "${DATA_MOUNT}/${BACKUP_SUB}" "${DATA_MOUNT}/${CONFIG_SUB}" 2>/dev/null || true
+else
+  DATA_MOUNT="${PKG_VAR}/share_mount"
+fi
+
+RESOLVED_LOCKDOWN=$(readlink -f "$LOCKDOWN_DIR" 2>/dev/null || true)
+if [ -n "$RESOLVED_LOCKDOWN" ] && [ -d "$RESOLVED_LOCKDOWN" ]; then
+  LOCKDOWN_MOUNT="$RESOLVED_LOCKDOWN"
+else
+  LOCKDOWN_MOUNT="$LOCKDOWN_DIR"
+fi
+
+RESOLVED_SECRETS=$(readlink -f "$SECRETS_DIR" 2>/dev/null || true)
+if [ -n "$RESOLVED_SECRETS" ] && [ -d "$RESOLVED_SECRETS" ]; then
+  SECRETS_MOUNT="$RESOLVED_SECRETS"
+else
+  SECRETS_MOUNT="$SECRETS_DIR"
+fi
+
+# 2. 直接渲染 Container Manager 读取的 compose/docker-compose.yml 与 DSM 主菜单 ui/config
+ESC_PORT=$(escape_sed "$PORT_VAL")
+ESC_TZ=$(escape_sed "$TZ_VAL")
+ESC_LOG=$(escape_sed "$LOG_VAL")
+ESC_BSUB=$(escape_sed "$BACKUP_SUB")
+ESC_CSUB=$(escape_sed "$CONFIG_SUB")
+ESC_FREE=$(escape_sed "$MIN_FREE_BYTES")
+ESC_JOBS=$(escape_sed "$MAX_HEAVY_JOBS")
+ESC_PLIST=$(escape_sed "$PLIST_MAX_MIB")
+ESC_CIDRS=$(escape_sed "$WEBHOOK_CIDRS")
+ESC_EXP=$(escape_sed "$EXP_VAL")
+ESC_DATA_MOUNT=$(escape_sed "$DATA_MOUNT")
+ESC_LOCKDOWN_MOUNT=$(escape_sed "$LOCKDOWN_MOUNT")
+ESC_SECRETS_MOUNT=$(escape_sed "$SECRETS_MOUNT")
+
+if [ -f "${PKG_DEST}/compose/docker-compose.yml.in" ]; then
+  tmp_compose="${PKG_DEST}/compose/docker-compose.yml.tmp.$$"
+  sed \
+    -e "s/@PORT@/${ESC_PORT}/g" \
+    -e "s/@TZ@/${ESC_TZ}/g" \
+    -e "s/@LOG_LEVEL@/${ESC_LOG}/g" \
+    -e "s/@BACKUP_SUB@/${ESC_BSUB}/g" \
+    -e "s/@CONFIG_SUB@/${ESC_CSUB}/g" \
+    -e "s/@MIN_FREE_BYTES@/${ESC_FREE}/g" \
+    -e "s/@MAX_HEAVY_JOBS@/${ESC_JOBS}/g" \
+    -e "s/@PLIST_MAX_MIB@/${ESC_PLIST}/g" \
+    -e "s/@WEBHOOK_CIDRS@/${ESC_CIDRS}/g" \
+    -e "s/@EXP_VAL@/${ESC_EXP}/g" \
+    -e "s/@DATA_MOUNT@/${ESC_DATA_MOUNT}/g" \
+    -e "s/@LOCKDOWN_MOUNT@/${ESC_LOCKDOWN_MOUNT}/g" \
+    -e "s/@SECRETS_MOUNT@/${ESC_SECRETS_MOUNT}/g" \
+    "${PKG_DEST}/compose/docker-compose.yml.in" >"$tmp_compose"
+  chmod 644 "$tmp_compose"
+  mv -f "$tmp_compose" "${PKG_DEST}/compose/docker-compose.yml"
+fi
+
+if [ -f "${PKG_DEST}/ui/config.in" ]; then
+  tmp_uicfg="${PKG_DEST}/ui/config.tmp.$$"
+  if [ -n "$EXTERNAL_URL" ]; then
+    cat >"$tmp_uicfg" <<EOF
+{
+  ".url": {
+    "SYNO.SDS.iOSBackup": {
+      "title": "iOS Backup",
+      "desc": "iOS 设备备份管理控制台",
+      "icon": "images/icon_{0}.png",
+      "type": "url",
+      "url": "${EXTERNAL_URL}",
+      "allUsers": true
+    }
+  }
+}
+EOF
+  else
+    sed -e "s/@PORT@/${ESC_PORT}/g" "${PKG_DEST}/ui/config.in" >"$tmp_uicfg"
+  fi
+  chmod 644 "$tmp_uicfg"
+  mv -f "$tmp_uicfg" "${PKG_DEST}/ui/config"
+fi
+
+if [ -f "${PKG_DEST}/ui/index.cgi.in" ]; then
+  ESC_EXT_URL=$(escape_sed "$EXTERNAL_URL")
+  tmp_cgi="${PKG_DEST}/ui/index.cgi.tmp.$$"
+  sed \
+    -e "s/@PORT@/${ESC_PORT}/g" \
+    -e "s/@EXTERNAL_URL@/${ESC_EXT_URL}/g" \
+    "${PKG_DEST}/ui/index.cgi.in" >"$tmp_cgi"
+  chmod 755 "$tmp_cgi"
+  mv -f "$tmp_cgi" "${PKG_DEST}/ui/index.cgi"
+fi
+
+# 3. 保留本地环境快照与管理员密码（升级且留空时绝不覆盖已有密码）
+write_private_atomically "$SECRET_PORT_FILE" "$PORT_VAL"
+ENV_CONTENT="PORT=${PORT_VAL}
+TZ=${TZ_VAL}
+LOG_LEVEL=${LOG_VAL}
+IOSBK_BACKUPS_DIR=/data/${BACKUP_SUB}
+IOSBK_CONFIGS_DIR=/data/${CONFIG_SUB}
+IOSBK_MIN_FREE_BYTES=${MIN_FREE_BYTES}
+IOSBK_MAX_HEAVY_JOBS=${MAX_HEAVY_JOBS}
+IOSBK_PLIST_MAX_MIB=${PLIST_MAX_MIB}
+IOSBK_WEBHOOK_ALLOW_CIDRS=${WEBHOOK_CIDRS}
+IOSBK_ENABLE_EXPERIMENTAL_OPERATIONS=${EXP_VAL}"
+write_private_atomically "$RUNTIME_ENV_FILE" "$ENV_CONTENT"
+
+if [ -n "$RAW_PWD" ]; then
+  cleaned=$(printf '%s' "$RAW_PWD" | tr -d '\r\n')
+  if [ "${#cleaned}" -lt 24 ]; then
+    exit 1
+  fi
+  write_private_atomically "$PWD_FILE" "$cleaned"
+elif [ ! -s "$PWD_FILE" ]; then
+  fallback_pwd=$(generate_fallback_password)
+  write_private_atomically "$PWD_FILE" "$fallback_pwd"
+fi
+
+if [ -n "${SYNOPKG_TEMP_LOGFILE:-}" ] && [ "${SYNOPKG_PKG_STATUS:-}" != "UPGRADE" ]; then
+  if [ -n "$EXTERNAL_URL" ]; then
+    LAUNCH_HINT_ZH="${EXTERNAL_URL}"
+    LAUNCH_HINT_EN="${EXTERNAL_URL}"
+  else
+    LAUNCH_HINT_ZH="http://<群晖IP>:${PORT_VAL}/"
+    LAUNCH_HINT_EN="http://<NAS-IP>:${PORT_VAL}/"
+  fi
+  case "${SYNOPKG_DSM_LANGUAGE:-chs}" in
+    chs|cht)
+      printf '安装完成！请从 DSM 主菜单或套件中心打开 iOS Backup（目标地址：%s）并使用向导中设置的管理员密码登录。备份保存在共享文件夹 %s/%s，配置保存在 %s/%s；请勿将未加认证保护的端口直接暴露到公网。\n' \
+        "$LAUNCH_HINT_ZH" "$SHARE_NAME" "$BACKUP_SUB" "$SHARE_NAME" "$CONFIG_SUB" >>"$SYNOPKG_TEMP_LOGFILE"
+      ;;
+    *)
+      printf 'Installation complete! Open iOS Backup from the DSM Main Menu or Package Center (target: %s) and sign in with your administrator password. Backups are stored in %s/%s and configs in %s/%s.\n' \
+        "$LAUNCH_HINT_EN" "$SHARE_NAME" "$BACKUP_SUB" "$SHARE_NAME" "$CONFIG_SUB" >>"$SYNOPKG_TEMP_LOGFILE"
+      ;;
+  esac
+fi
+
+exit 0

@@ -1,0 +1,14 @@
+{
+  ".url": {
+    "SYNO.SDS.iOSBackup": {
+      "title": "iOS Backup",
+      "desc": "iOS 设备备份管理控制台",
+      "icon": "images/icon_{0}.png",
+      "type": "url",
+      "protocol": "http",
+      "port": "@PORT@",
+      "url": "/",
+      "allUsers": true
+    }
+  }
+}

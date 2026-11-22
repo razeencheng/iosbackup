@@ -431,6 +431,43 @@ jobs:
             "docker.io/razeencheng/iosbackup@${{ steps.platforms.outputs.arm64_digest }}" \
             | jq -s -e 'length > 0 and all(.[]; type == "object")' >/dev/null
 
+      - name: Set up Go for Synology SPK packaging
+        # actions/setup-go v7.0.0
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Build and verify Synology SPK packages
+        shell: bash
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+          AMD64_DIGEST: ${{ steps.platforms.outputs.amd64_digest }}
+          ARM64_DIGEST: ${{ steps.platforms.outputs.arm64_digest }}
+        run: |
+          set -euo pipefail
+          ./packaging/synology/build_spk.sh --offline \
+            --arch x86_64 \
+            --version "$VERSION" \
+            --build-num 0001 \
+            --image "ghcr.io/razeencheng/iosbackup:$VERSION" \
+            --expected-manifest-digest "$AMD64_DIGEST" \
+            --output-file dist/iosbackup-synology-x86_64.spk
+          ./packaging/synology/build_spk.sh --offline \
+            --arch armv8 \
+            --version "$VERSION" \
+            --build-num 0001 \
+            --image "ghcr.io/razeencheng/iosbackup:$VERSION" \
+            --expected-manifest-digest "$ARM64_DIGEST" \
+            --output-file dist/iosbackup-synology-armv8.spk
+          test -s dist/iosbackup-synology-x86_64.spk
+          test -s dist/iosbackup-synology-armv8.spk
+          (
+            cd dist
+            sha256sum iosbackup-synology-x86_64.spk iosbackup-synology-armv8.spk > iosbackup-synology-spk-sha256sums.txt
+            sha256sum -c iosbackup-synology-spk-sha256sums.txt
+          )
+
       - name: Generate deterministic release notes
         shell: bash
         env:
@@ -472,6 +509,9 @@ jobs:
             dist/iosbackup-cosign-signature-verification.json
             dist/iosbackup-linux-amd64-cosign-sbom-attestation-verification.json
             dist/iosbackup-linux-arm64-cosign-sbom-attestation-verification.json
+            dist/iosbackup-synology-x86_64.spk
+            dist/iosbackup-synology-armv8.spk
+            dist/iosbackup-synology-spk-sha256sums.txt
             dist/iosbackup-release-notes.md
           if-no-files-found: error
           retention-days: 1
@@ -518,6 +558,9 @@ jobs:
             iosbackup-cosign-signature-verification.json
             iosbackup-linux-amd64-cosign-sbom-attestation-verification.json
             iosbackup-linux-arm64-cosign-sbom-attestation-verification.json
+            iosbackup-synology-x86_64.spk
+            iosbackup-synology-armv8.spk
+            iosbackup-synology-spk-sha256sums.txt
             iosbackup-release-notes.md
           )
           printf '%s\n' "${expected_assets[@]}" | sort > "$expected"
@@ -546,6 +589,14 @@ jobs:
           jq -e 'type == "array" and length > 0' dist/iosbackup-cosign-signature-verification.json >/dev/null
           jq -e 'type == "array" and length > 0' dist/iosbackup-linux-amd64-cosign-sbom-attestation-verification.json >/dev/null
           jq -e 'type == "array" and length > 0' dist/iosbackup-linux-arm64-cosign-sbom-attestation-verification.json >/dev/null
+          test -s dist/iosbackup-synology-x86_64.spk
+          test -s dist/iosbackup-synology-armv8.spk
+          test "$(tar -tf dist/iosbackup-synology-x86_64.spk | head -n 1)" = "INFO"
+          test "$(tar -tf dist/iosbackup-synology-armv8.spk | head -n 1)" = "INFO"
+          (
+            cd dist
+            sha256sum -c iosbackup-synology-spk-sha256sums.txt
+          )
           test -s dist/iosbackup-release-notes.md
           test "$(grep -Ec '^## ' dist/iosbackup-release-notes.md)" = "0"
           grep -Eq '^### ' dist/iosbackup-release-notes.md
@@ -573,6 +624,9 @@ jobs:
             dist/iosbackup-cosign-signature-verification.json
             dist/iosbackup-linux-amd64-cosign-sbom-attestation-verification.json
             dist/iosbackup-linux-arm64-cosign-sbom-attestation-verification.json
+            dist/iosbackup-synology-x86_64.spk
+            dist/iosbackup-synology-armv8.spk
+            dist/iosbackup-synology-spk-sha256sums.txt
 
       - name: Set up Docker Buildx for promotion
         # docker/setup-buildx-action v4.4.1; registry operations only, no second build

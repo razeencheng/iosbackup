@@ -42,7 +42,7 @@ jobs:
           ./scripts/verify_licensing_test.sh
           ./scripts/collect_cargo_licenses_test.sh
       - name: Format
-        run: test -z "$(find cmd internal scripts -type f -name '*.go' -exec gofmt -l {} +)"
+        run: test -z "$(find cmd internal scripts packaging -type f -name '*.go' -exec gofmt -l {} +)"
       - name: Standard-library-only module
         run: test "$(go list -m all)" = "iosbackup"
       - name: Vet

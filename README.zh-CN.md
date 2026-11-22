@@ -31,7 +31,7 @@ iOS Backup 让你通过浏览器把 iPhone/iPad 备份到自己的 Linux 主机�
 
 ## 快速开始
 
-准备一台安装 Docker Engine 和 Docker Compose 的 Linux 主机或 NAS、一台 iPhone/iPad（需知道锁屏密码）、USB 数据线，以及足够容纳完整设备备份的磁盘空间（请按完整设备备份预留空间）。群晖 DSM 请看[群晖安装指南](docs/manual/synology.zh-CN.md)；已有部署请直接看[升级与回滚](#升级与回滚)。
+准备一台安装 Docker Engine 和 Docker Compose 的 Linux 主机或 NAS、一台 iPhone/iPad（需知道锁屏密码）、USB 数据线，以及足够容纳完整设备备份的磁盘空间（请按完整设备备份预留空间）。群晖 DSM 7.2+ 可直接从 [GitHub Releases](https://github.com/razeencheng/iosbackup/releases/latest) 下载内置离线镜像的 `.spk` 安装包在“套件中心 → 手动安装”中按向导完成部署，详见[群晖安装指南](docs/manual/synology.zh-CN.md)；已有部署请直接看[升级与回滚](#升级与回滚)。
 
 **1. 启动服务**
 

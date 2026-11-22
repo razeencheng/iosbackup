@@ -18,7 +18,7 @@ OCI_OUTPUT ?= /tmp/iosbackup-$(TAG).oci
 BUILDER ?=
 BUILDER_FLAG = $(if $(BUILDER),--builder "$(BUILDER)",)
 
-.PHONY: build build-multi check-public test push
+.PHONY: build build-multi check-public test push spk spk-all spk-online
 
 # 默认 build 只在本机生成镜像，绝不隐式推送。
 build:
@@ -47,6 +47,22 @@ check-public:
 
 test:
 	go test -count=1 ./...
+
+# 构建群晖 DSM 7.2+ 内置离线镜像全量套件（默认跟随 release/manifest.env 版本，无需 NAS 联网拉取镜像）。
+SPK_ARCH ?= x86_64
+SPK_VERSION ?= $(VERSION)
+SPK_BUILD_NUM ?= 0001
+spk:
+	./packaging/synology/build_spk.sh --offline --arch "$(SPK_ARCH)" --version "$(SPK_VERSION)" --build-num "$(SPK_BUILD_NUM)"
+
+# 同时构建 x86_64 与 armv8 两个架构的离线全量套件。
+spk-all:
+	./packaging/synology/build_spk.sh --offline --arch x86_64 --version "$(SPK_VERSION)" --build-num "$(SPK_BUILD_NUM)"
+	./packaging/synology/build_spk.sh --offline --arch armv8 --version "$(SPK_VERSION)" --build-num "$(SPK_BUILD_NUM)"
+
+# 构建轻量在线拉取版套件（体积约 100 KB）。
+spk-online:
+	./packaging/synology/build_spk.sh --online --arch "$(SPK_ARCH)" --version "$(SPK_VERSION)" --build-num "$(SPK_BUILD_NUM)"
 
 # 发布必须显式给出完整目标，例如：
 # make push IMAGE=iosbackup TAG=$(IOSBK_VERSION) PUBLISH_IMAGE=ghcr.io/example/iosbackup:$(IOSBK_VERSION)
