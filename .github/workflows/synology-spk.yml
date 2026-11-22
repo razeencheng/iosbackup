@@ -5,10 +5,10 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Published release version tag to bundle (e.g. v1.5.6)"
+        description: "Published release version tag to bundle (e.g. v1.5.7)"
         required: true
         type: string
-        default: "v1.5.6"
+        default: "v1.5.7"
       build_num:
         description: "4-digit Synology SPK build number (e.g. 0001)"
         required: true

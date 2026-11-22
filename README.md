@@ -104,6 +104,8 @@ See [Operations](docs/OPERATIONS.md) for detailed troubleshooting.
 
 ## Version history
 
+v1.5.7 adds self-contained offline Synology DSM 7.2+ `.spk` release packages (`x86_64` and `armv8`) with an interactive install/upgrade wizard, and upgrades the Go toolchain to 1.27.4. See the [release notes](CHANGELOG.md#v157).
+
 v1.5.6 fixes history imports with large metadata, adds a configurable plist parsing limit, improves failed-import retry and diagnostics, and preserves complete online CSV records. See the [release notes](CHANGELOG.md#v156).
 
 v1.5.5 adds backup history, complete exports, offline browsing and checks, with improved backup controls, localization, notifications, and deployment timezone support. See the [release notes](CHANGELOG.md#v155).

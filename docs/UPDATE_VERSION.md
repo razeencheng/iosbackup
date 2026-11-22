@@ -26,7 +26,7 @@
 3. 在 GitHub 仓库 Settings → Secrets and variables → Actions 中，添加 Repository variable `DOCKERHUB_USERNAME`，值为 `razeencheng`；添加 Repository secret `DOCKERHUB_TOKEN`，值为访问令牌。令牌不要写入源码、构建参数、日志或聊天。
 4. 发布时两个镜像仓库都必须登录成功。缺少配置、认证失败或 Docker Hub 仓库非公开/不存在时，流程在构建前停止。重试 Release 作业时也需保持令牌有效，该作业会重新登录以更新 `latest`。
 
-一次构建推送两个版本标签，Docker Hub 的 index digest 必须与构建输出一致后才能继续签名。两处均保存 index 的 keyless 签名和各平台 SBOM 证明，并针对准确的标签工作流身份验证。GitHub Release 的九个附件保留 GHCR 规范引用；Docker Hub 验证结果另见 Actions 日志，两边镜像的 index digest 相同。
+一次构建推送两个版本标签，Docker Hub 的 index digest 必须与构建输出一致后才能继续签名。两处均保存 index 的 keyless 签名和各平台 SBOM 证明，并针对准确的标签工作流身份验证。GitHub Release 的供应链证据与群晖离线 `.spk` 附件保留 GHCR 规范引用；Docker Hub 验证结果另见 Actions 日志，两边镜像的 index digest 相同。
 
 跨仓库写入无法保证原子性：推送或更新 `latest` 时，可能一边成功而另一边失败。工作流失败不代表完成双仓库发布；重试前核对两边版本和 `latest` 的摘要，只有两边最终摘要检查均通过才更新 GitHub Latest 标记。重跑构建可能产生新的候选镜像摘要，应保持标签源码提交不变，以成功运行的证据为准。
 
@@ -110,6 +110,6 @@ git diff --check
 
 成功流程构建 `linux/amd64` 与 `linux/arm64` 镜像，记录多架构 index 和各平台 digest，生成每平台 SPDX SBOM 与 BuildKit SLSA provenance，在两个镜像仓库使用 Cosign 签名 index、证明各平台 SBOM，并验证结果。
 
-GitHub Release 正文来自 CHANGELOG；附件包括 **9 个证据文件** ：两份 SBOM、两份 provenance、平台 manifest 列表、index digest、三份 Cosign 验证结果。中间 Actions artifact 另含发布说明，共 10 个文件，当前仅保留 1 天。没有独立 Go 可执行文件或完整镜像 tar 发行附件。
+GitHub Release 正文来自 CHANGELOG；附件包括 **12 个发行文件** ：9 个供应链证据文件（两份 SBOM、两份 provenance、平台 manifest 列表、index digest、三份 Cosign 验证结果）以及 3 个群晖 DSM 7.2+ 离线套件附件（`iosbackup-synology-x86_64.spk`、`iosbackup-synology-armv8.spk` 与 `iosbackup-synology-spk-sha256sums.txt`）。中间 Actions artifact 另含发布说明，共 13 个文件，当前仅保留 1 天。没有独立 Go 可执行文件或裸镜像 tar 发行附件。
 
 发布后按实际 digest 检查两架构镜像及构建身份，保存工作流运行和验证证据；参照用户[升级与回滚](manual/upgrade.zh-CN.md)进行受控验收。同时验证匿名源码访问和匿名镜像拉取；最高正式版本还需核对两个仓库的 `latest` 与版本标签是否均指向同一个多架构 index digest。USB、加密读取、恢复等能力的证据分别记录，未验证项继续按[功能状态](FEATURE_STATUS.zh-CN.md)标注，不能由打包或签名成功推断。

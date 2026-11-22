@@ -2,6 +2,47 @@
 
 This project follows Semantic Versioning. Release dates and source metadata are frozen in [`release/manifest.env`](release/manifest.env); this file does not duplicate the current release date.
 
+## v1.5.7
+
+### English
+
+**v1.5.7 — Offline Synology DSM 7.2+ .spk packages and toolchain security updates**
+
+- **Publish self-contained offline Synology DSM 7.2+ `.spk` packages**: After dual-registry Cosign signing and SBOM attestation verification, the release workflow bundles the digest-verified `linux/amd64` and `linux/arm64` images into `iosbackup-synology-x86_64.spk` and `iosbackup-synology-armv8.spk` alongside `iosbackup-synology-spk-sha256sums.txt` on GitHub Releases. Synology NAS users can install via **Package Center → Manual Install** without outbound access to `ghcr.io` or Docker Hub.
+- **Three-step interactive DSM install and upgrade wizard**: Configure the shared folder (with `/volumeX` detection and free-space display), backup and config subdirectories, Web port, optional reverse-proxy external URL (`pkgwizard_external_url`), administrator password, timezone, log level, minimum free space, heavy-job concurrency, plist parsing limit, private webhook CIDRs, and experimental operations. Upgrades can retain the existing administrator password and recreate the container in place; uninstalling never deletes user shared folders.
+- **Manual `.spk` workflow and local Make targets**: Add the manual `synology-spk.yml` workflow and `make spk` / `make spk-all` / `make spk-online` targets using a standard-library-only registry fetcher with per-layer SHA-256 verification and no local Docker daemon requirement.
+- **Toolchain and documentation updates**: Upgrade the Go toolchain and builder image to `1.27.4`, update pinned GitHub Actions commit SHAs in the release workflow, and refresh bilingual READMEs, screenshots, and Synology manuals.
+
+### Upgrade notes
+
+- Runtime behavior, persistent directory layout, pairing records, and backup formats remain compatible with v1.5.6; no data migration is required.
+- Existing Docker Compose deployments upgrade as usual with `docker compose pull` and `docker compose up -d`.
+- Synology users already running a manual Compose project can keep using it, or stop the manual project first and point Step 1 of the `.spk` wizard at the existing shared folder and subdirectories so two privileged host-network containers do not contend for the same port and USB bus.
+
+### Validation / 验证
+
+- Complete CI suite passed on Go `1.27.4` (unit tests, race detector, `govulncheck`, licensing, supply-chain and release workflow contract checks, and website build checks).
+- Verified offline `.spk` archive layout (`INFO` header ordering, `preload-image` tar structure, ExtJS wizard JSON/regex escaping, `postinst` compose and DSM `ui/config` rendering, custom port and reverse-proxy URL handling, and password retention across upgrades) on DSM 7.2+ Container Manager as well as automated lifecycle tests.
+
+### 中文
+
+**v1.5.7 — 群晖 DSM 7.2+ 离线 .spk 套件发布与工具链安全基线升级**
+
+- **新增群晖 DSM 7.2+ 离线 `.spk` 安装包发布**：发布流程在完成双仓库镜像签名与供应链证明校验后，按已校验的平台 manifest 摘要（`linux/amd64` 与 `linux/arm64`）将镜像直接内嵌封装为 `iosbackup-synology-x86_64.spk`、`iosbackup-synology-armv8.spk` 及 `iosbackup-synology-spk-sha256sums.txt`，随 GitHub Release 一并发布。群晖 NAS 在“套件中心 → 手动安装”上传对应架构 `.spk` 即可离线完成导入与部署，全程无需 NAS 联网访问 `ghcr.io` 或 Docker Hub。
+- **三步交互式安装与升级向导**：支持在向导中直接配置共享文件夹名称（自动探测 `/volumeX` 挂载卷及可用空间）、备份与配置子目录、Web 端口、反向代理外部访问地址（`pkgwizard_external_url`）、管理员密码、时区、日志级别、最低预留空间、最大并发备份数、plist 解析上限、内网 Webhook CIDR 及实验性操作开关；升级时支持保留现有管理员密码并自动重建容器生效，卸载时绝不删除用户共享文件夹。
+- **手动 `.spk` 打包工作流与本地构建目标**：新增 `synology-spk.yml` 手动工作流及 `make spk` / `make spk-all` / `make spk-online` 构建目标，仅依赖 Go 标准库拉取镜像并逐层校验 SHA-256 摘要，无需本机运行 Docker 守护进程。
+- **工具链与文档维护**：将 Go 工具链及构建基础镜像升级至 `1.27.4`，同步更新发布工作流固定的 GitHub Actions 提交哈希，并完善中英文 README、截图与群晖安装手册。
+
+### 升级须知
+
+- 应用运行时行为、持久化目录结构、配对记录及备份格式与 v1.5.6 完全兼容，无需数据迁移。
+- 已有 Docker Compose 部署继续执行 `docker compose pull` 与 `docker compose up -d` 升级。
+- 已在群晖通过手动 Compose 运行的用户可继续沿用现有方式；若改用 `.spk` 套件，请先停用原有手动 Compose 项目，并在安装向导第 1 步填写原有共享文件夹与子目录以复用既有数据，避免两个特权 `host` 网络容器同时占用端口与 USB 总线。
+
+**Related / 关联**: [#31](https://github.com/razeencheng/iosbackup/pull/31), [#32](https://github.com/razeencheng/iosbackup/pull/32), [#33](https://github.com/razeencheng/iosbackup/pull/33).
+
+**Full changelog / 完整变更**: https://github.com/razeencheng/iosbackup/compare/v1.5.6...v1.5.7
+
 ## v1.5.6
 
 ### 中文
