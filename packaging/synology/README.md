@@ -1,20 +1,20 @@
 # 群晖 DSM 套件（`.spk`）构建与安装说明
 
-本目录提供适用于 **群晖 DSM 7.2+（Container Manager）** 的 `.spk` 套件打包脚手架，默认封装最新发布版本 **`v1.5.6`** 的**内置离线 Docker 镜像全量 `.spk`**（NAS 全程无需联网访问 `ghcr.io` 即可完成安装），并在安装与升级向导中提供完整的目录、端口与高级运行参数配置。
+本目录提供适用于 **群晖 DSM 7.2+（Container Manager）** 的 `.spk` 套件打包脚手架，默认读取 [`release/manifest.env`](../../release/manifest.env) 中的发布版本封装**内置离线 Docker 镜像全量 `.spk`**（NAS 全程无需联网访问 `ghcr.io` 即可完成安装），并在安装与升级向导中提供完整的目录、端口与高级运行参数配置。
 
 ## 1. 构建 `.spk`
 
 无需在本机启动 Docker 守护进程或安装群晖重型交叉编译工具链，打包工具会直接通过 Go 标准库从镜像仓库拉取并逐层校验 SHA-256 摘要，封装为 Container Manager 原生支持的 `preload-image` 离线归档：
 
 ```bash
-# 构建 x86_64 离线全量套件（默认 v1.5.6，输出至 ./dist/iosbackup-x86_64-1.5.6-0004.spk）
+# 构建 x86_64 离线全量套件（默认跟随 release/manifest.env 版本，输出至 ./dist/）
 make spk
 
 # 一次性构建 x86_64 与 armv8 两个架构的离线全量套件
 make spk-all
 
-# 如需指定其它版本或本地已导出的镜像 tar/tar.gz
-./packaging/synology/build_spk.sh --arch x86_64 --version v1.5.6
+# 如需指定其它已发布版本或本地已导出的镜像 tar/tar.gz
+./packaging/synology/build_spk.sh --arch x86_64 --version v1.5.7
 ./packaging/synology/build_spk.sh --arch x86_64 --image-tar /path/to/image.tar.gz
 
 # 构建不含镜像的在线轻量包（约 100 KB）
